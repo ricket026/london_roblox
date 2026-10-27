@@ -155,8 +155,9 @@ function Chess.init(_activities: any)
 	header = label(-8, 20)
 	statusLabel = label(6, 22)
 	resign = Instance.new("TextButton")
-	resign.AnchorPoint = Vector2.new(0.5, 0)
-	resign.Position = UDim2.new(0.5, 0, 1, 42)
+	-- beside the board's bottom-right corner: below it would fall off a 360 px tall phone screen
+	resign.AnchorPoint = Vector2.new(0, 1)
+	resign.Position = UDim2.new(1, 12, 1, 0)
 	resign.Size = UDim2.fromOffset(140, 38)
 	resign.BackgroundColor3 = Color3.fromRGB(60, 52, 42)
 	resign.Font = Enum.Font.Garamond

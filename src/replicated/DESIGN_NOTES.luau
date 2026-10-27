@@ -24,6 +24,9 @@ STATUS
   2026-10-27  Second review: role cooldown cleared on character switch, saved looks repaired
               against Config on load, one free rename within Config.NAME_FIX_GRACE of creation,
               skin swatch outline (UIStroke Border mode), character menu retries its first List.
+  2026-10-27  Third review (+ scripted checks: block/bracket balance, Module.field references,
+              client/server remote contracts, unused locals - all clean). Bell threshold 95 -> 85
+              (window was ~35 ms per sweep), strength meter and chess Resign fit phone screens.
 
 MODULES
   ReplicatedStorage.Shared

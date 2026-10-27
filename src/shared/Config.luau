@@ -176,7 +176,7 @@ Config.STRENGTH_SITE = { x = -140, z = -1318 }
 Config.STRENGTH_SWINGS = 3 -- swings per go
 Config.STRENGTH_PERIOD = { min = 0.9, max = 1.3 } -- seconds for the meter to sweep up and down
 Config.STRENGTH_TIMEOUT = 25 -- seconds a go may last before it ends itself
-Config.STRENGTH_BELL = 95 -- score (0-100) that rings the bell
+Config.STRENGTH_BELL = 85 -- score (0-100) that rings the bell: ~90-125 ms per sweep with Shared.Meter (95 was ~35 ms, near impossible)
 Config.STRENGTH_POLE = 22 -- studs from the base to the bell
 Config.STRENGTH_PAY_BELL = 2 -- pence per bell rung
 Config.STRENGTH_XP = { base = 4, perTen = 1 } -- Sport XP per go: base + best score / 10 * perTen

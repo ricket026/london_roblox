@@ -44,10 +44,14 @@ function Strength.init(_activities: any)
 	gui.Name = "StrengthMeter"
 	gui.ResetOnSpawn = false
 	gui.Enabled = false
+	-- Everything stays within ~130 px of the centre: a landscape phone is ~360 px tall.
 	local bar = Instance.new("Frame")
 	bar.AnchorPoint = Vector2.new(1, 0.5)
 	bar.Position = UDim2.new(0.5, -110, 0.5, 0)
-	bar.Size = UDim2.fromOffset(40, 300)
+	bar.Size = UDim2.new(0, 40, 0.7, 0)
+	local barLimit = Instance.new("UISizeConstraint")
+	barLimit.MaxSize = Vector2.new(40, 300)
+	barLimit.Parent = bar
 	bar.BackgroundColor3 = Color3.fromRGB(40, 34, 28)
 	bar.BorderSizePixel = 0
 	bar.Parent = gui
@@ -64,9 +68,10 @@ function Strength.init(_activities: any)
 	marker.BorderSizePixel = 0
 	marker.Parent = bar
 	info = Instance.new("TextLabel")
-	info.AnchorPoint = Vector2.new(0.5, 0)
-	info.Position = UDim2.new(0.5, 0, 0.5, 160)
-	info.Size = UDim2.fromOffset(360, 50)
+	info.AnchorPoint = Vector2.new(0, 1)
+	info.Position = UDim2.new(0.5, -90, 0.5, -6)
+	info.Size = UDim2.fromOffset(320, 50)
+	info.TextXAlignment = Enum.TextXAlignment.Left
 	info.BackgroundTransparency = 1
 	info.Font = Enum.Font.Garamond
 	info.TextSize = 24
@@ -74,8 +79,8 @@ function Strength.init(_activities: any)
 	info.TextStrokeTransparency = 0.5
 	info.Parent = gui
 	local button = Instance.new("TextButton")
-	button.AnchorPoint = Vector2.new(0.5, 0)
-	button.Position = UDim2.new(0.5, 0, 0.5, 215)
+	button.AnchorPoint = Vector2.new(0, 0)
+	button.Position = UDim2.new(0.5, -90, 0.5, 6)
 	button.Size = UDim2.fromOffset(180, 56)
 	button.BackgroundColor3 = Color3.fromRGB(150, 40, 35)
 	button.Font = Enum.Font.GaramondBold
