@@ -158,14 +158,19 @@ keep the scripts you touch to the list (or say why), run `tools/check_luau.py`, 
 - Arrival cinematic (skippable) → character creator (exists) → rules card → pick a starter job
   with a 60-second guided task → first pay → "Next steps" goals list. Log each funnel step.
 
-### T26 · Wave-1 activities ⬜ (one task each; all use the framework in `Activities/init.luau`)
-**Specs** ACTIVITIES §2. Suggested order (busiest hubs first):
-croquet · rowing on the lake · bandstand concert (rhythm, tips) · Rotten Row "best dressed"
-vote · picnic · music hall stage · busking · flower selling · tea room · carousel & swing boats
-(ride) · coconut shy · fishing on the Embankment · curiosities hunt (100 hidden curios) ·
-bicycle race (needs T14) · waltz & quadrille (needs emotes, T05).
-Each: site from map coordinates in Config, rewards via `A.reward`, a board via `A.board`,
-collection entries in `Shared.Collection`, phone-sized UI.
+### T26 · Activities ⬜ (one task per activity)
+**Specs** `activities/` (a full design per activity: site, rules, controls, rewards, checks,
+"done when"). Follow the build order in `activities/README.md`:
+1. **T26a framework pieces** F5 controls kit, F1 lobby, F2 rounds, F9 thrown things (then F3, F4,
+   F6–F8, F11 as activities need them; `activities/framework.md`).
+2. **Batch A** (framework only): coconut shy, hoop-la, croquet, fishing, curiosities hunt, rowing,
+   carousel & swing boats, Rotten Row promenade, kite flying, model boats, cricket nets, and the
+   follow-ups for ducks, strength, mudlarking and chess (+ draughts).
+3. **Batch B** (🔒 sounds/animations from the user): bandstand, music hall, busking, waltz, piano,
+   Punch & Judy.
+4. **Batch C** (needs other systems): races, regatta, sports day, tea room, flower selling, picnic,
+   auction, photography, detective mysteries, allotments, ice skating, balloon.
+Mark progress in the table in `activities/README.md`.
 
 ### T27 · Collection book UI ⬜ · **Specs** ACTIVITIES §4 · Pages from `Collection.PAGES`, found/missing, page rewards.
 ### T28 · Hobby level rewards ⬜ · **Specs** ACTIVITIES §3 · Cosmetic per level (ribbons, title tags) + unlocks.

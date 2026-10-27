@@ -1,5 +1,8 @@
 # Side activities & minigames spec
 
+> Detailed per-activity designs (sites, rules, controls, rewards, build steps) are in
+> [`activities/`](activities/README.md); this page stays the overview.
+
 The user wants **a ton** of side activities (2026-10-24). They're what players do between jobs
 and RP, and the main way to keep hubs busy (PLAYER_GATHERING §2).
 
