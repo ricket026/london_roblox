@@ -10,6 +10,7 @@ local Text = require(Shared:WaitForChild("Text"))
 
 require(script:WaitForChild("IdentityUI")).init()
 require(script:WaitForChild("ClockHUD")).init()
+require(script:WaitForChild("Activities")).init()
 
 local State = { pence = 0, bank = 0 }
 

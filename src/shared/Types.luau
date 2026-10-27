@@ -14,6 +14,9 @@ export type Profile = {
 	licences: { cab: boolean, omnibus: boolean, motor: boolean },
 	record: { arrests: number, warnings: { any }, mutedUntil: number },
 	settings: { [string]: any },
+	hobbies: { [string]: number }, -- hobby -> XP (Shared.Hobbies)
+	collection: { [string]: number }, -- Shared.Collection id -> times found
+	bests: { [string]: number }, -- activity id -> personal best score
 	firstJoin: number,
 	playtime: number, -- seconds
 }

@@ -12,11 +12,15 @@ STATUS
               not the scripts in Studio, or the next Rojo sync overwrites the Studio edits.
               M1 identity started: names, roles + seats, overhead tags, world clock (not yet
               Play-tested).
+  2026-10-27  Activity framework + the 4 proving activities from ACTIVITIES §5 (ducks, test your
+              strength, mudlarking, chess). Not yet Play-tested. Shared.Chess passes perft
+              (start d3, Kiwipete d2, pos3 d3) in a line-for-line port; promotion is queen-only.
 
 MODULES
   ReplicatedStorage.Shared
     Config   every tunable, commented.
-    Types    Profile (schema v1, TECH §5.1 incl. vehicles/licences, + record.mutedUntil), LogEntry.
+    Types    Profile (schema v1, TECH §5.1 incl. vehicles/licences, + record.mutedUntil,
+             + hobbies/collection/bests from the activities; reconcile fills them in), LogEntry.
     Roles    Roles.ACTIONS table + Roles.can(player, action, target?). M0 input = staff level
              (attribute "StaffLevel", set by the server from group rank / Config lists).
     Net      Remotes/<Domain>Event + <Domain>Fn. Net.handle(domain, action, spec, fn) with
@@ -40,14 +44,24 @@ MODULES
              per-server station role (Shared.Stations: open / claim with seats + playtime /
              appoint / throne). Attributes RPName, Role. Server BillboardGui "RPTag" on the Head.
              Remotes Identity.Get / SetName / ChooseRole; pushes State, Seats.
+    Activities  framework (claim/release one activity at a time, reward with the hourly pay cap
+             Config.ACTIVITY_PAY_PER_HOUR, hobby XP + levels, collection, per-server daily
+             boards + profile bests) and children Ducks, Strength, Mudlark, Chess, each built
+             in workspace.Activities from Config coordinates (Y by raycast). Remotes:
+             Activity.StrengthSwing / ChessMove / ChessResign.
     WorldClock (M1) shared clock from server time (Config.DAY_MINUTES), drives Lighting.ClockTime,
              Lighting attr "Phase", WorldClock.PhaseChanged for lamplighters (M3).
   ReplicatedStorage.Shared (M1 additions)
     Stations every role, its station, claim rule, seats, playtime gate.
     Names    name rules + period name suggestions.
+    Collection  collection book items (birds, mudlark finds) + weighted roll for free finds.
+    Hobbies  hobby XP -> level (Config.HOBBY_XP_*).
+    Chess    full chess rules (server authority, client move hints).
+    Meter    timing meter curve shared by client and server.
   StarterPlayerScripts.LondonClient  wallet state + staff notices into RBXSystem chat.
     IdentityUI (stub) name picker on first join, "Station" role menu bottom-left.
     ClockHUD   (stub) "6:45 pm · Dusk" at the top.
+    Activities (stub) reward toasts + Strength meter + Chess board for seated players.
   ReplicatedFirst.LoadingScreen       stub title card until "ProfileLoaded".
 
 STAFF

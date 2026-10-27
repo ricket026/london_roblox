@@ -109,4 +109,60 @@ Config.CLOCK_PHASES = { -- in-game hour each phase starts (lamplighters: JOBS §
 	{ name = "Night", hour = 20 },
 }
 
+-- Activities (LondonServer.Activities, systems/ACTIVITIES.md) ----------------
+-- Sites are greybox map coordinates (map_layout_v2.json); Y comes from a raycast to the ground.
+Config.ACTIVITY_PAY_PER_HOUR = 120 -- pence all activities together may pay a player per real hour (10s; jobs pay more, §1)
+Config.ACTIVITY_BOARD_SIZE = 5 -- names shown on each site's "Today in this server" board
+Config.HOBBIES = { "Sport", "Music", "Performance", "Outdoors", "Collecting", "Games" } -- ACTIVITIES §3
+Config.HOBBY_MAX_LEVEL = 10
+Config.HOBBY_XP_BASE = 100 -- XP to reach level n = BASE * (n - 1) ^ EXP (l2 100, l5 800, l10 2700)
+Config.HOBBY_XP_EXP = 1.5
+
+-- Feeding the ducks & pigeons (St James's Park lake)
+Config.DUCKS_SITE = { x = 282, z = -330 } -- west shore of the lake, a short walk from the bandstand
+Config.DUCKS_LAKE = { cx = 330, cz = -470, rx = 55, rz = 280, surface = -1 } -- same as map_layout_v2 water.lake
+Config.DUCKS_SEED_PRICE = 1 -- pence per bag of seed (ACTIVITIES §2)
+Config.DUCKS_COOLDOWN = 15 -- seconds between feeds per player
+Config.DUCKS_BIRDS = 6 -- water birds that come per feed
+Config.DUCKS_PIGEONS = 3 -- pigeons that land at your feet per feed
+Config.DUCKS_STAY = 12 -- seconds the birds stay before leaving
+Config.DUCKS_MAX_LIVE = 48 -- cap on birds in the world at once
+Config.DUCKS_XP = 4 -- Outdoors XP per feed
+-- Which bird comes depends on the time of day, not chance (no paid chance, §1).
+Config.DUCKS_SPECIES = { -- first match wins; hours are in-game
+	{ id = "bird_pelican", from = 14, to = 15 }, -- the park's pelicans are fed at half past two
+	{ id = "bird_swan", from = 5, to = 7 },
+	{ id = "bird_mallard", from = 0, to = 24 },
+}
+
+-- Test your strength (fairground, Covent Garden)
+Config.STRENGTH_SITE = { x = -140, z = -1318 }
+Config.STRENGTH_SWINGS = 3 -- swings per go
+Config.STRENGTH_PERIOD = { min = 0.9, max = 1.3 } -- seconds for the meter to sweep up and down
+Config.STRENGTH_TIMEOUT = 25 -- seconds a go may last before it ends itself
+Config.STRENGTH_BELL = 95 -- score (0-100) that rings the bell
+Config.STRENGTH_POLE = 22 -- studs from the base to the bell
+Config.STRENGTH_PAY_BELL = 2 -- pence per bell rung
+Config.STRENGTH_XP = { base = 4, perTen = 1 } -- Sport XP per go: base + best score / 10 * perTen
+Config.STRENGTH_RANGE = 14 -- studs a swinger may stand from the machine
+Config.STRENGTH_BELL_SOUND = "" -- rbxassetid for the bell; "" = silent (pick one from the audio library)
+
+-- Mudlarking (Thames foreshore below the Temple)
+Config.MUDLARK_AREA = { x = { 1154, 1182 }, z = { -1745, -2100 } } -- inside map_layout_v2 water.foreshore
+Config.MUDLARK_GLINTS = 10 -- glints on the foreshore at once (shared: first to dig gets it)
+Config.MUDLARK_RESPAWN = { min = 8, max = 20 } -- seconds before a dug glint reappears elsewhere
+Config.MUDLARK_DIG_SECONDS = 2 -- hold time on a glint
+Config.MUDLARK_XP = 6 -- Collecting XP per find
+Config.TIDE_LOW = { { from = 0, to = 6 }, { from = 12, to = 18 } } -- in-game hours of low tide (2 x 6 real min a day)
+
+-- Chess (outdoor tables by the bandstand)
+Config.CHESS_TABLES = { { x = 140, z = -330 }, { x = 140, z = -352 }, { x = 118, z = -341 } }
+Config.CHESS_MOVE_TIMEOUT = 120 -- seconds the side to move has before losing on time
+Config.CHESS_MIN_PLIES = 10 -- half-moves before a game pays out (stops instant-resign farming)
+Config.CHESS_PAY = { win = 6, draw = 3, loss = 0 } -- pence
+Config.CHESS_XP = { win = 30, draw = 20, loss = 15 } -- Games XP
+Config.CHESS_START_DELAY = 3 -- seconds after both sit before the first move
+-- Board glyphs; swap for letters ("K", "Q"...) if a device lacks the chess font.
+Config.CHESS_GLYPHS = { K = "♚", Q = "♛", R = "♜", B = "♝", N = "♞", P = "♟" }
+
 return Config

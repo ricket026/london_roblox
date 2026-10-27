@@ -50,6 +50,9 @@ function Profiles.defaults(): Profile
 		licences = { cab = false, omnibus = false, motor = false },
 		record = { arrests = 0, warnings = {}, mutedUntil = 0 },
 		settings = {},
+		hobbies = {},
+		collection = {},
+		bests = {},
 		firstJoin = os.time(),
 		playtime = 0,
 	}
