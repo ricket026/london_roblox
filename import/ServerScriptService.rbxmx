@@ -2664,8 +2664,7 @@ local function label(parent: Instance, name: string, y: number, h: number, bold:
 end
 
 local function refreshTag(player: Player)
-	local head = player.Character and player.Character:FindFirstChild("Head")
-	local tag = head and head:FindFirstChild("RPTag")
+	local tag = player.Character and player.Character:FindFirstChild("RPTag")
 	if not tag then
 		return
 	end
@@ -2677,16 +2676,14 @@ local function refreshTag(player: Player)
 	role.Text = if r and r.id ~= Config.DEFAULT_ROLE then r.name else ""
 end
 
+-- The tag lives on the character, not the Head: applying a HumanoidDescription swaps the
+-- Head part, which would delete a tag parented to it. It re-points at each new Head.
 local function buildTag(player: Player, character: Model)
-	local head = character:WaitForChild("Head", 10)
-	local humanoid = character:FindFirstChildOfClass("Humanoid")
-	if not head or not head:IsA("BasePart") then
-		return
-	end
-	if humanoid then
+	local humanoid = character:WaitForChild("Humanoid", 10)
+	if humanoid and humanoid:IsA("Humanoid") then
 		humanoid.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
 	end
-	local old = head:FindFirstChild("RPTag")
+	local old = character:FindFirstChild("RPTag")
 	if old then
 		old:Destroy()
 	end
@@ -2698,8 +2695,20 @@ local function buildTag(player: Player, character: Model)
 	bb.LightInfluence = 0
 	label(bb, "RPName", 0, 0.6, true)
 	label(bb, "RPRole", 0.6, 0.4, false)
-	bb.Adornee = head
-	bb.Parent = head
+	local function adorn()
+		local head = character:FindFirstChild("Head")
+		if head and head:IsA("BasePart") then
+			bb.Adornee = head
+		end
+	end
+	character:WaitForChild("Head", 10)
+	adorn()
+	character.ChildAdded:Connect(function(child)
+		if child.Name == "Head" then
+			adorn()
+		end
+	end)
+	bb.Parent = character
 	refreshTag(player)
 end
 
