@@ -4,7 +4,8 @@
 -- and builds its own site in workspace.Activities from greybox coordinates in Config.
 -- The framework gives every activity:
 --   A.claim / A.release / A.current   one activity at a time per player
---   A.reward(player, opts)            pence (capped per hour), hobby XP + level-ups, collection
+--   A.reward(player, opts)            pence (capped per hour, saved so server hops don't reset it),
+--                                     hobby XP + level-ups (active character), collection (account)
 --   A.score(id, player, n, mode)      per-server daily board + saved personal best
 --   A.board(id, title, unit, cframe)  a site board showing today's top names in this server
 --   A.ground, A.part, A.prompt, A.notice   building and messaging helpers
@@ -20,9 +21,11 @@ local Hobbies = require(Shared:WaitForChild("Hobbies"))
 local Collection = require(Shared:WaitForChild("Collection"))
 local Profiles = require(script.Parent:WaitForChild("Profiles"))
 local Analytics = require(script.Parent:WaitForChild("Analytics"))
+local Characters = require(script.Parent:WaitForChild("Characters"))
 
 local A = {}
 A.MODULES = { "Ducks", "Strength", "Mudlark", "Chess" }
+local leaveFns: { (Player) -> () } = {} -- each module's optional leave(player)
 
 export type RewardOpts = {
 	activity: string, -- activity id, for analytics
@@ -34,7 +37,6 @@ export type RewardOpts = {
 
 local root: Folder
 local busy: { [Player]: string } = {}
-local payWindow: { [Player]: { t: number, paid: number } } = {}
 type BoardEntry = { userId: number, name: string, score: number }
 local boards: { [string]: { title: string, unit: string, rows: { BoardEntry }, labels: { TextLabel } } } = {}
 local boardDay = os.date("!%Y%m%d")
@@ -65,34 +67,35 @@ function A.notice(player: Player, text: string)
 	Net.push(player, "Activity", "Notice", { text = text })
 end
 
--- Pence this player may still earn from activities this hour.
-local function payRoom(player: Player): number
-	local w = payWindow[player]
-	local now = os.clock()
-	if not w or now - w.t >= 3600 then
-		w = { t = now, paid = 0 }
-		payWindow[player] = w
+-- Pence this player may still earn from activities this hour (window kept in the profile).
+local function payRoom(p: any): number
+	local lim = p.limits
+	local now = os.time()
+	if now - lim.activityWindow >= 3600 then
+		lim.activityWindow = now
+		lim.activityPaid = 0
 	end
-	return math.max(0, Config.ACTIVITY_PAY_PER_HOUR - w.paid)
+	return math.max(0, Config.ACTIVITY_PAY_PER_HOUR - lim.activityPaid)
 end
 
 function A.reward(player: Player, opts: RewardOpts)
 	local p = Profiles.get(player)
-	if not p then
-		return
+	local prog = Profiles.progress(player)
+	if not p or not prog then
+		return -- at the character menu: nothing to reward
 	end
 	local msg: { [string]: any } = { activity = opts.activity }
-	local pence = math.min(math.floor(opts.pence or 0), payRoom(player))
+	local pence = math.min(math.floor(opts.pence or 0), payRoom(p))
 	if pence > 0 and Profiles.addPence(player, pence) then
-		payWindow[player].paid += pence
+		p.limits.activityPaid += pence
 		msg.pence = Money.format(pence)
 	elseif (opts.pence or 0) > 0 then
 		msg.capped = true -- the hourly activity cap is reached; XP and finds still count
 	end
 	if opts.hobby and Hobbies.isHobby(opts.hobby) and (opts.xp or 0) > 0 then
-		local before = p.hobbies[opts.hobby] or 0
+		local before = prog.hobbies[opts.hobby] or 0
 		local after = before + math.floor(opts.xp :: number)
-		p.hobbies[opts.hobby] = after
+		prog.hobbies[opts.hobby] = after
 		msg.hobby = opts.hobby
 		msg.xp = after - before
 		msg.level = Hobbies.level(after)
@@ -140,9 +143,9 @@ end
 -- mode "max": keep each player's best; "sum": add up (e.g. wins today).
 function A.score(id: string, player: Player, n: number, mode: string)
 	rollDay()
-	local p = Profiles.get(player)
-	if p and mode == "max" and n > (p.bests[id] or -math.huge) then
-		p.bests[id] = n
+	local prog = Profiles.progress(player)
+	if prog and mode == "max" and n > (prog.bests[id] or -math.huge) then
+		prog.bests[id] = n
 	end
 	local b = boards[id]
 	if not b then
@@ -171,8 +174,9 @@ end
 
 -- A notice board facing along cframe.LookVector, showing today's top names in this server.
 function A.board(id: string, title: string, unit: string, cframe: CFrame)
-	local part = A.part({ Name = "Board", Size = Vector3.new(7, 5, 0.4), CFrame = cframe * CFrame.new(0, 3.5, 0), Color = Color3.fromRGB(70, 48, 30), Material = Enum.Material.Wood })
-	A.part({ Name = "Post", Size = Vector3.new(0.4, 3.5, 0.4), CFrame = cframe * CFrame.new(0, 1.0, 0.4), Color = Color3.fromRGB(50, 34, 22), Material = Enum.Material.Wood }).Parent = part
+	-- 9 x 6.5 studs at 40 px/stud = 360 x 260 px: title + subtitle + 5 rows need 246 px
+	local part = A.part({ Name = "Board", Size = Vector3.new(9, 6.5, 0.4), CFrame = cframe * CFrame.new(0, 4.25, 0), Color = Color3.fromRGB(70, 48, 30), Material = Enum.Material.Wood })
+	A.part({ Name = "Post", Size = Vector3.new(0.4, 4.25, 0.4), CFrame = cframe * CFrame.new(0, 2.125, 0.4), Color = Color3.fromRGB(50, 34, 22), Material = Enum.Material.Wood }).Parent = part
 	local gui = Instance.new("SurfaceGui")
 	gui.Face = Enum.NormalId.Front
 	gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
@@ -210,7 +214,8 @@ local rayParams = RaycastParams.new()
 rayParams.FilterType = Enum.RaycastFilterType.Exclude
 
 -- Ground point under (x, z), ignoring map markers, characters and other activity props.
-function A.ground(x: number, z: number): Vector3
+-- fromY: start the ray lower to look under something (a bridge deck over the foreshore).
+function A.ground(x: number, z: number, fromY: number?): Vector3
 	local skip: { Instance } = { root }
 	local map = workspace:FindFirstChild("Map")
 	if map then
@@ -227,8 +232,9 @@ function A.ground(x: number, z: number): Vector3
 		end
 	end
 	rayParams.FilterDescendantsInstances = skip
-	local hit = workspace:Raycast(Vector3.new(x, 300, z), Vector3.new(0, -600, 0), rayParams)
-	return if hit then hit.Position else Vector3.new(x, 0, z)
+	local top = fromY or 300
+	local hit = workspace:Raycast(Vector3.new(x, top, z), Vector3.new(0, -top - 300, 0), rayParams)
+	return if hit then hit.Position else Vector3.new(x, math.min(top, 0), z)
 end
 
 -- Anchored part with properties; parent defaults to nothing (set .Parent or use A.site).
@@ -273,7 +279,6 @@ end
 
 function A.onPlayerRemoving(player: Player)
 	busy[player] = nil
-	payWindow[player] = nil
 end
 
 function A.init()
@@ -283,12 +288,23 @@ function A.init()
 	Net.domain("Activity")
 	for _, name in A.MODULES do
 		local ok, err = pcall(function()
-			require(script:WaitForChild(name) :: ModuleScript).init(A)
+			local m = require(script:WaitForChild(name) :: ModuleScript)
+			m.init(A)
+			if m.leave then
+				table.insert(leaveFns, m.leave)
+			end
 		end)
 		if not ok then
 			warn(string.format("[Activities] %s failed to start: %s", name, tostring(err)))
 		end
 	end
+	-- Switching or deleting the character ends whatever they were doing, rewarded to the old one.
+	Characters.onBeforeChange(function(player)
+		for _, fn in leaveFns do
+			fn(player)
+		end
+		busy[player] = nil
+	end)
 end
 
 return A

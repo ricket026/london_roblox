@@ -1,9 +1,10 @@
 --!strict
--- LondonServer.Identity: RP names, station roles and overhead tags (M1, DESIGN §5-6.1).
--- Names are saved in the profile (filtered, cooldown after the first pick). Roles are per
--- server (Q4): held in memory, with seat limits and playtime gates from Shared.Stations.
+-- LondonServer.Identity: station roles and overhead tags (M1, DESIGN §5-6.1). RP names come
+-- from the character being played (LondonServer.Characters sets RPName). Roles are per server
+-- (Q4): held in memory, with seat limits and playtime gates from Shared.Stations, and reset to
+-- Config.DEFAULT_ROLE whenever the player switches character.
 -- Player attributes (read by tags, Roles.roleOf and the client): RPName, Role.
--- Remotes (Identity domain, calls): Get, SetName { first, last }, ChooseRole { role }.
+-- Remotes (Identity domain, calls): Get, ChooseRole { role }.
 -- Pushes: Identity.State (to one player), Identity.Seats (to everyone, on any seat change).
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -12,11 +13,8 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared:WaitForChild("Config"))
 local Net = require(Shared:WaitForChild("Net"))
 local Roles = require(Shared:WaitForChild("Roles"))
-local Text = require(Shared:WaitForChild("Text"))
-local Names = require(Shared:WaitForChild("Names"))
 local Stations = require(Shared:WaitForChild("Stations"))
 local Profiles = require(script.Parent:WaitForChild("Profiles"))
-local Analytics = require(script.Parent:WaitForChild("Analytics"))
 
 local V = Net.V
 local Identity = {}
@@ -38,21 +36,9 @@ local function seatCounts(): { [string]: number }
 	return out
 end
 
-local function nameCooldownLeft(player: Player): number
-	local p = Profiles.get(player)
-	if not p or p.name.first == "" then
-		return 0
-	end
-	return math.max(0, Config.NAME_CHANGE_COOLDOWN - (os.time() - p.name.changedAt))
-end
-
 local function state(player: Player): { [string]: any }
-	local p = Profiles.get(player)
 	return {
-		first = if p then p.name.first else "",
-		last = if p then p.name.last else "",
-		needsName = rpName(player) == nil,
-		nameCooldown = nameCooldownLeft(player),
+		hasCharacter = rpName(player) ~= nil,
 		role = Roles.roleOf(player),
 		roleCooldown = math.max(0, Config.ROLE_SWITCH_COOLDOWN - (os.clock() - (switchedAt[player] or -math.huge))),
 		playtime = Profiles.playtime(player),
@@ -152,8 +138,8 @@ function Identity.canTake(player: Player, roleId: string): string?
 	if Roles.roleOf(player) == roleId then
 		return "You already hold that role."
 	end
-	if roleId ~= Config.DEFAULT_ROLE and not rpName(player) then
-		return "Choose your name first."
+	if not rpName(player) then
+		return "Choose a character first."
 	end
 	local since = os.clock() - (switchedAt[player] or -math.huge)
 	if since < Config.ROLE_SWITCH_COOLDOWN then
@@ -168,54 +154,18 @@ function Identity.canTake(player: Player, roleId: string): string?
 	return nil
 end
 
--- Names ---------------------------------------------------------------------------
--- Returns the full name, or nil and a reason.
-function Identity.setName(player: Player, first: any, last: any): (string?, string?)
-	local p = Profiles.get(player)
-	if not p then
-		return nil, "Your profile isn't loaded yet."
+-- Lifecycle --------------------------------------------------------------------------
+-- Back to the default role (frees any limited seat). Called when the character changes, so
+-- a seat earned as one character isn't carried into another.
+function Identity.resetRole(player: Player)
+	if Roles.roleOf(player) ~= Config.DEFAULT_ROLE or player:GetAttribute(Roles.ROLE_ATTR) == nil then
+		setRole(player, Config.DEFAULT_ROLE)
 	end
-	local left = nameCooldownLeft(player)
-	if left > 0 then
-		return nil, string.format("You can change your name again in %d days.", math.ceil(left / 86400))
-	end
-	local f, whyF = Names.cleanPart(first)
-	if not f then
-		return nil, whyF
-	end
-	local l, whyL = Names.cleanPart(last)
-	if not l then
-		return nil, whyL
-	end
-	if Names.isBlocked(f, l) then
-		return nil, "That's a real person's name. Please pick a fictional one."
-	end
-	local full = f .. " " .. l
-	local filtered = Text.filterBroadcast(full, player.UserId)
-	if filtered == nil then
-		return nil, "The name check isn't answering. Please try again."
-	end
-	if filtered ~= full then
-		return nil, "That name isn't allowed. Please pick another."
-	end
-	local firstPick = p.name.first == ""
-	p.name = { first = f, last = l, changedAt = if firstPick then 0 else os.time() }
-	player:SetAttribute(Identity.NAME_ATTR, full)
-	if firstPick then
-		Analytics.onboardingStep(player, "Name")
-	end
-	return full
+	pushState(player)
 end
 
--- Lifecycle --------------------------------------------------------------------------
-function Identity.onProfileLoaded(player: Player, profile: any)
-	if profile.name.first ~= "" then
-		player:SetAttribute(Identity.NAME_ATTR, profile.name.first .. " " .. profile.name.last)
-	end
+function Identity.onProfileLoaded(player: Player)
 	player:SetAttribute(Roles.ROLE_ATTR, Config.DEFAULT_ROLE)
-	if player.Character then
-		task.spawn(buildTag, player, player.Character)
-	end
 	pushState(player)
 end
 
@@ -240,17 +190,6 @@ end
 
 function Identity.init()
 	Net.handle("Identity", "Get", { call = true }, function(player)
-		return state(player)
-	end)
-	Net.handle("Identity", "SetName", {
-		schema = { first = V.str(Config.NAME_MAX * 2), last = V.str(Config.NAME_MAX * 2) },
-		rate = Config.NAME_RATE,
-		call = true,
-	}, function(player, a)
-		local full, why = Identity.setName(player, a.first, a.last)
-		if not full then
-			return nil, why
-		end
 		return state(player)
 	end)
 	Net.handle("Identity", "ChooseRole", {

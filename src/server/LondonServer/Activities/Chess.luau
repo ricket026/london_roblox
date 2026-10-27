@@ -159,6 +159,7 @@ local function leave(t: Table, c: string)
 			finish(t, if c == "w" then "b" else "w", "resigned")
 		else
 			t.game = nil -- nobody moved yet: just call it off
+			t.status = "waiting"
 			render(t)
 		end
 	end
@@ -275,6 +276,16 @@ local function build(folder: Folder, i: number, pos: Vector3): Table
 		end)
 	end
 	return t
+end
+
+-- Stands this player up from any table (resigning a game in progress); called on a character switch.
+function ChessActivity.leave(player: Player)
+	for _, t in tables do
+		local c = colourOf(t, player)
+		if c then
+			leave(t, c)
+		end
+	end
 end
 
 function ChessActivity.init(framework: any)

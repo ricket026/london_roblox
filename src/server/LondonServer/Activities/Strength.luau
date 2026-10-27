@@ -131,6 +131,14 @@ local function swing(player: Player, t: number)
 	end
 end
 
+-- Ends this player's go (rewarding what they did); the framework calls it on a character switch.
+function Strength.leave(player: Player)
+	local s = session
+	if s and s.player == player then
+		finish(s)
+	end
+end
+
 function Strength.init(framework: any)
 	A = framework
 	local folder = A.site("Strength")

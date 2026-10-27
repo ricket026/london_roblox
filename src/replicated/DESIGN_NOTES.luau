@@ -15,12 +15,21 @@ STATUS
   2026-10-27  Activity framework + the 4 proving activities from ACTIVITIES §5 (ducks, test your
               strength, mudlarking, chess). Not yet Play-tested. Shared.Chess passes perft
               (start d3, Kiwipete d2, pos3 d3) in a line-for-line port; promotion is queen-only.
+  2026-10-27  Characters + save slots, profile schema v2 (user decisions: linked slots; money,
+              Robux purchases, collection and moderation record are account-wide; first slot
+              free, sharing progress into a new slot costs £100; creator = name + look presets).
+              Review fixes: duck stand off the shoreline, glints raycast under Blackfriars
+              Bridge, tide sign off the parapet, bigger site boards, persisted pastime pay cap.
+              Not yet Play-tested.
 
 MODULES
   ReplicatedStorage.Shared
     Config   every tunable, commented.
-    Types    Profile (schema v1, TECH §5.1 incl. vehicles/licences, + record.mutedUntil,
-             + hobbies/collection/bests from the activities; reconcile fills them in), LogEntry.
+    Types    Profile schema v2 (account: money, collection, purchases, outfits, vehicles, rental,
+             record, limits; slots { "1".. } -> Slot { char, name, look }; progress { c1.. } ->
+             Progress { jobs, hobbies, bests, licences, honours }), LogEntry. Profiles migrates
+             v1 -> v2 (old identity becomes slot 1). Every session starts at the menu (active "").
+    Looks    look presets (Config.SKIN_TONES / HAIR_STYLES / OUTFITS) validation.
     Roles    Roles.ACTIONS table + Roles.can(player, action, target?). M0 input = staff level
              (attribute "StaffLevel", set by the server from group rank / Config lists).
     Net      Remotes/<Domain>Event + <Domain>Fn. Net.handle(domain, action, spec, fn) with
@@ -40,10 +49,17 @@ MODULES
              SessionSeconds custom event. Studio: memory only (ANALYTICS_IN_STUDIO=false).
     Debug    Studio only: ServerStorage.LondonDebug bindable (profile, givePence, setStaff,
              rejoin, lockTest, raw, setRaw, admin, net, analytics, setRole, clock).
-    Identity (M1) RP name (filtered, Shared.Names rules, 7-day cooldown after the first pick) and
-             per-server station role (Shared.Stations: open / claim with seats + playtime /
-             appoint / throne). Attributes RPName, Role. Server BillboardGui "RPTag" on the Head.
-             Remotes Identity.Get / SetName / ChooseRole; pushes State, Seats.
+    Characters  save slots (Config.MAX_SLOTS): Create (first free), Link (shares a Progress,
+             Config.SLOT_LINK_PRICE), Select (switch cooldown), Rename (7-day cooldown), Delete
+             (type the full name; Progress kept while another slot links to it). Saves at once.
+             CharacterAutoLoads off: spawns with LoadCharacterWithHumanoidDescription from the
+             slot's Look (own face/body, modern clothes removed) and respawns after death.
+             Characters.onBeforeChange(fn) settles activities before a switch.
+             Attributes RPName, CharSlot. Remotes Character.List/Create/Link/Select/Rename/Delete.
+    Identity (M1) per-server station role (Shared.Stations: open / claim with seats + playtime /
+             appoint / throne), reset on character switch. Attribute Role. Server BillboardGui
+             "RPTag" on the Head shows RPName + role. Remotes Identity.Get / ChooseRole;
+             pushes State, Seats.
     Activities  framework (claim/release one activity at a time, reward with the hourly pay cap
              Config.ACTIVITY_PAY_PER_HOUR, hobby XP + levels, collection, per-server daily
              boards + profile bests) and children Ducks, Strength, Mudlark, Chess, each built
@@ -59,7 +75,9 @@ MODULES
     Chess    full chess rules (server authority, client move hints).
     Meter    timing meter curve shared by client and server.
   StarterPlayerScripts.LondonClient  wallet state + staff notices into RBXSystem chat.
-    IdentityUI (stub) name picker on first join, "Station" role menu bottom-left.
+    CharacterUI (stub) character menu at session start / "Characters" button: slots, creator,
+             share progress, rename, delete. Menu camera from Config.MENU_CAMERA.
+    IdentityUI (stub) "Station" role menu bottom-left.
     ClockHUD   (stub) "6:45 pm · Dusk" at the top.
     Activities (stub) reward toasts + Strength meter + Chess board for seated players.
   ReplicatedFirst.LoadingScreen       stub title card until "ProfileLoaded".

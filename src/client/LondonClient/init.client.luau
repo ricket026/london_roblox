@@ -8,6 +8,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Net = require(Shared:WaitForChild("Net"))
 local Text = require(Shared:WaitForChild("Text"))
 
+require(script:WaitForChild("CharacterUI")).init()
 require(script:WaitForChild("IdentityUI")).init()
 require(script:WaitForChild("ClockHUD")).init()
 require(script:WaitForChild("Activities")).init()

@@ -70,11 +70,46 @@ Config.DOOR_PROMPT_DISTANCE = 8 -- studs from the prompt a player can open a doo
 Config.DOOR_PROMPT_HEIGHT = 3.4 -- prompt height above the sill (ring-pull height)
 Config.DOOR_AUTO_CLOSE = 0 -- seconds before an opened door shuts itself; 0 = stays open
 
--- RP names (LondonServer.Identity, DESIGN §6.1) -------------------------------
+-- Characters & save slots (LondonServer.Characters) --------------------------
+-- Money, Robux purchases, the collection book and the moderation record belong to the account.
+-- Each slot has its own name and look; job ranks, hobbies, licences and bests belong to the
+-- slot's progress, which linked slots share.
+Config.MAX_SLOTS = 3 -- character slots per account
+Config.SLOT_NEW_PRICE = 0 -- pence for a fresh character in a slot after the first (the first is always free)
+Config.SLOT_LINK_PRICE = 240 * 100 -- £100: a new slot linked to an existing character's progression
+Config.CHARACTER_SWITCH_COOLDOWN = 60 -- seconds between switching characters in a session
+Config.CHARACTER_RATE = { count = 4, per = 5 } -- Character remote calls per player per action
+Config.RESPAWN_SECONDS = 5 -- after death (LAW §1 hospital respawn replaces the spawn point in M5)
+-- Where the camera looks while the character menu is open (The Mall, facing the palace).
+Config.MENU_CAMERA = { from = Vector3.new(0, 38, -170), to = Vector3.new(0, 28, 260) }
+
+-- Character looks (Shared.Looks). Outfits colour the body until catalog clothing is picked:
+-- coat = torso + arms (gloved hands), lower = legs (trousers or skirts). Set shirt / pants to
+-- classic clothing asset ids, or layered = { { id = assetId, type = "Jacket" / "DressSkirt" /
+-- "Pants" / "Shirt"... (Enum.AccessoryType name) } } in wearing order, once chosen (ART §7).
+Config.SKIN_TONES = {
+	Color3.fromRGB(255, 224, 196), Color3.fromRGB(241, 194, 158), Color3.fromRGB(224, 172, 128),
+	Color3.fromRGB(198, 140, 99), Color3.fromRGB(161, 105, 70), Color3.fromRGB(124, 78, 50),
+	Color3.fromRGB(92, 58, 38), Color3.fromRGB(64, 42, 30),
+}
+Config.HAIR_STYLES = { -- "own" keeps the player's Roblox hair; others list hair accessory asset ids
+	{ id = "own", name = "My own hair", assets = {} },
+	{ id = "none", name = "No hair (wear a hat)", assets = {} },
+}
+Config.OUTFITS = {
+	{ id = "frock", name = "Frock coat", coat = Color3.fromRGB(28, 28, 32), lower = Color3.fromRGB(70, 70, 76), shirt = 0, pants = 0, layered = {} },
+	{ id = "tweed", name = "Tweed suit", coat = Color3.fromRGB(110, 92, 66), lower = Color3.fromRGB(96, 80, 58), shirt = 0, pants = 0, layered = {} },
+	{ id = "work", name = "Working clothes", coat = Color3.fromRGB(78, 62, 48), lower = Color3.fromRGB(52, 48, 44), shirt = 0, pants = 0, layered = {} },
+	{ id = "daydress", name = "Day dress", coat = Color3.fromRGB(70, 40, 60), lower = Color3.fromRGB(70, 40, 60), shirt = 0, pants = 0, layered = {} },
+	{ id = "walking", name = "Walking costume", coat = Color3.fromRGB(34, 52, 70), lower = Color3.fromRGB(46, 60, 74), shirt = 0, pants = 0, layered = {} },
+	{ id = "plain", name = "Plain dress & apron", coat = Color3.fromRGB(96, 92, 86), lower = Color3.fromRGB(120, 112, 100), shirt = 0, pants = 0, layered = {} },
+}
+
+-- RP names (LondonServer.Characters, DESIGN §6.1) -----------------------------
 Config.NAME_MIN = 2 -- characters in a first or last name
 Config.NAME_MAX = 14 -- characters in a first or last name
-Config.NAME_CHANGE_COOLDOWN = 60 * 60 * 24 * 7 -- seconds between name changes after the first pick
-Config.NAME_RATE = { count = 4, per = 20 } -- SetName calls per player (each one runs the text filter)
+Config.NAME_CHANGE_COOLDOWN = 60 * 60 * 24 * 7 -- seconds between renames of a character (from its creation)
+Config.NAME_RATE = { count = 4, per = 20 } -- calls that run the text filter (create, link, rename) per player
 -- Words a name may not contain (lowercase): titles and ranks are granted, never typed (TECH §8).
 Config.NAME_RESERVED = {
 	"king", "queen", "prince", "princess", "duke", "duchess", "marquess", "earl", "count", "viscount",
@@ -119,7 +154,7 @@ Config.HOBBY_XP_BASE = 100 -- XP to reach level n = BASE * (n - 1) ^ EXP (l2 100
 Config.HOBBY_XP_EXP = 1.5
 
 -- Feeding the ducks & pigeons (St James's Park lake)
-Config.DUCKS_SITE = { x = 282, z = -330 } -- west shore of the lake, a short walk from the bandstand
+Config.DUCKS_SITE = { x = 268, z = -330 } -- 14 studs back from the lake's west shore (shore is x 282 here)
 Config.DUCKS_LAKE = { cx = 330, cz = -470, rx = 55, rz = 280, surface = -1 } -- same as map_layout_v2 water.lake
 Config.DUCKS_SEED_PRICE = 1 -- pence per bag of seed (ACTIVITIES §2)
 Config.DUCKS_COOLDOWN = 15 -- seconds between feeds per player
@@ -149,6 +184,8 @@ Config.STRENGTH_BELL_SOUND = "" -- rbxassetid for the bell; "" = silent (pick on
 
 -- Mudlarking (Thames foreshore below the Temple)
 Config.MUDLARK_AREA = { x = { 1154, 1182 }, z = { -1745, -2100 } } -- inside map_layout_v2 water.foreshore
+Config.MUDLARK_RAY_FROM = -4 -- glints raycast down from here: below Blackfriars Bridge deck (bottom -3), above the foreshore (-10)
+Config.MUDLARK_SIGN = { x = 1138, z = -1751 } -- street side of the river wall parapet, by the stairs
 Config.MUDLARK_GLINTS = 10 -- glints on the foreshore at once (shared: first to dig gets it)
 Config.MUDLARK_RESPAWN = { min = 8, max = 20 } -- seconds before a dug glint reappears elsewhere
 Config.MUDLARK_DIG_SECONDS = 2 -- hold time on a glint

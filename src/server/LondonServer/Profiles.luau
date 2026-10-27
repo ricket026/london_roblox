@@ -1,6 +1,8 @@
 --!strict
--- LondonServer.Profiles: player profiles (schema v1, TECH.md §5.1) in Config.PROFILE_STORE under
+-- LondonServer.Profiles: player profiles (schema v2, Shared.Types) in Config.PROFILE_STORE under
 -- "u_<userId>". Stored record: { data = Profile, lock = { id, t }?, savedAt }.
+-- One profile per account: account-wide money/purchases/collection/record plus character slots
+-- (LondonServer.Characters). Profiles.progress(player) is the active character's shared progress.
 -- Session lock: a server claims the record with UpdateAsync; other servers wait LOCK_RETRY and
 -- give up after LOCK_MAX_WAIT, unless the lock is older than LOCK_STALE (dead server: taken over).
 -- Saves on leave (releases the lock), every AUTOSAVE_SECONDS (refreshes it) and on BindToClose.
@@ -18,7 +20,7 @@ type Profile = Types.Profile
 type Entry = { data: Profile, token: string, saving: boolean, lastTick: number, isNew: boolean }
 
 local Profiles = {}
-Profiles.VERSION = 1
+Profiles.VERSION = 2
 Profiles.TOKEN = (if game.JobId ~= "" then game.JobId else "studio") .. "/" .. HttpService:GenerateGUID(false)
 
 local store = Store.open(Config.PROFILE_STORE)
@@ -31,6 +33,42 @@ Profiles.Loaded = loadedEvent.Event -- (player, profile)
 -- MIGRATIONS[n] upgrades a v(n) profile to v(n+1) in place.
 local MIGRATIONS: { [number]: (any) -> () } = {}
 
+function Profiles.progressDefaults(): Types.Progress
+	return {
+		jobs = {},
+		hobbies = {},
+		bests = {},
+		licences = { cab = false, omnibus = false, motor = false },
+		honours = {},
+	}
+end
+
+-- v1 -> v2 (2026-10-27): the single identity becomes character slot "1"; per-character grind
+-- moves into progress "c1". Offices are per server (Q4) and are dropped.
+MIGRATIONS[1] = function(d)
+	local prog = Profiles.progressDefaults()
+	prog.jobs = if type(d.jobs) == "table" then d.jobs else {}
+	prog.hobbies = if type(d.hobbies) == "table" then d.hobbies else {}
+	prog.bests = if type(d.bests) == "table" then d.bests else {}
+	prog.honours = if type(d.titles) == "table" then d.titles else {}
+	if type(d.licences) == "table" then
+		prog.licences = d.licences
+	end
+	d.slots, d.progress, d.active, d.nextChar = {}, {}, "", 1
+	local name = d.name
+	if type(name) == "table" and type(name.first) == "string" and name.first ~= "" then
+		d.progress.c1 = prog
+		d.slots["1"] = {
+			char = "c1",
+			name = { first = name.first, last = tostring(name.last or ""), changedAt = tonumber(name.changedAt) or 0 },
+			look = { skin = 1, hair = Config.HAIR_STYLES[1].id, outfit = Config.OUTFITS[1].id },
+			createdAt = tonumber(d.firstJoin) or os.time(),
+		}
+		d.nextChar = 2
+	end
+	d.name, d.jobs, d.hobbies, d.bests, d.titles, d.offices, d.licences = nil, nil, nil, nil, nil, nil, nil
+end
+
 local function key(userId: number): string
 	return "u_" .. userId
 end
@@ -38,23 +76,22 @@ end
 function Profiles.defaults(): Profile
 	return {
 		v = Profiles.VERSION,
-		name = { first = "", last = "", changedAt = 0 },
 		pence = Config.START_PENCE,
 		bank = 0,
-		jobs = {},
-		titles = {},
-		offices = {},
+		collection = {},
+		purchases = {},
 		outfits = { owned = {}, equipped = {} },
 		rental = { houseId = nil, paidUntil = 0 },
 		vehicles = {},
-		licences = { cab = false, omnibus = false, motor = false },
 		record = { arrests = 0, warnings = {}, mutedUntil = 0 },
+		limits = { activityWindow = 0, activityPaid = 0 },
 		settings = {},
-		hobbies = {},
-		collection = {},
-		bests = {},
 		firstJoin = os.time(),
 		playtime = 0,
+		slots = {},
+		active = "",
+		progress = {},
+		nextChar = 1,
 	}
 end
 
@@ -84,6 +121,14 @@ local function upgrade(data: any): (Profile?, string?)
 		data.v = v
 	end
 	reconcile(data, Profiles.defaults())
+	for id, prog in data.progress do
+		if type(prog) == "table" then
+			reconcile(prog, Profiles.progressDefaults())
+		else
+			data.progress[id] = Profiles.progressDefaults()
+		end
+	end
+	data.active = "" -- every session starts at the character menu
 	return data
 end
 
@@ -194,6 +239,45 @@ end
 function Profiles.playtime(player: Player): number
 	local e = active[player.UserId]
 	return if e then e.data.playtime + (os.time() - e.lastTick) else 0
+end
+
+-- The slot being played, and its key.
+function Profiles.activeSlot(player: Player): (Types.Slot?, string)
+	local p = Profiles.get(player)
+	if not p or p.active == "" then
+		return nil, ""
+	end
+	return p.slots[p.active], p.active
+end
+
+-- Progress of the character being played (shared with its linked slots), or nil at the menu.
+function Profiles.progress(player: Player): Types.Progress?
+	local p = Profiles.get(player)
+	local slot = Profiles.activeSlot(player)
+	return if p and slot then p.progress[slot.char] else nil
+end
+
+-- Takes pence from the wallet, then the bank. False (and nothing taken) if they can't afford it.
+function Profiles.charge(player: Player, pence: number): boolean
+	local p = Profiles.get(player)
+	if not p or pence % 1 ~= 0 or pence < 0 or p.pence + p.bank < pence then
+		return false
+	end
+	local fromWallet = math.min(p.pence, pence)
+	p.pence -= fromWallet
+	p.bank -= pence - fromWallet
+	Profiles.pushWallet(player)
+	return true
+end
+
+-- Saves now (keeps the session lock). Use after purchases and character changes so a server
+-- crash can't lose them. Returns "ok", "error", "lost" or "none" (no profile).
+function Profiles.save(player: Player): string
+	local e = active[player.UserId]
+	if not e then
+		return "none"
+	end
+	return commit(player.UserId, e, false)
 end
 
 -- True when this session created the profile (first join).

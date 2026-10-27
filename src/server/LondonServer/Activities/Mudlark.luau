@@ -75,7 +75,7 @@ end
 
 spawnGlint = function()
 	local area = Config.MUDLARK_AREA
-	local pos = A.ground(rng:NextNumber(area.x[1], area.x[2]), rng:NextNumber(math.min(area.z[1], area.z[2]), math.max(area.z[1], area.z[2])))
+	local pos = A.ground(rng:NextNumber(area.x[1], area.x[2]), rng:NextNumber(math.min(area.z[1], area.z[2]), math.max(area.z[1], area.z[2])), Config.MUDLARK_RAY_FROM)
 	local g = A.part({ ClassName = "Part", Name = "Glint", Shape = Enum.PartType.Ball, Size = Vector3.new(0.7, 0.7, 0.7), CFrame = CFrame.new(pos + Vector3.new(0, 0.25, 0)), Color = Color3.fromRGB(255, 240, 190), Material = Enum.Material.Neon, CanCollide = false, CastShadow = false })
 	local sp = Instance.new("Sparkles")
 	sp.SparkleColor = Color3.fromRGB(255, 245, 210)
@@ -107,8 +107,7 @@ end
 function Mudlark.init(framework: any)
 	A = framework
 	folder = A.site("Mudlark")
-	local area = Config.MUDLARK_AREA
-	local top = A.ground(area.x[1] - 8, area.z[1] - 6) -- on the embankment by the river stairs
+	local top = A.ground(Config.MUDLARK_SIGN.x, Config.MUDLARK_SIGN.z) -- on the embankment by the river stairs
 	local face = CFrame.lookAt(top, top + Vector3.new(-1, 0, 0)) -- facing the street (west)
 	local sign = A.part({ Name = "TideSign", Size = Vector3.new(6, 3, 0.3), CFrame = face * CFrame.new(0, 4, 0), Color = Color3.fromRGB(40, 50, 60), Material = Enum.Material.Wood })
 	local sg = Instance.new("SurfaceGui")

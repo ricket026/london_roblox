@@ -2,7 +2,7 @@
 -- LondonServer.Debug: Studio-only test bindable, ServerStorage.LondonDebug (never created live).
 -- From the Server datamodel: game.ServerStorage.LondonDebug:Invoke("givePence", userId, 120)
 -- Commands: profile, givePence, setStaff, rejoin, lockTest, raw, setRaw, admin, net, analytics,
--- setRole, clock.
+-- setRole, clock, play.
 local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -17,6 +17,7 @@ local Profiles = require(script.Parent:WaitForChild("Profiles"))
 local Admin = require(script.Parent:WaitForChild("Admin")) :: any
 local Analytics = require(script.Parent:WaitForChild("Analytics"))
 local Identity = require(script.Parent:WaitForChild("Identity"))
+local Characters = require(script.Parent:WaitForChild("Characters"))
 local WorldClock = require(script.Parent:WaitForChild("WorldClock"))
 
 local Debug = {}
@@ -62,6 +63,10 @@ local cmds: { [string]: (...any) -> any } = {
 	-- setRole(userId, roleId): skips cooldowns, seat checks still count the seat
 	setRole = function(userId, roleId)
 		return Identity.debugSetRole(plr(userId), roleId)
+	end,
+	-- play(userId): skip the character menu (makes slot 1 "Test Player<id>" if empty)
+	play = function(userId)
+		return Characters.debugQuickStart(plr(userId))
 	end,
 	-- clock(hour): jump the world clock, e.g. clock(18) for dusk
 	clock = function(hour)

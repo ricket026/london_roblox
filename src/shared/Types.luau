@@ -1,24 +1,51 @@
 --!strict
 -- Shared.Types: shared type definitions.
+
+-- How a character looks (Shared.Looks validates; ids index Config.HAIR_STYLES / Config.OUTFITS).
+export type Look = {
+	skin: number, -- index into Config.SKIN_TONES
+	hair: string,
+	outfit: string,
+}
+
+-- One save slot: who the character is. What they've earned lives in Progress (shared by linked slots).
+export type Slot = {
+	char: string, -- Progress id ("c1"); linked slots share it
+	name: { first: string, last: string, changedAt: number }, -- changedAt starts the rename cooldown
+	look: Look,
+	createdAt: number,
+}
+
+-- Grind that linked slots share (systems/JOBS.md ranks, ACTIVITIES.md hobbies...).
+export type Progress = {
+	jobs: { [string]: { xp: number, rank: number } },
+	hobbies: { [string]: number }, -- hobby -> XP (Shared.Hobbies)
+	bests: { [string]: number }, -- activity id -> personal best score
+	licences: { cab: boolean, omnibus: boolean, motor: boolean },
+	honours: { string }, -- cosmetic "highest honour held" records (COURT_PARLIAMENT, Q4)
+}
+
+-- Schema v2 (TECH.md §5.1, revised 2026-10-27 for character slots). One per account.
 export type Profile = {
 	v: number, -- schema version, migrated on load
-	name: { first: string, last: string, changedAt: number },
+	-- account-wide
 	pence: number, -- wallet, integer pence
 	bank: number, -- banked pence
-	jobs: { [string]: { xp: number, rank: number } },
-	titles: { string }, -- persistent grants (Titles registry ids)
-	offices: { string },
+	collection: { [string]: number }, -- Shared.Collection id -> times found
+	purchases: { [string]: number }, -- Robux gamepass / product id -> count (M9)
 	outfits: { owned: { string }, equipped: { [string]: string } },
 	rental: { houseId: string?, paidUntil: number },
 	vehicles: { { id: string, kind: string, livery: string, condition: number } },
-	licences: { cab: boolean, omnibus: boolean, motor: boolean },
 	record: { arrests: number, warnings: { any }, mutedUntil: number },
+	limits: { activityWindow: number, activityPaid: number }, -- hourly pastime pay cap (os.time window start)
 	settings: { [string]: any },
-	hobbies: { [string]: number }, -- hobby -> XP (Shared.Hobbies)
-	collection: { [string]: number }, -- Shared.Collection id -> times found
-	bests: { [string]: number }, -- activity id -> personal best score
 	firstJoin: number,
-	playtime: number, -- seconds
+	playtime: number, -- seconds, whole account
+	-- characters
+	slots: { [string]: Slot }, -- keys "1".."MAX_SLOTS" (string keys: DataStore JSON can't hold sparse arrays)
+	active: string, -- slot key being played this session, "" = none
+	progress: { [string]: Progress },
+	nextChar: number, -- next Progress id number
 }
 
 export type LogEntry = {

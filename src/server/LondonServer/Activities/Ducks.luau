@@ -45,8 +45,10 @@ local function makeBird(kind: string, at: CFrame): Model
 	m.Name = kind
 	local body = Instance.new("Part")
 	body.Name = "Body"
-	body.Shape = Enum.PartType.Ball
-	body.Size = Vector3.new(1.4, 1, 2) * s
+	body.Size = Vector3.new(1.4, 1, 2) * s -- a Ball part is always round; the sphere mesh makes it oval
+	local mesh = Instance.new("SpecialMesh")
+	mesh.MeshType = Enum.MeshType.Sphere
+	mesh.Parent = body
 	body.Color = look.body
 	body.Anchored = true
 	body.CanCollide = false

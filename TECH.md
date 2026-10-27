@@ -87,24 +87,34 @@ Workspace
 
 ### 5.1 Player profile (DataStore `Profile_v1`, key `u_<userId>`)
 
+Schema v2 (2026-10-27): one profile per account holding character save slots. Exact types in
+`Shared.Types`; v1 profiles migrate on load (the old identity becomes slot 1).
+
 ```lua
 {
-  v = 1,                    -- schema version, migrate on load
-  name = { first = "", last = "", changedAt = 0 },
-  pence = 0,                -- wallet, integer
-  bank = 0,                 -- banked pence (safe from pickpockets)
-  jobs = { [jobId] = { xp = 0, rank = 1 } },
-  titles = { "baron_kew" }, -- persistent grants (ids into the Titles registry)
-  offices = {},             -- current appointed offices
+  v = 2,                    -- schema version, migrate on load
+  -- account-wide (shared by every character)
+  pence = 0, bank = 0,      -- wallet and bank, integer pence
+  collection = {},          -- curio id -> times found
+  purchases = {},           -- Robux gamepass / product id -> count
   outfits = { owned = {}, equipped = {} },
   rental = { houseId = nil, paidUntil = 0 },
   vehicles = { { id = "", kind = "hansom", livery = "", condition = 100 } },
-  licences = { cab = false, omnibus = false, motor = false },
-  record = { arrests = 0, warnings = {}, mutedUntil = 0 },  -- mutedUntil added in M0 (Admin)
-  settings = { },
-  firstJoin = 0, playtime = 0,
+  record = { arrests = 0, warnings = {}, mutedUntil = 0 },  -- moderation follows the player
+  limits = { activityWindow = 0, activityPaid = 0 },       -- hourly pastime pay cap
+  settings = {}, firstJoin = 0, playtime = 0,
+  -- characters (Config.MAX_SLOTS; string keys because DataStore JSON can't hold sparse arrays)
+  slots = { ["1"] = { char = "c1", name = { first, last, changedAt }, look = { skin, hair, outfit }, createdAt } },
+  active = "",              -- slot being played; every session starts at the character menu
+  progress = { c1 = { jobs = {}, hobbies = {}, bests = {}, licences = {}, honours = {} } },
+  nextChar = 2,
 }
 ```
+
+- **Linked slots** point at the same `progress` entry: their own name and look, shared job
+  ranks, hobbies, licences and bests. Linking costs `Config.SLOT_LINK_PRICE` (£100); the first
+  slot is free. A progress entry is deleted only when no slot points at it.
+- Titles and offices are per server (Q4) and are not saved; `honours` keeps the cosmetic record.
 
 - Session lock through `UpdateAsync` with a lock token and timeout; save on leave, on
   BindToClose, and every N minutes. Money changes save as deltas **(CF)**.
