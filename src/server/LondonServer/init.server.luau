@@ -1,0 +1,52 @@
+--!strict
+-- LondonServer: server boot. Wires the player lifecycle: staff level -> ban check -> profile.
+-- Systems live in the child ModuleScripts (TECH.md §3); later milestones add theirs here.
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Roles = require(Shared:WaitForChild("Roles"))
+local Store = require(script:WaitForChild("Store"))
+local Profiles = require(script:WaitForChild("Profiles"))
+local Admin = require(script:WaitForChild("Admin"))
+local Analytics = require(script:WaitForChild("Analytics"))
+local Doors = require(script:WaitForChild("Doors"))
+local Identity = require(script:WaitForChild("Identity"))
+local WorldClock = require(script:WaitForChild("WorldClock"))
+
+Profiles.init()
+Admin.init()
+Doors.init()
+Identity.init()
+WorldClock.init()
+if RunService:IsStudio() then
+	require(script:WaitForChild("Debug")).init()
+end
+
+local function onPlayerAdded(player: Player)
+	player:SetAttribute(Roles.STAFF_ATTR, Roles.computeStaffLevel(player))
+	if Admin.checkBan(player) then
+		return
+	end
+	local profile = Profiles.onPlayerAdded(player)
+	if profile then
+		Admin.onProfileLoaded(player, profile)
+		Identity.onProfileLoaded(player, profile)
+		Analytics.onProfileLoaded(player, Profiles.isNew(player))
+	end
+end
+
+Players.PlayerAdded:Connect(onPlayerAdded)
+Players.PlayerRemoving:Connect(function(player)
+	Admin.onPlayerRemoving(player)
+	Identity.onPlayerRemoving(player)
+	Analytics.onPlayerRemoving(player)
+	Profiles.onPlayerRemoving(player)
+end)
+for _, p in Players:GetPlayers() do
+	task.spawn(onPlayerAdded, p)
+end
+game:BindToClose(Profiles.closeAll)
+
+print(string.format("[LondonServer] ready (store: %s)", if Store.isMock then "Studio mock" else "DataStore"))

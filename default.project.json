@@ -1,0 +1,25 @@
+{
+  "name": "london",
+  "tree": {
+    "$className": "DataModel",
+    "ReplicatedFirst": {
+      "LoadingScreen": { "$path": "src/first/LoadingScreen.client.luau" }
+    },
+    "ReplicatedStorage": {
+      "Shared": { "$path": "src/shared" },
+      "DESIGN_NOTES": { "$path": "src/replicated/DESIGN_NOTES.luau" }
+    },
+    "ServerScriptService": {
+      "LondonServer": { "$path": "src/server/LondonServer" }
+    },
+    "ServerStorage": {
+      "MapGreybox": { "$path": "src/serverstorage/MapGreybox.luau" },
+      "MapLayoutData": { "$path": "src/serverstorage/MapLayoutData.luau" }
+    },
+    "StarterPlayer": {
+      "StarterPlayerScripts": {
+        "LondonClient": { "$path": "src/client/LondonClient" }
+      }
+    }
+  }
+}

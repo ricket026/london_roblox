@@ -1,3 +1,34 @@
+# Crown & Court (London, 1897)
+
+## Working with the code (Rojo)
+
+The game's scripts live in `src/` and sync into Studio with [Rojo](https://rojo.space).
+The map, palace, Parliament, interiors and backups stay in the place file; Rojo only manages
+the scripts listed in `default.project.json`.
+
+| Folder | Becomes in Studio |
+|---|---|
+| `src/shared/` | `ReplicatedStorage.Shared` |
+| `src/replicated/DESIGN_NOTES.luau` | `ReplicatedStorage.DESIGN_NOTES` |
+| `src/server/LondonServer/` | `ServerScriptService.LondonServer` (+ its modules) |
+| `src/serverstorage/` | `ServerStorage.MapGreybox`, `ServerStorage.MapLayoutData` |
+| `src/client/LondonClient/` | `StarterPlayer.StarterPlayerScripts.LondonClient` |
+| `src/first/LoadingScreen.client.luau` | `ReplicatedFirst.LoadingScreen` |
+
+One-time setup on your PC:
+1. Install Rojo (e.g. with [Rokit](https://github.com/rojo-rbx/rokit): `rokit add rojo-rbx/rojo`)
+   and the Rojo plugin in Studio (Plugins tab → Manage Plugins, or `rojo plugin install`).
+2. `git clone https://github.com/ricket026/london_roblox` (or `git pull` in your copy).
+
+Every session:
+1. `git pull`, then `rojo serve` in the repo folder.
+2. Open your London place in Studio → Rojo plugin → **Connect**. The scripts update live.
+3. Press Play to test. Edit scripts in the files, not in Studio (a sync overwrites Studio edits).
+4. Save the place as usual; publish when you're happy.
+
+`.luau` = ModuleScript, `.server.luau` = Script, `.client.luau` = LocalScript, and a folder with
+`init.*.luau` is a script with child modules.
+
 # System specs
 
 Detailed specs behind DESIGN.md. Numbers are starting values for `Shared.Config`, tuned in M9.

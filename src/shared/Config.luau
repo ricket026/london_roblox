@@ -1,0 +1,112 @@
+--!strict
+-- Shared.Config: every tunable value, with a comment (TECH.md §4). Read-only at runtime.
+local Config = {}
+
+-- Identity ------------------------------------------------------------------
+Config.GAME_NAME = "Crown & Court" -- working title (OPEN_QUESTIONS Q1 default)
+Config.SETTING_LINE = "London, 1897" -- loading screen subtitle (era changed from 1770 on 2026-10-24)
+
+-- Staff ---------------------------------------------------------------------
+Config.GROUP_ID = 0 -- Roblox group for ranks; 0 = no group yet (pre-M0 checklist, needed by M3)
+Config.STAFF_LEVEL = { NONE = 0, MOD = 1, ADMIN = 2, OWNER = 3 } -- tiers used by Roles.ACTIONS
+Config.GROUP_RANK_STAFF = { [250] = 1, [254] = 2, [255] = 3 } -- min group rank -> staff level (when GROUP_ID ~= 0)
+Config.STAFF_USER_IDS = { [3967616473] = 3 } -- userId -> staff level without a group (place owner)
+Config.STUDIO_TEST_STAFF = { [-1] = 3, [-2] = 1 } -- Studio local-server test players: Player1 owner, Player2 mod
+
+-- Data stores ---------------------------------------------------------------
+Config.PROFILE_STORE = "Profile_v1" -- player profiles, key "u_<userId>" (TECH.md §5.1)
+Config.BANS_STORE = "Bans_v1" -- key "u_<userId>" -> { reason, by, at, untilT (0 = permanent) }
+Config.ADMIN_LOG_STORE = "AdminLog_v1" -- key "d_<yyyymmdd>" -> list of staff actions that day
+Config.STUDIO_USE_REAL_STORE = false -- true once the place is published and Studio API access is on
+Config.MOCK_LATENCY = 0.05 -- seconds each mock store call yields, so ordering bugs show up in Studio
+Config.AUTOSAVE_SECONDS = 120 -- periodic profile save; also refreshes the session lock
+Config.LOCK_STALE_SECONDS = 360 -- a lock older than this belongs to a dead server and is taken over
+Config.LOCK_RETRY_SECONDS = 3 -- wait between claims while another server holds the lock
+Config.LOCK_MAX_WAIT = 30 -- give up after this long (player is kicked with a rejoin message)
+Config.LOAD_RETRIES = 3 -- store errors tolerated while loading before giving up
+Config.SAVE_RETRIES = 3 -- attempts per save
+Config.SAVE_RETRY_SECONDS = 2 -- wait between save attempts
+Config.CLOSE_SAVE_TIMEOUT = 25 -- BindToClose budget for final saves (Roblox allows 30)
+
+-- Money (pence are the only stored unit; 12d = 1s, 20s = £1) -----------------
+Config.PENCE_PER_SHILLING = 12 -- pre-decimal: 12 pence to the shilling
+Config.SHILLINGS_PER_POUND = 20 -- 20 shillings to the pound
+Config.START_PENCE = 60 -- new profile wallet (5s)
+Config.PENCE_MAX = 240 * 1000000 -- wallet / bank cap (£1,000,000)
+
+-- Admin ---------------------------------------------------------------------
+Config.REASON_MAX = 200 -- characters in a kick/ban/mute reason
+Config.MAX_BAN_MINUTES = 60 * 24 * 365 -- longest timed ban (0 = permanent is separate)
+Config.MAX_MUTE_MINUTES = 60 * 24 * 7 -- longest mute
+Config.MUTE_CHECK_SECONDS = 15 -- how often expired mutes are lifted
+Config.ADMIN_LOG_MEMORY = 200 -- newest staff actions kept in this server for /logs
+Config.ADMIN_LOG_DAY_CAP = 500 -- max entries stored per day key
+Config.ADMIN_LOG_SHOW = 5 -- entries shown by the /logs chat command
+Config.ADMIN_TOPIC = "LondonAdmin" -- MessagingService topic for cross-server bans
+Config.ADMIN_RATE = { count = 5, per = 10 } -- Admin remote calls per player per action
+
+-- Net -----------------------------------------------------------------------
+Config.NET_RATE_DEFAULT = { count = 10, per = 1 } -- messages per player per action when a handler sets none
+Config.NET_REJECT_WARN_EVERY = 20 -- warn on the 1st and every Nth rejected message per player (Guard reads these later)
+
+-- Text ----------------------------------------------------------------------
+Config.TEXT_FILTER_RETRIES = 2 -- FilterStringAsync attempts; failure = text is not shown (fail closed)
+
+-- Analytics (systems/PLAYER_GATHERING.md §7) ---------------------------------
+Config.ANALYTICS_IN_STUDIO = false -- false = Studio only records events in memory, nothing is sent
+Config.ONBOARDING_STEPS = { -- funnel order (systems/LOW_POP_AND_ONBOARDING.md §3); M0 logs step 1 only
+	"ProfileLoaded", "Arrival", "Name", "Look", "Rules", "FirstJob", "FirstPay", "Tour",
+}
+Config.ANALYTICS_MEMORY = 100 -- recent events kept in memory for tests / the staff summary
+
+-- Loading screen ------------------------------------------------------------
+Config.LOADING_MIN_SECONDS = 1.5 -- keep the title card up at least this long
+Config.LOADING_TIMEOUT = 45 -- drop the card even if the profile never arrives
+
+-- Doors (ServerScriptService.LondonServer.Doors) ------------------------------
+Config.DOOR_TAG = "Door" -- CollectionService tag on swinging leaves (attrs DoorHinge, DoorOpenDeg, DoorGroup)
+Config.DOOR_SWING_TIME = 0.8 -- seconds to swing open or shut
+Config.DOOR_PROMPT_DISTANCE = 8 -- studs from the prompt a player can open a door
+Config.DOOR_PROMPT_HEIGHT = 3.4 -- prompt height above the sill (ring-pull height)
+Config.DOOR_AUTO_CLOSE = 0 -- seconds before an opened door shuts itself; 0 = stays open
+
+-- RP names (LondonServer.Identity, DESIGN §6.1) -------------------------------
+Config.NAME_MIN = 2 -- characters in a first or last name
+Config.NAME_MAX = 14 -- characters in a first or last name
+Config.NAME_CHANGE_COOLDOWN = 60 * 60 * 24 * 7 -- seconds between name changes after the first pick
+Config.NAME_RATE = { count = 4, per = 20 } -- SetName calls per player (each one runs the text filter)
+-- Words a name may not contain (lowercase): titles and ranks are granted, never typed (TECH §8).
+Config.NAME_RESERVED = {
+	"king", "queen", "prince", "princess", "duke", "duchess", "marquess", "earl", "count", "viscount",
+	"baron", "lord", "lady", "sir", "dame", "majesty", "highness", "royal", "rt hon", "mp",
+	"admin", "mod", "staff", "owner", "roblox",
+}
+-- Whole names of real royals and politicians of the period (lowercase "first last"). Fictional families only (Q2).
+Config.NAME_BLOCKED = {
+	"victoria hanover", "albert edward", "edward saxe", "alexandra dagmar", "george hanover",
+	"william gladstone", "robert gascoyne", "robert cecil", "benjamin disraeli", "arthur balfour",
+	"jack ripper", "victoria regina",
+}
+
+-- Stations (Shared.Stations, LondonServer.Identity) ---------------------------
+Config.ROLE_SWITCH_COOLDOWN = 120 -- seconds between role changes (JOBS §1: 2 min)
+Config.ROLE_RATE = { count = 3, per = 5 } -- ChooseRole calls per player
+Config.DEFAULT_ROLE = "Citizen" -- role everyone holds until they pick one
+
+-- Overhead tags (LondonServer.Identity) ----------------------------------------
+Config.TAG_MAX_DISTANCE = 60 -- studs; tags fade out past this so a 50-player hub stays readable
+Config.TAG_OFFSET = 2.6 -- studs above the head
+Config.TAG_SIZE = { w = 8, h = 1.6 } -- studs (scales with distance like the world)
+
+-- World clock (LondonServer.WorldClock, Q10) -----------------------------------
+Config.DAY_MINUTES = 24 -- real minutes per in-game day (ECONOMY §1)
+Config.CLOCK_OFFSET_HOURS = 6 -- shifts the shared clock so it isn't midnight at 00:00 UTC
+Config.CLOCK_TICK = 0.5 -- seconds between Lighting.ClockTime updates
+Config.CLOCK_PHASES = { -- in-game hour each phase starts (lamplighters: JOBS §2, dusk 18-20, dawn 5-7)
+	{ name = "Dawn", hour = 5 },
+	{ name = "Day", hour = 7 },
+	{ name = "Dusk", hour = 18 },
+	{ name = "Night", hour = 20 },
+}
+
+return Config
