@@ -21,6 +21,12 @@ Each open question has a **default** I'll use if you don't answer.
 | Q16 | City size kept as drafted (~4 min end to end, hubs ~1 min apart) | 2026-10-25 |
 | Q17 | Hyde Park: **playable** | 2026-10-25 |
 | Q18 | South bank: **playable later**; façades in v1 | 2026-10-25 |
+| Q12 | **Git: yes.** Scripts live in `src/` on GitHub (`ricket026/london_roblox`) | 2026-10-27 |
+| Slots | **Character save slots with linked progress.** A new slot can share an existing character's progress (job ranks, hobbies, licences, bests): own name and look, progress counts for both | 2026-10-27 |
+| Slots | **Account-wide:** money (wallet + bank), Robux purchases, collection book, moderation record | 2026-10-27 |
+| Slots | **First slot free; sharing progress into a new slot costs £100** in-game | 2026-10-27 |
+| Creator | **Name + look presets** (skin tone, hair, outfit) on the player's own face and body | 2026-10-27 |
+| Workflow | The user installs scripts **by copy-paste**; keep the number of scripts per change small and always say which to paste (CLAUDE.md) | 2026-10-27 |
 
 ## Still open
 
@@ -29,8 +35,10 @@ Each open question has a **default** I'll use if you don't answer.
 | Q1 | **Game name?** Ideas: *Crown & Court*, *Jubilee*, *Gaslight London*, *The Season*, *Fog & Crown* | Crown & Court (working title) |
 | Q9 | **Other roleplay settings later** (pirate port, modern city): build the framework reusable from day one? | Yes: setting data in Config/Roles, systems generic |
 | Q10 | **Day length?** | 24 real minutes per in-game day |
-| Q12 | **Git for the London folder?** | Yes |
 | Q15 | **Headline event times?** Two weekly slots for time zones | Saturday 14:00 and 20:00 US Eastern |
 | Q19 | **How does someone become King or Queen in a server?** | Claim the empty throne (needs ≥ 2 h playtime); the royal family's line of succession gets first refusal (COURT_PARLIAMENT §2) |
 | Q20 | **How many royal family members per server?** | 8 |
 | Q21 | **Money packs:** OK to let Robux money buy expensive vehicles, or should some things be earn-only? | Packs buy anything except licences and ranks; top vehicles also need a job rank |
+| Q22 | **Price of a fresh (unlinked) character in slots 2–3?** Only the £100 link price was set | Free (`Config.SLOT_NEW_PRICE = 0`) |
+| Q23 | **How should outfits be made?** 3D outfits built from parts (TASKS T06, discussed), catalog clothing IDs, or Blender meshes later. And are hats a separate choice? | 3D part outfits now (swappable for Blender meshes later); hats come with the outfit |
+| Q24 | **Staff tools vs Q11 "no staff":** the M0 `Admin` module has moderator/admin levels and group ranks | Cut down to owner-only tools + automatic moderation |

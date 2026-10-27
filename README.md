@@ -1,5 +1,9 @@
 # Crown & Court (London, 1897)
 
+**Start here:** [CLAUDE.md](CLAUDE.md) (how to work on this project) · [TASKS.md](TASKS.md)
+(what to build next) · [INSTALL.md](INSTALL.md) (putting scripts into Studio by hand) ·
+[ROADMAP.md](ROADMAP.md) · [DESIGN.md](DESIGN.md) · [OPEN_QUESTIONS.md](OPEN_QUESTIONS.md)
+
 ## Working with the code (Rojo)
 
 The game's scripts live in `src/` and sync into Studio with [Rojo](https://rojo.space).

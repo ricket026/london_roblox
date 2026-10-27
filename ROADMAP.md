@@ -1,5 +1,11 @@
 # Roadmap
 
+> **Status 2026-10-27.** Work is split into agent-sized tasks in `TASKS.md` (T-numbers below);
+> how to work on the code is in `CLAUDE.md`, and what's installed in the user's place is in
+> `INSTALL.md`. Scripts now live in git (`src/`, Q12 answered yes). New since the original plan:
+> **character save slots** (built ahead of M1 at the user's request) and the **activity
+> framework + 4 activities** (pulled forward from M3, the user's priority).
+
 Era: 1897. Each milestone ends with a Play test (0 console errors), screenshots, a short report,
 and the user's go-ahead before the next one.
 
@@ -32,7 +38,7 @@ Shared (Config, Net, Roles, Money, Text), Profiles with session lock + mock stor
 scripts, debug bindable, LoadingScreen stub, Admin basics (kick/ban/mute, logs), Analytics
 module with the onboarding funnel.
 **Done when:** a player joins, a profile loads/saves across rejoin, staff can kick/ban, 0 errors.
-- [x] Built + Play-tested 2026-10-24 in Place1 (mock store). Waiting on the user's go-ahead. Details: `ReplicatedStorage.DESIGN_NOTES`.
+- [x] Built + Play-tested 2026-10-24 in Place1 (mock store). Details: `ReplicatedStorage.DESIGN_NOTES`.
 
 ### M1 — Greybox city + identity
 Blockout of the city from `systems/MAP_LAYOUT.md` + `map_layout.html` (bounds X −1150…1900,
@@ -41,6 +47,13 @@ Garden, Charing Cross terminus), roads wide enough for two carriages,
 spawns, district signs, day/night clock, gas lamps. First-join name picker (filtered),
 station/role select with seat limits, overhead name + title.
 **Done when:** two clients pick names and roles and see each other's tags; walk every district.
+- [x] Greybox city (map, plots, roads, kerbs, water, bridges, markers): built in the place by
+      `MapGreybox` from `map_layout_v2.json`.
+- [x] Character creator + save slots (name, look presets, linked slots, profile v2): **Play-tested
+      by the user, works**; name-tag fix waiting to be pasted (INSTALL 1b).
+- [x] Station roles with seat limits, overhead tags, world clock + HUD: built, not Play-tested.
+- [ ] Spawn at the terminus (T03), gas lamps (T04), quick phrases + emotes (T05), 3D outfits (T06),
+      lighting/fog (T07), forms of address (T08). The first-join flow moves to T25 (needs jobs).
 
 ### M2 — Economy + vehicles core
 Wallet (£ s d), wages, ledger, tax hook. Vehicle framework: spawn, seats, driver ownership,
@@ -48,6 +61,7 @@ speed check, no-vehicle-kill rule, zone blocking, mews storage. First vehicles i
 bicycle, hansom cab, horse omnibus.
 **Done when:** a player buys a bicycle that persists; a second player rides in a cab and an
 omnibus; hitting a pedestrian never hurts them.
+- [ ] Ledger T09, wallet HUD T10, bank T11, tax T12, vehicles T13–T14, shops T15, stipend T16.
 
 ### M3 — First jobs
 Cabbie (fares by distance, ranks, hailing), lamplighter, police constable (beat + whistle),
@@ -56,12 +70,16 @@ licences. HUD wallet + job tracker. First-join flow + goals HUD. NPC fallbacks f
 Activity framework + 4 starter activities (ducks, chess, test your strength, mudlarking).
 **Done when:** each job runs start-to-pay; a cab licence is required and enforced; a new player
 is earning within 60 s; each starter activity plays a full round.
+- [x] Activity framework + the 4 starter activities (ducks, test your strength, mudlarking, chess):
+      built, not Play-tested.
+- [ ] Job framework T17, jobs T18–T23, NPCs T24, first-join flow + goals T25, more activities T26–T29.
 
 ### M3b — Gathering
 Hub "appointments" every ~10 min with HUD countdown, cross-server "What's on" + Join, parties,
 join friends, daily tasks + stipend, letters.
 **Done when:** a player in server A sees and joins an event in server B; something starts in a
 hub every ~10 min.
+- [ ] T30–T33. Cross-server parts need the place published (see "Before M0").
 
 ### M4 — The Court
 Palace throne room, audience queue, protocol and Court chat channel, bow/curtsy, presentations,
@@ -69,6 +87,7 @@ appointments & honours menu, persistent title registry + MessagingService sync, 
 balcony appearance, Changing of the Guard (scheduled).
 **Done when:** a Crown player grants a title and an office; it shows in another server; a
 decree is proclaimed city-wide; the guard changes on schedule.
+- [ ] T34–T40. Note Q4 (2026-10-25) made titles per server, so "shows in another server" now means the cosmetic honour record only.
 
 ### M5 — Law & order
 Crimes + wanted marks, whistle alerts, cuffs, police van, cells, police court + full trial,
@@ -76,6 +95,7 @@ sentences (fine, prison, licence revoked, banishment), downed state + revive, sa
 speeding stops.
 **Done when:** a full pickpocket → arrest → trial → sentence loop works across 3 clients; a
 speeder is stopped and fined.
+- [ ] T41–T46.
 
 ### M6 — Property, wardrobe, motor cars
 Rentals with mews, door locks, keys, household staff jobs, furniture layouts. Wardrobe with
@@ -83,12 +103,14 @@ role-locked outfits and tailor shop. Motor cars (showroom, fuel, breakdowns, mot
 motor licence), private carriages.
 **Done when:** rent a townhouse, store a car in its mews, lock the door, wear a bought outfit;
 all persist.
+- [ ] T47–T49 (T06 3D outfits is the base for the wardrobe).
 
 ### M7 — Parliament + events
 Sittings, bills on real levers (incl. speed limit and cab fares), votes, Lords delay, royal
 assent. Event framework + State Procession, Royal Ball, Motor Run, Fire, Pea-souper, Tower
 Bridge lift, Market Day.
 **Done when:** a bill changes the speed limit live; a procession and a fire run start-to-finish.
+- [ ] T50–T53.
 
 ### M8 — Art pass + UI + all platforms
 Modular Victorian kit replaces every greybox building; interiors; vehicles' final models and
