@@ -1,0 +1,1196 @@
+<roblox xmlns:xmime="http://www.w3.org/2005/05/xmlmime" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://www.roblox.com/roblox.xsd" version="4"><Item class="LocalScript" referent="RBX00000028"><Properties><string name="Name">LondonClient</string><ProtectedString name="Source"><![CDATA[--!strict
+-- LondonClient: client boot. M0: wallet state and staff notices in chat. UI modules arrive from
+-- M1 as children of this script (UIKit, HUD, RoleMenu... TECH.md §3).
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TextChatService = game:GetService("TextChatService")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Net = require(Shared:WaitForChild("Net"))
+local Text = require(Shared:WaitForChild("Text"))
+
+require(script:WaitForChild("CharacterUI")).init()
+require(script:WaitForChild("IdentityUI")).init()
+require(script:WaitForChild("ClockHUD")).init()
+require(script:WaitForChild("Activities")).init()
+
+local State = { pence = 0, bank = 0 }
+
+Net.listen("Profile", "Wallet", function(msg)
+	if type(msg.pence) == "number" then
+		State.pence = msg.pence
+	end
+	if type(msg.bank) == "number" then
+		State.bank = msg.bank
+	end
+	script:SetAttribute("Pence", State.pence) -- read by tests until the HUD exists (M2)
+end)
+
+Net.listen("Admin", "Notice", function(msg)
+	if type(msg.text) ~= "string" then
+		return
+	end
+	local channels = TextChatService:FindFirstChild("TextChannels")
+	local system = if channels then channels:FindFirstChild("RBXSystem") else nil
+	if system and system:IsA("TextChannel") then
+		system:DisplaySystemMessage("<font color=\"#d9b36c\">[Staff]</font> " .. Text.escapeRich(msg.text))
+	end
+end)
+]]></ProtectedString></Properties><Item class="ModuleScript" referent="RBX00000024"><Properties><string name="Name">Activities</string><ProtectedString name="Source"><![CDATA[--!strict
+-- LondonClient.Activities (stub UI): reward toasts and notices for every activity, plus the
+-- per-activity UIs in child modules (Strength, Chess). Plain until the UI pass (ART §8, M8).
+-- Server: LondonServer.Activities (pushes Activity.Reward / Activity.Notice).
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
+
+local Net = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Net"))
+
+local Activities = {}
+Activities.CHILDREN = { "Strength", "Chess" }
+
+local INK = Color3.fromRGB(240, 232, 214)
+local GOLD = Color3.fromRGB(240, 205, 120)
+
+local gui: ScreenGui
+local stack: Frame
+local order = 0
+
+-- A short message at the right of the screen that fades after a few seconds.
+function Activities.toast(lines: { string }, colour: Color3?)
+	if #lines == 0 then
+		return
+	end
+	order += 1
+	local f = Instance.new("TextLabel")
+	f.LayoutOrder = order
+	f.AutomaticSize = Enum.AutomaticSize.Y
+	f.Size = UDim2.new(1, 0, 0, 0)
+	f.BackgroundColor3 = Color3.fromRGB(18, 16, 14)
+	f.BackgroundTransparency = 0.2
+	f.BorderSizePixel = 0
+	f.Font = Enum.Font.Garamond
+	f.TextSize = 20
+	f.TextWrapped = true
+	f.TextColor3 = colour or INK
+	f.Text = table.concat(lines, "\n")
+	local pad = Instance.new("UIPadding")
+	pad.PaddingTop, pad.PaddingBottom = UDim.new(0, 6), UDim.new(0, 6)
+	pad.Parent = f
+	f.Parent = stack
+	task.delay(4, function()
+		local info = TweenInfo.new(0.6)
+		TweenService:Create(f, info, { TextTransparency = 1, BackgroundTransparency = 1 }):Play()
+		task.wait(0.6)
+		f:Destroy()
+	end)
+end
+
+local function onReward(msg: any)
+	local lines = {}
+	local gold = false
+	if type(msg.pence) == "string" then
+		table.insert(lines, "+" .. msg.pence)
+	end
+	if type(msg.xp) == "number" and type(msg.hobby) == "string" then
+		table.insert(lines, string.format("+%d %s", msg.xp, msg.hobby))
+		if msg.levelUp then
+			table.insert(lines, string.format("%s is now level %d!", msg.hobby, msg.level))
+			gold = true
+		end
+	end
+	if type(msg.items) == "table" then
+		for _, it in msg.items do
+			if it.new then
+				table.insert(lines, "New for your collection: " .. tostring(it.name))
+				gold = true
+			else
+				table.insert(lines, "Found: " .. tostring(it.name))
+			end
+		end
+	end
+	if msg.capped then
+		table.insert(lines, "(No more pay from pastimes this hour)")
+	end
+	Activities.toast(lines, if gold then GOLD else nil)
+end
+
+function Activities.init()
+	gui = Instance.new("ScreenGui")
+	gui.Name = "Activities"
+	gui.ResetOnSpawn = false
+	gui.DisplayOrder = 5
+	stack = Instance.new("Frame")
+	stack.AnchorPoint = Vector2.new(1, 0.5)
+	stack.Position = UDim2.new(1, -12, 0.45, 0)
+	stack.Size = UDim2.fromOffset(280, 300)
+	stack.BackgroundTransparency = 1
+	stack.Parent = gui
+	local list = Instance.new("UIListLayout")
+	list.SortOrder = Enum.SortOrder.LayoutOrder
+	list.VerticalAlignment = Enum.VerticalAlignment.Bottom
+	list.Padding = UDim.new(0, 6)
+	list.Parent = stack
+	gui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
+
+	Net.listen("Activity", "Reward", onReward)
+	Net.listen("Activity", "Notice", function(msg)
+		if type(msg.text) == "string" then
+			Activities.toast({ msg.text })
+		end
+	end)
+	for _, name in Activities.CHILDREN do
+		require(script:WaitForChild(name) :: ModuleScript).init(Activities)
+	end
+end
+
+return Activities
+]]></ProtectedString></Properties><Item class="ModuleScript" referent="RBX00000022"><Properties><string name="Name">Chess</string><ProtectedString name="Source"><![CDATA[--!strict
+-- LondonClient.Activities.Chess (stub UI): the board for the two seated players.
+-- Tap one of your pieces to see its moves (Shared.Chess), tap a square to move. The server
+-- checks every move. Spectators watch the board on the table top instead.
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared:WaitForChild("Config"))
+local Net = require(Shared:WaitForChild("Net"))
+local Rules = require(Shared:WaitForChild("Chess"))
+
+local Chess = {}
+
+local LIGHT = Color3.fromRGB(222, 205, 170)
+local DARK = Color3.fromRGB(120, 85, 55)
+local LAST = Color3.fromRGB(205, 180, 90)
+local SELECTED = Color3.fromRGB(120, 160, 90)
+local TARGET = Color3.fromRGB(150, 190, 120)
+
+local gui: ScreenGui
+local header: TextLabel
+local statusLabel: TextLabel
+local resign: TextButton
+local cells: { TextButton } = {} -- indexed by board square 1..64
+local current: any = nil
+local selected = 0
+local targets: { number } = {}
+
+local REASONS = { checkmate = "by checkmate", resigned = "by resignation", time = "on time", stalemate = "stalemate", fifty = "fifty-move rule", bare = "only kings left" }
+
+local function stateOf(s: any): Rules.State
+	return { board = s.board, turn = s.turn, castle = s.castle, ep = s.ep, halfmove = s.halfmove, plies = s.plies }
+end
+
+local function myTurn(): boolean
+	return current ~= nil and current.board ~= nil and current.result == nil and current.turn == current.you
+end
+
+local function draw()
+	local s = current
+	if not s then
+		return
+	end
+	local flip = s.you == "b"
+	for i = 1, 64 do
+		local b = cells[i]
+		local f, r = Rules.fileRank(i)
+		local col = if flip then 8 - f else f - 1
+		local row = if flip then r - 1 else 8 - r
+		b.Position = UDim2.fromScale(col / 8, row / 8)
+		local piece = if s.board then s.board[i] else ""
+		b.Text = if piece ~= "" then (Config.CHESS_GLYPHS :: any)[string.sub(piece, 2, 2)] or "?" else ""
+		b.TextColor3 = if string.sub(piece, 1, 1) == "w" then Color3.fromRGB(250, 248, 240) else Color3.fromRGB(20, 18, 16)
+		local colour = if (f + r) % 2 == 0 then DARK else LIGHT
+		if s.last and (s.last.from == i or s.last.to == i) then
+			colour = LAST
+		end
+		if i == selected then
+			colour = SELECTED
+		elseif table.find(targets, i) then
+			colour = TARGET
+		end
+		b.BackgroundColor3 = colour
+	end
+	header.Text = string.format("White: %s   ·   Black: %s", s.white ~= "" and s.white or "(empty seat)", s.black ~= "" and s.black or "(empty seat)")
+	resign.Visible = s.board ~= nil and s.result == nil and s.plies > 0
+end
+
+local function statusText(): string
+	local s = current
+	if not s then
+		return ""
+	end
+	if s.result then
+		local why = REASONS[s.reason] or ""
+		if s.result == "draw" then
+			return "Drawn: " .. why
+		end
+		return (if s.result == s.you then "You win " else "You lose ") .. why
+	end
+	if not s.board then
+		return if s.white ~= "" and s.black ~= "" then "Setting up the pieces..." else "Waiting for an opponent to sit down"
+	end
+	local left = if s.deadline then math.max(0, math.floor(s.deadline - workspace:GetServerTimeNow())) else 0
+	local who = if myTurn() then "Your move" else "Their move"
+	return string.format("%s%s   (%d:%02d)", who, if s.status == "check" then " — check!" else "", left // 60, left % 60)
+end
+
+local function click(i: number)
+	local s = current
+	if not myTurn() then
+		return
+	end
+	if selected ~= 0 and table.find(targets, i) then
+		Net.send("Activity", "ChessMove", { table = s.table, from = selected, to = i })
+		selected, targets = 0, {}
+		draw()
+		return
+	end
+	local piece = s.board[i]
+	if piece ~= "" and string.sub(piece, 1, 1) == s.you then
+		selected = i
+		targets = Rules.legalFrom(stateOf(s), i)
+	else
+		selected, targets = 0, {}
+	end
+	draw()
+end
+
+function Chess.init(_activities: any)
+	gui = Instance.new("ScreenGui")
+	gui.Name = "ChessBoard"
+	gui.ResetOnSpawn = false
+	gui.Enabled = false
+	local frame = Instance.new("Frame")
+	frame.AnchorPoint = Vector2.new(0.5, 0.5)
+	frame.Position = UDim2.fromScale(0.5, 0.5)
+	frame.Size = UDim2.fromScale(0.62, 0.62)
+	frame.SizeConstraint = Enum.SizeConstraint.RelativeYY -- square, sized from the screen height
+	frame.BackgroundTransparency = 1
+	frame.Parent = gui
+	local limit = Instance.new("UISizeConstraint")
+	limit.MaxSize = Vector2.new(480, 480)
+	limit.Parent = frame
+	for i = 1, 64 do
+		local b = Instance.new("TextButton")
+		b.Size = UDim2.fromScale(1 / 8, 1 / 8)
+		b.BorderSizePixel = 0
+		b.AutoButtonColor = false
+		b.TextScaled = true
+		b.Font = Enum.Font.SourceSans
+		b.TextStrokeTransparency = 0.6
+		b.Text = ""
+		b.Parent = frame
+		b.Activated:Connect(function()
+			click(i)
+		end)
+		cells[i] = b
+	end
+	local function label(y: number, size: number): TextLabel
+		local l = Instance.new("TextLabel")
+		l.AnchorPoint = Vector2.new(0.5, if y < 0 then 1 else 0)
+		l.Position = UDim2.new(0.5, 0, if y < 0 then 0 else 1, y)
+		l.Size = UDim2.new(1.4, 0, 0, size + 8)
+		l.BackgroundTransparency = 1
+		l.Font = Enum.Font.Garamond
+		l.TextSize = size
+		l.TextColor3 = Color3.fromRGB(240, 232, 214)
+		l.TextStrokeTransparency = 0.4
+		l.Parent = frame
+		return l
+	end
+	header = label(-8, 20)
+	statusLabel = label(6, 22)
+	resign = Instance.new("TextButton")
+	-- beside the board's bottom-right corner: below it would fall off a 360 px tall phone screen
+	resign.AnchorPoint = Vector2.new(0, 1)
+	resign.Position = UDim2.new(1, 12, 1, 0)
+	resign.Size = UDim2.fromOffset(140, 38)
+	resign.BackgroundColor3 = Color3.fromRGB(60, 52, 42)
+	resign.Font = Enum.Font.Garamond
+	resign.TextSize = 20
+	resign.TextColor3 = Color3.fromRGB(240, 232, 214)
+	resign.Text = "Resign"
+	resign.Parent = frame
+	resign.Activated:Connect(function()
+		if current then
+			Net.send("Activity", "ChessResign", { table = current.table })
+		end
+	end)
+	gui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
+
+	Net.listen("Activity", "ChessState", function(msg)
+		current = msg
+		selected, targets = 0, {}
+		gui.Enabled = true
+		draw()
+	end)
+	Net.listen("Activity", "ChessLeave", function()
+		current = nil
+		gui.Enabled = false
+	end)
+	RunService.Heartbeat:Connect(function()
+		if gui.Enabled then
+			statusLabel.Text = statusText()
+		end
+	end)
+end
+
+return Chess
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX00000023"><Properties><string name="Name">Strength</string><ProtectedString name="Source"><![CDATA[--!strict
+-- LondonClient.Activities.Strength (stub UI): the swing meter for test your strength.
+-- Draws Shared.Meter on the server clock and sends the press time; the server scores it.
+-- Swing: the SWING button, F, or a gamepad R2 / A.
+local ContextActionService = game:GetService("ContextActionService")
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared:WaitForChild("Config"))
+local Net = require(Shared:WaitForChild("Net"))
+local Meter = require(Shared:WaitForChild("Meter"))
+
+local Strength = {}
+
+local gui: ScreenGui
+local marker: Frame
+local info: TextLabel
+local session: { start: number, period: number, left: number }? = nil
+local stepConn: RBXScriptConnection? = nil
+
+local ACTION = "LondonStrengthSwing"
+
+local function swing()
+	if not session or session.left <= 0 then
+		return
+	end
+	Net.send("Activity", "StrengthSwing", { t = workspace:GetServerTimeNow() })
+end
+
+local function stop()
+	session = nil
+	ContextActionService:UnbindAction(ACTION)
+	if stepConn then
+		stepConn:Disconnect()
+		stepConn = nil
+	end
+	gui.Enabled = false
+end
+
+function Strength.init(_activities: any)
+	gui = Instance.new("ScreenGui")
+	gui.Name = "StrengthMeter"
+	gui.ResetOnSpawn = false
+	gui.Enabled = false
+	-- Everything stays within ~130 px of the centre: a landscape phone is ~360 px tall.
+	local bar = Instance.new("Frame")
+	bar.AnchorPoint = Vector2.new(1, 0.5)
+	bar.Position = UDim2.new(0.5, -110, 0.5, 0)
+	bar.Size = UDim2.new(0, 40, 0.7, 0)
+	local barLimit = Instance.new("UISizeConstraint")
+	barLimit.MaxSize = Vector2.new(40, 300)
+	barLimit.Parent = bar
+	bar.BackgroundColor3 = Color3.fromRGB(40, 34, 28)
+	bar.BorderSizePixel = 0
+	bar.Parent = gui
+	local bellLine = Instance.new("Frame") -- the gold zone at the top that rings the bell
+	bellLine.Size = UDim2.new(1, 0, 1 - Config.STRENGTH_BELL / 100, 0)
+	bellLine.BackgroundColor3 = Color3.fromRGB(200, 160, 60)
+	bellLine.BorderSizePixel = 0
+	bellLine.Parent = bar
+	marker = Instance.new("Frame")
+	marker.AnchorPoint = Vector2.new(0, 0.5)
+	marker.Size = UDim2.new(1, 12, 0, 6)
+	marker.Position = UDim2.new(0, -6, 1, 0)
+	marker.BackgroundColor3 = Color3.fromRGB(240, 232, 214)
+	marker.BorderSizePixel = 0
+	marker.Parent = bar
+	info = Instance.new("TextLabel")
+	info.AnchorPoint = Vector2.new(0, 1)
+	info.Position = UDim2.new(0.5, -90, 0.5, -6)
+	info.Size = UDim2.fromOffset(320, 50)
+	info.TextXAlignment = Enum.TextXAlignment.Left
+	info.BackgroundTransparency = 1
+	info.Font = Enum.Font.Garamond
+	info.TextSize = 24
+	info.TextColor3 = Color3.fromRGB(240, 232, 214)
+	info.TextStrokeTransparency = 0.5
+	info.Parent = gui
+	local button = Instance.new("TextButton")
+	button.AnchorPoint = Vector2.new(0, 0)
+	button.Position = UDim2.new(0.5, -90, 0.5, 6)
+	button.Size = UDim2.fromOffset(180, 56)
+	button.BackgroundColor3 = Color3.fromRGB(150, 40, 35)
+	button.Font = Enum.Font.GaramondBold
+	button.TextSize = 28
+	button.TextColor3 = Color3.fromRGB(250, 230, 180)
+	button.Text = "SWING"
+	button.Parent = gui
+	button.Activated:Connect(swing)
+	gui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
+
+	Net.listen("Activity", "StrengthStart", function(msg)
+		session = { start = msg.start, period = msg.period, left = msg.swings }
+		info.Text = string.format("%d swings. Hit the gold for the bell!", msg.swings)
+		gui.Enabled = true
+		ContextActionService:BindAction(ACTION, function(_, state)
+			if state == Enum.UserInputState.Begin then
+				swing()
+			end
+			return Enum.ContextActionResult.Sink
+		end, false, Enum.KeyCode.F, Enum.KeyCode.ButtonR2, Enum.KeyCode.ButtonA)
+		if stepConn then
+			stepConn:Disconnect()
+		end
+		stepConn = RunService.RenderStepped:Connect(function()
+			local s = session
+			if not s then
+				return
+			end
+			local elapsed = workspace:GetServerTimeNow() - s.start
+			local v = if elapsed < 0 then 0 else Meter.value(elapsed, s.period)
+			marker.Position = UDim2.new(0, -6, 1 - v, 0)
+		end)
+	end)
+	Net.listen("Activity", "StrengthResult", function(msg)
+		if session then
+			session.left = msg.left
+		end
+		local head = if msg.bell then string.format("DING! %d", msg.score) else tostring(msg.score)
+		info.Text = head .. (if msg.left > 0 then string.format("   (%d left)", msg.left) else "")
+	end)
+	Net.listen("Activity", "StrengthEnd", function(msg)
+		info.Text = string.format("Best: %d", msg.best)
+		session = nil
+		task.delay(1.5, function()
+			if not session then
+				stop()
+			end
+		end)
+	end)
+end
+
+return Strength
+]]></ProtectedString></Properties></Item></Item><Item class="ModuleScript" referent="RBX00000025"><Properties><string name="Name">CharacterUI</string><ProtectedString name="Source"><![CDATA[--!strict
+-- LondonClient.CharacterUI (stub): the character menu shown at the start of every session, and
+-- from the "Characters" button. Pick a slot to play, create a character (name + skin + hair +
+-- outfit), share an existing character's progress into a new slot, rename or delete.
+-- Plain on purpose: the real look comes from the user's references in the UI pass (ART §8, M8).
+-- Server: LondonServer.Characters (Character.List / Create / Link / Select / Rename / Delete).
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared:WaitForChild("Config"))
+local Net = require(Shared:WaitForChild("Net"))
+local Names = require(Shared:WaitForChild("Names"))
+local Money = require(Shared:WaitForChild("Money"))
+local Looks = require(Shared:WaitForChild("Looks"))
+
+local CharacterUI = {}
+
+local INK = Color3.fromRGB(230, 220, 200)
+local PAPER = Color3.fromRGB(18, 16, 14)
+local MUTED = Color3.fromRGB(150, 140, 125)
+local ERROR = Color3.fromRGB(220, 120, 100)
+local BUTTON = Color3.fromRGB(60, 52, 42)
+local PICKED = Color3.fromRGB(150, 120, 60)
+
+local player = Players.LocalPlayer
+local rng = Random.new()
+local list: any = { loaded = false }
+
+local gui: ScreenGui
+local openButton: TextButton
+local menu: GuiObject -- slot list
+local form: GuiObject -- create / link / rename (scrolls)
+local confirmBox: GuiObject -- delete
+
+-- Shared builders ---------------------------------------------------------------------------
+local function make(cls: string, parent: Instance, props: { [string]: any }): any
+	local o: any = Instance.new(cls :: any)
+	if o:IsA("GuiObject") then
+		o.BorderSizePixel = 0
+	end
+	if o:IsA("TextLabel") or o:IsA("TextButton") or o:IsA("TextBox") then
+		o.BackgroundTransparency = 1
+		o.Font = Enum.Font.Garamond
+		o.TextColor3 = INK
+		o.TextSize = 20
+	end
+	for k, v in props do
+		o[k] = v
+	end
+	o.Parent = parent
+	return o
+end
+
+local function button(parent: Instance, text: string, props: { [string]: any }): TextButton
+	local b = make("TextButton", parent, props)
+	b.Text = text
+	b.BackgroundTransparency = 0
+	b.BackgroundColor3 = props.BackgroundColor3 or BUTTON
+	b.AutoButtonColor = true
+	return b
+end
+
+local function panel(name: string, w: number, h: number, scrolls: boolean?): GuiObject
+	local f = make(if scrolls then "ScrollingFrame" else "Frame", gui, {
+		Name = name,
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
+		Size = UDim2.new(0.94, 0, 0.9, 0),
+		BackgroundColor3 = PAPER,
+		BackgroundTransparency = 0.08,
+		Visible = false,
+	})
+	if scrolls then -- phones in landscape are ~360 px tall: let long forms scroll
+		f.AutomaticCanvasSize = Enum.AutomaticSize.Y
+		f.CanvasSize = UDim2.new()
+		f.ScrollBarThickness = 6
+	end
+	make("UISizeConstraint", f, { MaxSize = Vector2.new(w, h) })
+	return f
+end
+
+local function padList(parent: Instance, padding: number)
+	make("UIListLayout", parent, { SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, padding), HorizontalAlignment = Enum.HorizontalAlignment.Center })
+	make("UIPadding", parent, { PaddingLeft = UDim.new(0, 14), PaddingRight = UDim.new(0, 14), PaddingTop = UDim.new(0, 12), PaddingBottom = UDim.new(0, 12) })
+end
+
+local function hasCharacter(): boolean
+	return list.loaded and list.active ~= "" and list.slots[list.active] ~= nil
+end
+
+local function show(which: GuiObject?)
+	menu.Visible = which == menu
+	form.Visible = which == form
+	confirmBox.Visible = which == confirmBox
+	openButton.Visible = which == nil and hasCharacter()
+end
+
+-- Camera while no character is in the world ------------------------------------------------------
+local function menuCamera()
+	local cam = workspace.CurrentCamera
+	if not player.Character and cam then
+		cam.CameraType = Enum.CameraType.Scriptable
+		cam.CFrame = CFrame.lookAt(Config.MENU_CAMERA.from, Config.MENU_CAMERA.to)
+	end
+end
+
+-- Slot list ----------------------------------------------------------------------------------------
+local menuBody: ScrollingFrame
+local menuError: TextLabel
+local renderMenu: () -> ()
+local openForm: (mode: string, key: string) -> ()
+local openDelete: (key: string) -> ()
+
+local function call(action: string, payload: { [string]: any }, errLabel: TextLabel): boolean
+	errLabel.Text = "One moment..."
+	local ok, res = Net.request("Character", action, payload)
+	if ok then
+		errLabel.Text = ""
+		list = res
+		renderMenu()
+		return true
+	end
+	errLabel.Text = tostring(res)
+	return false
+end
+
+renderMenu = function()
+	for _, c in menuBody:GetChildren() do
+		if c:IsA("GuiObject") then
+			c:Destroy()
+		end
+	end
+	if not list.loaded then
+		return
+	end
+	local filled = 0
+	for _ in list.slots do
+		filled += 1
+	end
+	for i = 1, list.maxSlots do
+		local key = tostring(i)
+		local s = list.slots[key]
+		local row = make("Frame", menuBody, { LayoutOrder = i, Size = UDim2.new(1, 0, 0, 96), BackgroundColor3 = Color3.fromRGB(34, 30, 26) })
+		if s then
+			make("TextLabel", row, { Text = s.first .. " " .. s.last, TextSize = 26, TextXAlignment = Enum.TextXAlignment.Left, Position = UDim2.fromOffset(12, 6), Size = UDim2.new(1, -24, 0, 30) })
+			local sub = s.summary
+			if s.linked then
+				sub ..= string.format("  ·  shares progress with %d other slot%s", s.shared - 1, if s.shared > 2 then "s" else "")
+			end
+			make("TextLabel", row, { Text = sub, TextSize = 16, TextColor3 = MUTED, TextXAlignment = Enum.TextXAlignment.Left, Position = UDim2.fromOffset(12, 36), Size = UDim2.new(1, -24, 0, 20) })
+			local isActive = list.active == key
+			local play = button(row, if isActive then "Playing" else "Play", { Position = UDim2.new(0, 12, 1, -36), Size = UDim2.fromOffset(110, 30), BackgroundColor3 = if isActive then PICKED else BUTTON })
+			play.Activated:Connect(function()
+				if not isActive and call("Select", { slot = key }, menuError) then
+					show(nil)
+				end
+			end)
+			local rename = button(row, if s.renameIn > 0 then string.format("Rename (%dd)", math.ceil(s.renameIn / 86400)) else "Rename", { Position = UDim2.new(0, 130, 1, -36), Size = UDim2.fromOffset(120, 30) })
+			rename.Activated:Connect(function()
+				openForm("rename", key)
+			end)
+			local del = button(row, "Delete", { Position = UDim2.new(1, -102, 1, -36), Size = UDim2.fromOffset(90, 30) })
+			del.Activated:Connect(function()
+				openDelete(key)
+			end)
+		else
+			make("TextLabel", row, { Text = string.format("Slot %d: empty", i), TextSize = 22, TextColor3 = MUTED, TextXAlignment = Enum.TextXAlignment.Left, Position = UDim2.fromOffset(12, 6), Size = UDim2.new(1, -24, 0, 30) })
+			local newText = if list.newPrice > 0 then "New character · " .. list.newPriceText else "New character"
+			local new = button(row, newText, { Position = UDim2.new(0, 12, 1, -40), Size = UDim2.new(0.5, -18, 0, 32) })
+			new.Activated:Connect(function()
+				openForm("new", key)
+			end)
+			if filled > 0 then
+				local link = button(row, "Share progress · " .. list.linkPriceText, { Position = UDim2.new(0.5, 6, 1, -40), Size = UDim2.new(0.5, -18, 0, 32) })
+				link.Activated:Connect(function()
+					openForm("link", key)
+				end)
+			end
+		end
+	end
+	make("TextLabel", menuBody, { LayoutOrder = 100, Text = "Funds (wallet + bank): " .. Money.format(list.money), TextSize = 18, TextColor3 = MUTED, Size = UDim2.new(1, 0, 0, 24) })
+	if hasCharacter() then
+		local close = button(menuBody, "Back to the city", { LayoutOrder = 101, Size = UDim2.fromOffset(200, 36) })
+		close.Activated:Connect(function()
+			show(nil)
+		end)
+	end
+end
+
+local function buildMenu()
+	menu = panel("CharacterMenu", 560, 560)
+	make("TextLabel", menu, { Text = "Your Characters", TextSize = 32, Position = UDim2.fromOffset(0, 10), Size = UDim2.new(1, 0, 0, 38) })
+	make("TextLabel", menu, {
+		Text = "Money and your collection book are shared by all your characters. Sharing progress gives a new character the same job ranks, hobbies and licences, and progress counts for both.",
+		TextSize = 16, TextColor3 = MUTED, TextWrapped = true, Position = UDim2.new(0, 16, 0, 50), Size = UDim2.new(1, -32, 0, 40),
+	})
+	menuError = make("TextLabel", menu, { Text = "", TextColor3 = ERROR, TextSize = 17, TextWrapped = true, Position = UDim2.new(0, 16, 0, 92), Size = UDim2.new(1, -32, 0, 22) })
+	menuBody = make("ScrollingFrame", menu, {
+		Position = UDim2.fromOffset(0, 116), Size = UDim2.new(1, 0, 1, -116), BackgroundTransparency = 1,
+		AutomaticCanvasSize = Enum.AutomaticSize.Y, CanvasSize = UDim2.new(), ScrollBarThickness = 6,
+	})
+	padList(menuBody, 8)
+end
+
+-- Create / link / rename form ------------------------------------------------------------------------
+local formTitle: TextLabel
+local formError: TextLabel
+local firstBox: TextBox
+local lastBox: TextBox
+local lookRows: { GuiObject } = {}
+local linkRow: Frame
+local pick = { skin = 1, hair = Config.HAIR_STYLES[1].id, outfit = Config.OUTFITS[1].id, from = "" }
+local formMode, formKey = "new", "1"
+local refreshPicks: () -> ()
+
+local function choiceRow(order: number, title: string, items: { { id: any, text: string, colour: Color3? } }, field: string, swatch: boolean): Frame
+	local row = make("Frame", form, { LayoutOrder = order, Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1 })
+	make("UIListLayout", row, { SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 4) })
+	make("TextLabel", row, { LayoutOrder = 0, Text = title, TextSize = 18, TextColor3 = MUTED, TextXAlignment = Enum.TextXAlignment.Left, Size = UDim2.new(1, 0, 0, 22) })
+	local wrap = make("Frame", row, { LayoutOrder = 1, Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1 })
+	make("UIGridLayout", wrap, {
+		CellSize = if swatch then UDim2.fromOffset(40, 40) else UDim2.fromOffset(160, 34),
+		CellPadding = UDim2.fromOffset(6, 6), SortOrder = Enum.SortOrder.LayoutOrder,
+	})
+	for i, it in items do
+		local b = button(wrap, if swatch then "" else it.text, { LayoutOrder = i, TextSize = 17 })
+		if it.colour then
+			b.BackgroundColor3 = it.colour
+		end
+		b:SetAttribute("Field", field)
+		b:SetAttribute("Value", it.id)
+		b.Activated:Connect(function()
+			local picks: any = pick
+			picks[field] = it.id
+			refreshPicks()
+		end)
+	end
+	return row
+end
+
+refreshPicks = function()
+	for _, d in form:GetDescendants() do
+		if d:IsA("TextButton") and d:GetAttribute("Field") then
+			local chosen = (pick :: any)[d:GetAttribute("Field") :: string] == d:GetAttribute("Value")
+			local isSwatch = d:GetAttribute("Field") == "skin"
+			if isSwatch then
+				-- Border mode: on a TextButton a stroke outlines the text by default, and swatches have none
+				local stroke = d:FindFirstChildOfClass("UIStroke") or make("UIStroke", d, { Thickness = 3, ApplyStrokeMode = Enum.ApplyStrokeMode.Border })
+				stroke.Color = PICKED
+				stroke.Enabled = chosen
+			else
+				d.BackgroundColor3 = if chosen then PICKED else BUTTON
+			end
+		end
+	end
+end
+
+local function rebuildLinkRow()
+	if linkRow then
+		linkRow:Destroy()
+	end
+	local items = {}
+	for i = 1, list.maxSlots do
+		local s = list.slots[tostring(i)]
+		if s then
+			table.insert(items, { id = tostring(i), text = s.first .. " " .. s.last })
+		end
+	end
+	linkRow = choiceRow(2, "Share progress with", items, "from", false)
+	pick.from = if items[1] then items[1].id else ""
+end
+
+local function buildForm()
+	form = panel("CharacterForm", 560, 640, true)
+	padList(form, 8)
+	formTitle = make("TextLabel", form, { LayoutOrder = 0, Text = "", TextSize = 30, Size = UDim2.new(1, 0, 0, 36) })
+	local names = make("Frame", form, { LayoutOrder = 1, Size = UDim2.new(1, 0, 0, 40), BackgroundTransparency = 1 })
+	local function box(x: number, placeholder: string): TextBox
+		local b = make("TextBox", names, {
+			PlaceholderText = placeholder, Text = "", ClearTextOnFocus = false, BackgroundTransparency = 0,
+			BackgroundColor3 = Color3.fromRGB(38, 34, 29), Position = UDim2.new(x, 0, 0, 0), Size = UDim2.new(0.38, -6, 1, 0),
+		})
+		b:GetPropertyChangedSignal("Text"):Connect(function()
+			local len = utf8.len(b.Text) or 0
+			if len > Config.NAME_MAX then
+				b.Text = string.sub(b.Text, 1, (utf8.offset(b.Text, Config.NAME_MAX + 1) or (#b.Text + 1)) - 1)
+			end
+		end)
+		return b
+	end
+	firstBox = box(0, "First name")
+	lastBox = box(0.38, "Last name")
+	local suggest = button(names, "Suggest", { Position = UDim2.new(0.76, 0, 0, 0), Size = UDim2.new(0.24, 0, 1, 0) })
+	suggest.Activated:Connect(function()
+		firstBox.Text, lastBox.Text = Names.suggest(rng)
+	end)
+
+	local skins = {}
+	for i, c in Config.SKIN_TONES do
+		table.insert(skins, { id = i, text = "", colour = c })
+	end
+	local hairs, outfits = {}, {}
+	for _, h in Config.HAIR_STYLES do
+		table.insert(hairs, { id = h.id, text = h.name })
+	end
+	for _, o in Config.OUTFITS do
+		table.insert(outfits, { id = o.id, text = o.name })
+	end
+	lookRows = {
+		choiceRow(3, "Skin tone", skins, "skin", true),
+		choiceRow(4, "Hair", hairs, "hair", false),
+		choiceRow(5, "Outfit", outfits, "outfit", false),
+	}
+	formError = make("TextLabel", form, { LayoutOrder = 6, Text = "", TextColor3 = ERROR, TextSize = 17, TextWrapped = true, Size = UDim2.new(1, 0, 0, 40) })
+	local buttons = make("Frame", form, { LayoutOrder = 7, Size = UDim2.new(1, 0, 0, 44), BackgroundTransparency = 1 })
+	local back = button(buttons, "Back", { Size = UDim2.new(0.5, -6, 1, 0) })
+	local confirm = button(buttons, "Confirm", { Position = UDim2.new(0.5, 6, 0, 0), Size = UDim2.new(0.5, -6, 1, 0) })
+	back.Activated:Connect(function()
+		show(menu)
+	end)
+	local busy = false
+	confirm.Activated:Connect(function()
+		if busy then
+			return
+		end
+		for _, b in { firstBox, lastBox } do -- explain local rule breaks without a round trip
+			local _, why = Names.cleanPart(b.Text)
+			if why then
+				formError.Text = why
+				return
+			end
+		end
+		local look = Looks.clean(pick.skin, pick.hair, pick.outfit)
+		if formMode ~= "rename" and not look then
+			formError.Text = "Please pick a look."
+			return
+		end
+		busy = true
+		local payload: { [string]: any } = { slot = formKey, first = firstBox.Text, last = lastBox.Text }
+		local action = "Rename"
+		if formMode ~= "rename" then
+			payload.skin, payload.hair, payload.outfit = pick.skin, pick.hair, pick.outfit
+			action = "Create"
+			if formMode == "link" then
+				payload.from = pick.from
+				action = "Link"
+			end
+		end
+		local ok = call(action, payload, formError)
+		busy = false
+		if ok then
+			-- a first character is played at once: straight into the city
+			show(if action == "Create" and list.active == formKey then nil else menu)
+		end
+	end)
+end
+
+openForm = function(mode: string, key: string)
+	formMode, formKey = mode, key
+	formError.Text = ""
+	local s = list.slots[key]
+	if mode == "rename" and s then
+		formTitle.Text = "Rename " .. s.first .. " " .. s.last
+		firstBox.Text, lastBox.Text = s.first, s.last
+	else
+		formTitle.Text = if mode == "link" then "New character, shared progress" else "New character"
+		firstBox.Text, lastBox.Text = "", ""
+		pick.skin, pick.hair, pick.outfit = Looks.default().skin, Looks.default().hair, Looks.default().outfit
+	end
+	for _, r in lookRows do
+		r.Visible = mode ~= "rename"
+	end
+	if mode == "link" then
+		rebuildLinkRow()
+	elseif linkRow then
+		linkRow:Destroy()
+		linkRow = nil :: any
+	end
+	if mode == "link" then
+		formError.Text = "Costs " .. list.linkPriceText .. " from your funds."
+	elseif mode == "new" and list.newPrice > 0 then
+		formError.Text = "Costs " .. list.newPriceText .. " from your funds."
+	end
+	refreshPicks()
+	show(form)
+end
+
+-- Delete confirmation ---------------------------------------------------------------------------------
+local confirmText: TextLabel
+local confirmInput: TextBox
+local confirmError: TextLabel
+local deleteKey = ""
+
+local function buildConfirm()
+	confirmBox = panel("CharacterDelete", 480, 280)
+	padList(confirmBox, 8)
+	confirmText = make("TextLabel", confirmBox, { LayoutOrder = 1, Text = "", TextWrapped = true, TextSize = 19, Size = UDim2.new(1, 0, 0, 90) })
+	confirmInput = make("TextBox", confirmBox, { LayoutOrder = 2, Text = "", PlaceholderText = "Full name", ClearTextOnFocus = false, BackgroundTransparency = 0, BackgroundColor3 = Color3.fromRGB(38, 34, 29), Size = UDim2.new(1, 0, 0, 38) })
+	confirmError = make("TextLabel", confirmBox, { LayoutOrder = 3, Text = "", TextColor3 = ERROR, TextSize = 17, Size = UDim2.new(1, 0, 0, 22) })
+	local buttons = make("Frame", confirmBox, { LayoutOrder = 4, Size = UDim2.new(1, 0, 0, 40), BackgroundTransparency = 1 })
+	local back = button(buttons, "Keep", { Size = UDim2.new(0.5, -6, 1, 0) })
+	local del = button(buttons, "Delete forever", { Position = UDim2.new(0.5, 6, 0, 0), Size = UDim2.new(0.5, -6, 1, 0), BackgroundColor3 = Color3.fromRGB(120, 40, 35) })
+	back.Activated:Connect(function()
+		show(menu)
+	end)
+	del.Activated:Connect(function()
+		if call("Delete", { slot = deleteKey, confirm = confirmInput.Text }, confirmError) then
+			menuCamera() -- deleting the character being played removes its body
+			show(menu)
+		end
+	end)
+end
+
+openDelete = function(key: string)
+	local s = list.slots[key]
+	if not s then
+		return
+	end
+	deleteKey = key
+	local full = s.first .. " " .. s.last
+	local keeps = if s.shared > 1 then "Their progress stays with the other slot that shares it." else "Their job ranks, hobbies and licences will be lost. Money and your collection stay on your account."
+	confirmText.Text = string.format("Delete %s? %s\nType \"%s\" to confirm.", full, keeps, full)
+	confirmInput.Text = ""
+	confirmError.Text = ""
+	show(confirmBox)
+end
+
+-- Boot ---------------------------------------------------------------------------------------------------
+function CharacterUI.open()
+	renderMenu()
+	if list.loaded and next(list.slots) == nil then
+		openForm("new", "1") -- first visit: straight to the creator
+	else
+		show(menu)
+	end
+end
+
+function CharacterUI.init()
+	gui = Instance.new("ScreenGui")
+	gui.Name = "Characters"
+	gui.ResetOnSpawn = false
+	gui.DisplayOrder = 20
+	gui.IgnoreGuiInset = true
+	buildMenu()
+	buildForm()
+	buildConfirm()
+	openButton = button(gui, "Characters", { AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0, 240, 1, -12), Size = UDim2.fromOffset(140, 40), Visible = false })
+	openButton.Activated:Connect(CharacterUI.open)
+	gui.Parent = player:WaitForChild("PlayerGui")
+
+	Net.listen("Character", "List", function(msg)
+		list = msg
+		if menu.Visible then
+			renderMenu()
+		end
+	end)
+	player.CharacterAdded:Connect(function(character)
+		local cam = workspace.CurrentCamera
+		local hum = character:WaitForChild("Humanoid", 10)
+		if cam and hum then
+			cam.CameraType = Enum.CameraType.Custom
+			cam.CameraSubject = hum :: Humanoid
+		end
+		if not menu.Visible and not form.Visible and not confirmBox.Visible then
+			show(nil)
+		end
+	end)
+	task.spawn(function()
+		while not player:GetAttribute("ProfileLoaded") do
+			task.wait(0.2)
+		end
+		for _ = 1, 10 do -- a slow first request mustn't leave an empty menu
+			local ok, res = Net.request("Character", "List")
+			if ok and type(res) == "table" and res.loaded then
+				list = res
+				break
+			end
+			task.wait(1)
+		end
+		menuCamera()
+		if not player.Character then
+			CharacterUI.open()
+		else
+			show(nil)
+		end
+	end)
+end
+
+return CharacterUI
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX00000026"><Properties><string name="Name">ClockHUD</string><ProtectedString name="Source"><![CDATA[--!strict
+-- LondonClient.ClockHUD (stub): the in-game time at the top of the screen, e.g. "6:45 pm · Dusk".
+-- Reads Lighting.ClockTime and the "Phase" attribute set by LondonServer.WorldClock.
+local Lighting = game:GetService("Lighting")
+local Players = game:GetService("Players")
+
+local ClockHUD = {}
+
+function ClockHUD.format(h: number): string
+	local hour = math.floor(h) % 24
+	local minute = math.floor((h % 1) * 60 / 5) * 5 -- 5-minute steps so it doesn't flicker
+	local suffix = if hour < 12 then "am" else "pm"
+	local h12 = if hour % 12 == 0 then 12 else hour % 12
+	return string.format("%d:%02d %s", h12, minute, suffix)
+end
+
+function ClockHUD.init()
+	local gui = Instance.new("ScreenGui")
+	gui.Name = "ClockHUD"
+	gui.ResetOnSpawn = false
+	local l = Instance.new("TextLabel")
+	l.AnchorPoint = Vector2.new(0.5, 0)
+	l.Position = UDim2.new(0.5, 0, 0, 6)
+	l.Size = UDim2.fromOffset(220, 26)
+	l.BackgroundTransparency = 1
+	l.Font = Enum.Font.Garamond
+	l.TextSize = 20
+	l.TextColor3 = Color3.fromRGB(240, 232, 214)
+	l.TextStrokeTransparency = 0.5
+	l.Parent = gui
+	gui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
+
+	local function update()
+		local phase = Lighting:GetAttribute("Phase")
+		l.Text = ClockHUD.format(Lighting.ClockTime) .. (if type(phase) == "string" then " · " .. phase else "")
+	end
+	Lighting:GetPropertyChangedSignal("ClockTime"):Connect(update)
+	Lighting:GetAttributeChangedSignal("Phase"):Connect(update)
+	update()
+end
+
+return ClockHUD
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX00000027"><Properties><string name="Name">IdentityUI</string><ProtectedString name="Source"><![CDATA[--!strict
+-- LondonClient.IdentityUI (stub): the station/role menu (M1). Names are picked in the character
+-- creator (LondonClient.CharacterUI). Plain on purpose: the real look comes from the user's
+-- references in the UI pass (ART §8, M8).
+-- Server: LondonServer.Identity (Identity.Get / ChooseRole, pushes State and Seats).
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared:WaitForChild("Config"))
+local Net = require(Shared:WaitForChild("Net"))
+local Stations = require(Shared:WaitForChild("Stations"))
+
+local IdentityUI = {}
+
+local INK = Color3.fromRGB(230, 220, 200)
+local PAPER = Color3.fromRGB(18, 16, 14)
+local MUTED = Color3.fromRGB(150, 140, 125)
+local ERROR = Color3.fromRGB(220, 120, 100)
+
+local player = Players.LocalPlayer
+local current: { [string]: any } = {}
+local seats: { [string]: number } = {}
+
+local gui: ScreenGui
+local roleButton: TextButton
+local rolePanel: ScrollingFrame
+local roleError: TextLabel
+local rows: { [string]: TextButton } = {}
+
+local function text(parent: Instance, cls: string, props: { [string]: any }): any
+	local o = Instance.new(cls :: any) :: any
+	o.BackgroundTransparency = 1
+	o.Font = Enum.Font.Garamond
+	o.TextColor3 = INK
+	o.TextSize = 20
+	for k, v in props do
+		o[k] = v
+	end
+	o.Parent = parent
+	return o
+end
+
+local function button(parent: Instance, label: string, props: { [string]: any }): TextButton
+	local b = text(parent, "TextButton", props)
+	b.Text = label
+	b.BackgroundTransparency = 0
+	b.BackgroundColor3 = Color3.fromRGB(60, 52, 42)
+	b.AutoButtonColor = true
+	return b
+end
+
+-- Role menu --------------------------------------------------------------------------
+local function rowText(r: Stations.Role): string
+	local s = r.name
+	if r.seats then
+		s ..= string.format("  (%d/%d)", seats[r.id] or 0, r.seats)
+	end
+	if r.minPlaytime then
+		s ..= string.format("  · %d h played", math.ceil(r.minPlaytime / 3600))
+	end
+	return s
+end
+
+local function refreshRows()
+	for id, b in rows do
+		local r = Stations.BY_ID[id]
+		local full = r.seats ~= nil and (seats[id] or 0) >= r.seats
+		local mine = current.role == id
+		b.Text = (if mine then "▸ " else "") .. rowText(r)
+		b.TextColor3 = if mine then Color3.fromRGB(240, 205, 120) elseif full then MUTED else INK
+	end
+	local r = Stations.BY_ID[current.role or Config.DEFAULT_ROLE]
+	roleButton.Text = "Station: " .. (if r then r.name else "?")
+end
+
+local function buildRolePanel()
+	roleButton = button(gui, "Station: Citizen", {
+		Name = "RoleButton",
+		AnchorPoint = Vector2.new(0, 1),
+		Position = UDim2.new(0, 12, 1, -12),
+		Size = UDim2.fromOffset(220, 40),
+	})
+	rolePanel = Instance.new("ScrollingFrame")
+	rolePanel.Name = "RolePanel"
+	rolePanel.AnchorPoint = Vector2.new(0, 1)
+	rolePanel.Position = UDim2.new(0, 12, 1, -60)
+	rolePanel.Size = UDim2.new(0.9, 0, 0.6, 0)
+	rolePanel.BackgroundColor3 = PAPER
+	rolePanel.BackgroundTransparency = 0.1
+	rolePanel.BorderSizePixel = 0
+	rolePanel.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	rolePanel.CanvasSize = UDim2.new()
+	rolePanel.ScrollBarThickness = 6
+	rolePanel.Visible = false
+	rolePanel.Parent = gui
+	local limit = Instance.new("UISizeConstraint")
+	limit.MaxSize = Vector2.new(380, 520)
+	limit.Parent = rolePanel
+	local list = Instance.new("UIListLayout")
+	list.SortOrder = Enum.SortOrder.LayoutOrder
+	list.Padding = UDim.new(0, 4)
+	list.Parent = rolePanel
+	local pad = Instance.new("UIPadding")
+	pad.PaddingLeft, pad.PaddingRight, pad.PaddingTop, pad.PaddingBottom = UDim.new(0, 10), UDim.new(0, 10), UDim.new(0, 8), UDim.new(0, 8)
+	pad.Parent = rolePanel
+
+	local order = 0
+	local function nextOrder(): number
+		order += 1
+		return order
+	end
+	roleError = text(rolePanel, "TextLabel", { LayoutOrder = nextOrder(), Text = "", TextColor3 = ERROR, TextSize = 17, TextWrapped = true, Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y })
+	for _, station in Stations.ORDER do
+		local shown = false
+		for _, r in Stations.ROLES do
+			if r.station ~= station or not Stations.selectable(r) then
+				continue
+			end
+			if not shown then
+				shown = true
+				text(rolePanel, "TextLabel", { LayoutOrder = nextOrder(), Text = station, TextColor3 = MUTED, TextSize = 18, TextXAlignment = Enum.TextXAlignment.Left, Size = UDim2.new(1, 0, 0, 24) })
+			end
+			local b = button(rolePanel, r.name, { LayoutOrder = nextOrder(), TextXAlignment = Enum.TextXAlignment.Left, Size = UDim2.new(1, 0, 0, 34) })
+			local p = Instance.new("UIPadding")
+			p.PaddingLeft = UDim.new(0, 8)
+			p.Parent = b
+			text(rolePanel, "TextLabel", { LayoutOrder = nextOrder(), Text = r.blurb, TextColor3 = MUTED, TextSize = 15, TextXAlignment = Enum.TextXAlignment.Left, Size = UDim2.new(1, 0, 0, 18) })
+			rows[r.id] = b
+			b.Activated:Connect(function()
+				roleError.Text = ""
+				local ok, res = Net.request("Identity", "ChooseRole", { role = r.id })
+				if ok then
+					IdentityUI.apply(res)
+				else
+					roleError.Text = tostring(res)
+				end
+			end)
+		end
+	end
+	roleButton.Activated:Connect(function()
+		rolePanel.Visible = not rolePanel.Visible
+		roleError.Text = ""
+	end)
+end
+
+-- State ----------------------------------------------------------------------------------
+function IdentityUI.apply(s: any)
+	if type(s) ~= "table" then
+		return
+	end
+	current = s
+	if type(s.seats) == "table" then
+		seats = s.seats
+	end
+	roleButton.Visible = s.hasCharacter == true
+	if not s.hasCharacter then
+		rolePanel.Visible = false
+	end
+	refreshRows()
+end
+
+function IdentityUI.init()
+	gui = Instance.new("ScreenGui")
+	gui.Name = "Identity"
+	gui.ResetOnSpawn = false
+	gui.DisplayOrder = 10
+	buildRolePanel()
+	roleButton.Visible = false
+	gui.Parent = player:WaitForChild("PlayerGui")
+
+	Net.listen("Identity", "State", IdentityUI.apply)
+	Net.listen("Identity", "Seats", function(msg)
+		if type(msg.seats) == "table" then
+			seats = msg.seats
+			refreshRows()
+		end
+	end)
+	task.spawn(function()
+		while not player:GetAttribute("ProfileLoaded") do
+			task.wait(0.2)
+		end
+		local ok, res = Net.request("Identity", "Get")
+		if ok then
+			IdentityUI.apply(res)
+		end
+	end)
+end
+
+return IdentityUI
+]]></ProtectedString></Properties></Item></Item></roblox>

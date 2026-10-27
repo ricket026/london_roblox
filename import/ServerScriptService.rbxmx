@@ -1,0 +1,3391 @@
+<roblox xmlns:xmime="http://www.w3.org/2005/05/xmlmime" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://www.roblox.com/roblox.xsd" version="4"><Item class="Script" referent="RBX0000001F"><Properties><string name="Name">LondonServer</string><ProtectedString name="Source"><![CDATA[--!strict
+-- LondonServer: server boot. Wires the player lifecycle: staff level -> ban check -> profile.
+-- Systems live in the child ModuleScripts (TECH.md §3); later milestones add theirs here.
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Roles = require(Shared:WaitForChild("Roles"))
+local Store = require(script:WaitForChild("Store"))
+local Profiles = require(script:WaitForChild("Profiles"))
+local Admin = require(script:WaitForChild("Admin"))
+local Analytics = require(script:WaitForChild("Analytics"))
+local Doors = require(script:WaitForChild("Doors"))
+local Identity = require(script:WaitForChild("Identity"))
+local Characters = require(script:WaitForChild("Characters"))
+local WorldClock = require(script:WaitForChild("WorldClock"))
+local Activities = require(script:WaitForChild("Activities"))
+
+Profiles.init()
+Admin.init()
+Doors.init()
+Identity.init()
+Characters.init()
+WorldClock.init()
+Activities.init()
+if RunService:IsStudio() then
+	require(script:WaitForChild("Debug")).init()
+end
+
+local function onPlayerAdded(player: Player)
+	player:SetAttribute(Roles.STAFF_ATTR, Roles.computeStaffLevel(player))
+	if Admin.checkBan(player) then
+		return
+	end
+	local profile = Profiles.onPlayerAdded(player)
+	if profile then
+		Admin.onProfileLoaded(player, profile)
+		Identity.onProfileLoaded(player)
+		Characters.onProfileLoaded(player)
+		Analytics.onProfileLoaded(player, Profiles.isNew(player))
+	end
+end
+
+Players.PlayerAdded:Connect(onPlayerAdded)
+Players.PlayerRemoving:Connect(function(player)
+	Admin.onPlayerRemoving(player)
+	Identity.onPlayerRemoving(player)
+	Characters.onPlayerRemoving(player)
+	Activities.onPlayerRemoving(player)
+	Analytics.onPlayerRemoving(player)
+	Profiles.onPlayerRemoving(player)
+end)
+for _, p in Players:GetPlayers() do
+	task.spawn(onPlayerAdded, p)
+end
+game:BindToClose(Profiles.closeAll)
+
+print(string.format("[LondonServer] ready (store: %s)", if Store.isMock then "Studio mock" else "DataStore"))
+]]></ProtectedString></Properties><Item class="ModuleScript" referent="RBX00000014"><Properties><string name="Name">Activities</string><ProtectedString name="Source"><![CDATA[--!strict
+-- LondonServer.Activities: the shared Activity framework (systems/ACTIVITIES.md §1) and one
+-- child module per activity (Ducks, Strength, Mudlark, Chess). Each child returns { init(A) }
+-- and builds its own site in workspace.Activities from greybox coordinates in Config.
+-- The framework gives every activity:
+--   A.claim / A.release / A.current   one activity at a time per player
+--   A.reward(player, opts)            pence (capped per hour, saved so server hops don't reset it),
+--                                     hobby XP + level-ups (active character), collection (account)
+--   A.score(id, player, n, mode)      per-server daily board + saved personal best
+--   A.board(id, title, unit, cframe)  a site board showing today's top names in this server
+--   A.ground, A.part, A.prompt, A.notice   building and messaging helpers
+-- Client: LondonClient.Activities (reward toasts) + per-activity UI modules.
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared:WaitForChild("Config"))
+local Net = require(Shared:WaitForChild("Net"))
+local Money = require(Shared:WaitForChild("Money"))
+local Hobbies = require(Shared:WaitForChild("Hobbies"))
+local Collection = require(Shared:WaitForChild("Collection"))
+local Profiles = require(script.Parent:WaitForChild("Profiles"))
+local Analytics = require(script.Parent:WaitForChild("Analytics"))
+local Characters = require(script.Parent:WaitForChild("Characters"))
+
+local A = {}
+A.MODULES = { "Ducks", "Strength", "Mudlark", "Chess" }
+local leaveFns: { (Player) -> () } = {} -- each module's optional leave(player)
+
+export type RewardOpts = {
+	activity: string, -- activity id, for analytics
+	hobby: string?,
+	xp: number?,
+	pence: number?,
+	items: { string }?, -- Shared.Collection ids
+}
+
+local root: Folder
+local busy: { [Player]: string } = {}
+type BoardEntry = { userId: number, name: string, score: number }
+local boards: { [string]: { title: string, unit: string, rows: { BoardEntry }, labels: { TextLabel } } } = {}
+local boardDay = os.date("!%Y%m%d")
+
+-- One activity at a time -------------------------------------------------------------
+function A.current(player: Player): string?
+	return busy[player]
+end
+
+function A.claim(player: Player, id: string): boolean
+	local cur = busy[player]
+	if cur and cur ~= id then
+		A.notice(player, "Finish what you're doing first.")
+		return false
+	end
+	busy[player] = id
+	return true
+end
+
+function A.release(player: Player, id: string)
+	if busy[player] == id then
+		busy[player] = nil
+	end
+end
+
+-- Rewards --------------------------------------------------------------------------------
+function A.notice(player: Player, text: string)
+	Net.push(player, "Activity", "Notice", { text = text })
+end
+
+-- Pence this player may still earn from activities this hour (window kept in the profile).
+local function payRoom(p: any): number
+	local lim = p.limits
+	local now = os.time()
+	if now - lim.activityWindow >= 3600 then
+		lim.activityWindow = now
+		lim.activityPaid = 0
+	end
+	return math.max(0, Config.ACTIVITY_PAY_PER_HOUR - lim.activityPaid)
+end
+
+function A.reward(player: Player, opts: RewardOpts)
+	local p = Profiles.get(player)
+	local prog = Profiles.progress(player)
+	if not p or not prog then
+		return -- at the character menu: nothing to reward
+	end
+	local msg: { [string]: any } = { activity = opts.activity }
+	local pence = math.min(math.floor(opts.pence or 0), payRoom(p))
+	if pence > 0 and Profiles.addPence(player, pence) then
+		p.limits.activityPaid += pence
+		msg.pence = Money.format(pence)
+	elseif (opts.pence or 0) > 0 then
+		msg.capped = true -- the hourly activity cap is reached; XP and finds still count
+	end
+	if opts.hobby and Hobbies.isHobby(opts.hobby) and (opts.xp or 0) > 0 then
+		local before = prog.hobbies[opts.hobby] or 0
+		local after = before + math.floor(opts.xp :: number)
+		prog.hobbies[opts.hobby] = after
+		msg.hobby = opts.hobby
+		msg.xp = after - before
+		msg.level = Hobbies.level(after)
+		msg.levelUp = Hobbies.level(before) < msg.level
+	end
+	if opts.items then
+		local found = {}
+		for _, id in opts.items do
+			local it = Collection.BY_ID[id]
+			if it then
+				local n = (p.collection[id] or 0) + 1
+				p.collection[id] = n
+				table.insert(found, { name = it.name, page = it.page, new = n == 1 })
+			end
+		end
+		msg.items = found
+	end
+	Analytics.event(player, "Activity_" .. opts.activity)
+	Net.push(player, "Activity", "Reward", msg)
+end
+
+-- Boards ---------------------------------------------------------------------------------
+local function renderBoard(id: string)
+	local b = boards[id]
+	if not b then
+		return
+	end
+	for i, l in b.labels do
+		local row = b.rows[i]
+		l.Text = if row then string.format("%d.  %s — %d %s", i, row.name, row.score, b.unit) else ""
+	end
+end
+
+local function rollDay()
+	local today = os.date("!%Y%m%d")
+	if today ~= boardDay then
+		boardDay = today
+		for id, b in boards do
+			b.rows = {}
+			renderBoard(id)
+		end
+	end
+end
+
+-- mode "max": keep each player's best; "sum": add up (e.g. wins today).
+function A.score(id: string, player: Player, n: number, mode: string)
+	rollDay()
+	local prog = Profiles.progress(player)
+	if prog and mode == "max" and n > (prog.bests[id] or -math.huge) then
+		prog.bests[id] = n
+	end
+	local b = boards[id]
+	if not b then
+		return
+	end
+	local name = player:GetAttribute("RPName")
+	local entry: BoardEntry? = nil
+	for _, r in b.rows do
+		if r.userId == player.UserId then
+			entry = r
+		end
+	end
+	if not entry then
+		local e: BoardEntry = { userId = player.UserId, name = "", score = if mode == "max" then -math.huge else 0 }
+		table.insert(b.rows, e)
+		entry = e
+	end
+	local e = entry :: BoardEntry
+	e.name = if type(name) == "string" then name else player.DisplayName
+	e.score = if mode == "max" then math.max(e.score, n) else e.score + n
+	table.sort(b.rows, function(x, y)
+		return x.score > y.score
+	end)
+	renderBoard(id)
+end
+
+-- A notice board facing along cframe.LookVector, showing today's top names in this server.
+function A.board(id: string, title: string, unit: string, cframe: CFrame)
+	-- 9 x 6.5 studs at 40 px/stud = 360 x 260 px: title + subtitle + 5 rows need 246 px
+	local part = A.part({ Name = "Board", Size = Vector3.new(9, 6.5, 0.4), CFrame = cframe * CFrame.new(0, 4.25, 0), Color = Color3.fromRGB(70, 48, 30), Material = Enum.Material.Wood })
+	A.part({ Name = "Post", Size = Vector3.new(0.4, 4.25, 0.4), CFrame = cframe * CFrame.new(0, 2.125, 0.4), Color = Color3.fromRGB(50, 34, 22), Material = Enum.Material.Wood }).Parent = part
+	local gui = Instance.new("SurfaceGui")
+	gui.Face = Enum.NormalId.Front
+	gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+	gui.PixelsPerStud = 40
+	gui.LightInfluence = 0.3
+	local list = Instance.new("UIListLayout")
+	list.SortOrder = Enum.SortOrder.LayoutOrder
+	list.Parent = gui
+	local function line(text: string, size: number, order: number): TextLabel
+		local l = Instance.new("TextLabel")
+		l.BackgroundTransparency = 1
+		l.Size = UDim2.new(1, 0, 0, size + 10)
+		l.Font = Enum.Font.Garamond
+		l.TextSize = size
+		l.TextColor3 = Color3.fromRGB(240, 228, 200)
+		l.Text = text
+		l.LayoutOrder = order
+		l.Parent = gui
+		return l
+	end
+	line(title, 34, 0)
+	line("Today in this server", 22, 1)
+	local labels = {}
+	for i = 1, Config.ACTIVITY_BOARD_SIZE do
+		table.insert(labels, line("", 24, 1 + i))
+	end
+	gui.Parent = part
+	boards[id] = { title = title, unit = unit, rows = {}, labels = labels }
+	renderBoard(id)
+	return part
+end
+
+-- Building helpers ----------------------------------------------------------------------------
+local rayParams = RaycastParams.new()
+rayParams.FilterType = Enum.RaycastFilterType.Exclude
+
+-- Ground point under (x, z), ignoring map markers, characters and other activity props.
+-- fromY: start the ray lower to look under something (a bridge deck over the foreshore).
+function A.ground(x: number, z: number, fromY: number?): Vector3
+	local skip: { Instance } = { root }
+	local map = workspace:FindFirstChild("Map")
+	if map then
+		for _, name in { "JobSites", "Labels", "CabRanks", "BusStops", "Routes", "Bounds", "Spawns", "Landmarks_Greybox" } do
+			local f = map:FindFirstChild(name)
+			if f then
+				table.insert(skip, f)
+			end
+		end
+	end
+	for _, plr in Players:GetPlayers() do
+		if plr.Character then
+			table.insert(skip, plr.Character)
+		end
+	end
+	rayParams.FilterDescendantsInstances = skip
+	local top = fromY or 300
+	local hit = workspace:Raycast(Vector3.new(x, top, z), Vector3.new(0, -top - 300, 0), rayParams)
+	return if hit then hit.Position else Vector3.new(x, math.min(top, 0), z)
+end
+
+-- Anchored part with properties; parent defaults to nothing (set .Parent or use A.site).
+function A.part(props: { [string]: any }): BasePart
+	local cls = props.ClassName or "Part"
+	local p: any = Instance.new(cls)
+	p.Anchored = true
+	p.TopSurface = Enum.SurfaceType.Smooth
+	p.BottomSurface = Enum.SurfaceType.Smooth
+	for k, v in props do
+		if k ~= "ClassName" then
+			p[k] = v
+		end
+	end
+	return p
+end
+
+-- A folder for one activity's site inside workspace.Activities.
+function A.site(name: string): Folder
+	local f = Instance.new("Folder")
+	f.Name = name
+	f.Parent = root
+	return f
+end
+
+function A.prompt(parent: Instance, action: string, object: string, hold: number?): ProximityPrompt
+	local pp = Instance.new("ProximityPrompt")
+	pp.ActionText = action
+	pp.ObjectText = object
+	pp.HoldDuration = hold or 0
+	pp.MaxActivationDistance = 10
+	pp.RequiresLineOfSight = false
+	pp.Parent = parent
+	return pp
+end
+
+-- Is the player's character within `range` studs of a point?
+function A.near(player: Player, pos: Vector3, range: number): boolean
+	local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+	return hrp ~= nil and hrp:IsA("BasePart") and (hrp.Position - pos).Magnitude <= range
+end
+
+function A.onPlayerRemoving(player: Player)
+	busy[player] = nil
+end
+
+function A.init()
+	root = Instance.new("Folder")
+	root.Name = "Activities"
+	root.Parent = workspace
+	Net.domain("Activity")
+	for _, name in A.MODULES do
+		local ok, err = pcall(function()
+			local m = require(script:WaitForChild(name) :: ModuleScript)
+			m.init(A)
+			if m.leave then
+				table.insert(leaveFns, m.leave)
+			end
+		end)
+		if not ok then
+			warn(string.format("[Activities] %s failed to start: %s", name, tostring(err)))
+		end
+	end
+	-- Switching or deleting the character ends whatever they were doing, rewarded to the old one.
+	Characters.onBeforeChange(function(player)
+		for _, fn in leaveFns do
+			fn(player)
+		end
+		busy[player] = nil
+	end)
+end
+
+return A
+]]></ProtectedString></Properties><Item class="ModuleScript" referent="RBX00000010"><Properties><string name="Name">Chess</string><ProtectedString name="Source"><![CDATA[--!strict
+-- Activities.Chess: outdoor chess tables by the bandstand (ACTIVITIES §2, wave 1). No money
+-- changes hands between players (§1); the game pays a little from Config.CHESS_PAY.
+-- Sit at either side; when both seats are taken the game starts. Standing up resigns. The side
+-- to move loses on time after Config.CHESS_MOVE_TIMEOUT. Rules: Shared.Chess (server is the
+-- authority). Spectators watch the board on the table top; players get LondonClient.Activities.Chess.
+-- Remotes: Activity.ChessMove { table, from, to }, Activity.ChessResign { table }.
+-- Pushes: Activity.ChessState (full state to both players), Activity.ChessLeave.
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared:WaitForChild("Config"))
+local Net = require(Shared:WaitForChild("Net"))
+local Rules = require(Shared:WaitForChild("Chess"))
+
+local ChessActivity = {}
+local A: any -- the Activities framework, set in init
+
+type Table = {
+	id: number,
+	seats: { [string]: Seat }, -- "w" / "b"
+	players: { [string]: Player }, -- "w" / "b" while seated
+	game: Rules.State?,
+	status: string,
+	last: { from: number, to: number }?,
+	lastMoveAt: number,
+	result: string?, -- "w", "b" or "draw" once over
+	reason: string?,
+	labels: { TextLabel },
+	squares: { Frame },
+}
+local tables: { Table } = {}
+
+local LIGHT = Color3.fromRGB(222, 205, 170)
+local DARK = Color3.fromRGB(120, 85, 55)
+local HIGHLIGHT = Color3.fromRGB(205, 180, 90)
+
+local function colourOf(t: Table, player: Player): string?
+	for c, p in t.players do
+		if p == player then
+			return c
+		end
+	end
+	return nil
+end
+
+local function nameOf(p: Player?): string
+	if not p then
+		return ""
+	end
+	local n = p:GetAttribute("RPName")
+	return if type(n) == "string" then n else p.DisplayName
+end
+
+local function render(t: Table)
+	local g = t.game
+	for i = 1, 64 do
+		local piece = if g then g.board[i] else ""
+		local l = t.labels[i]
+		l.Text = if piece ~= "" then (Config.CHESS_GLYPHS :: any)[string.sub(piece, 2, 2)] or "?" else ""
+		l.TextColor3 = if string.sub(piece, 1, 1) == "w" then Color3.fromRGB(250, 248, 240) else Color3.fromRGB(20, 18, 16)
+		local f, r = Rules.fileRank(i)
+		local base = if (f + r) % 2 == 0 then DARK else LIGHT
+		local lit = t.last ~= nil and (t.last.from == i or t.last.to == i)
+		t.squares[i].BackgroundColor3 = if lit then HIGHLIGHT else base
+	end
+end
+
+local function payload(t: Table, forColour: string): { [string]: any }
+	local g = t.game
+	return {
+		table = t.id,
+		you = forColour,
+		board = if g then g.board else nil,
+		turn = if g then g.turn else "w",
+		castle = if g then g.castle else nil,
+		ep = if g then g.ep else 0,
+		halfmove = if g then g.halfmove else 0,
+		plies = if g then g.plies else 0,
+		status = t.status,
+		last = t.last,
+		result = t.result,
+		reason = t.reason,
+		white = nameOf(t.players.w),
+		black = nameOf(t.players.b),
+		deadline = if g and not t.result then workspace:GetServerTimeNow() + Config.CHESS_MOVE_TIMEOUT - (os.clock() - t.lastMoveAt) else nil,
+	}
+end
+
+local function push(t: Table)
+	render(t)
+	for _, c in { "w", "b" } do
+		local p = t.players[c]
+		if p then
+			Net.push(p, "Activity", "ChessState", payload(t, c))
+		end
+	end
+end
+
+local startGame: (t: Table) -> ()
+
+local function finish(t: Table, result: string, reason: string)
+	local g = t.game
+	if not g or t.result then
+		return
+	end
+	t.result = result
+	t.reason = reason
+	t.status = "over"
+	if g.plies >= Config.CHESS_MIN_PLIES then
+		for _, c in { "w", "b" } do
+			local p = t.players[c]
+			if p then
+				local outcome = if result == "draw" then "draw" elseif result == c then "win" else "loss"
+				A.reward(p, { activity = "Chess", hobby = "Games", xp = (Config.CHESS_XP :: any)[outcome], pence = (Config.CHESS_PAY :: any)[outcome] })
+				if outcome == "win" then
+					A.score("Chess", p, 1, "sum")
+				end
+			end
+		end
+	end
+	push(t)
+	task.delay(6, function()
+		if t.game == g then
+			t.game = nil
+			t.last = nil
+			render(t)
+			startGame(t)
+		end
+	end)
+end
+
+startGame = function(t: Table)
+	if t.game or not t.players.w or not t.players.b then
+		return
+	end
+	task.delay(Config.CHESS_START_DELAY, function()
+		if t.game or not t.players.w or not t.players.b then
+			return
+		end
+		t.game = Rules.new()
+		t.status = "play"
+		t.last = nil
+		t.result = nil
+		t.reason = nil
+		t.lastMoveAt = os.clock()
+		push(t)
+	end)
+end
+
+local function leave(t: Table, c: string)
+	local p = t.players[c]
+	if not p then
+		return
+	end
+	if t.game and not t.result then
+		if t.game.plies > 0 then
+			finish(t, if c == "w" then "b" else "w", "resigned")
+		else
+			t.game = nil -- nobody moved yet: just call it off
+			t.status = "waiting"
+			render(t)
+		end
+	end
+	t.players[c] = nil
+	A.release(p, "Chess")
+	if p.Parent == Players then
+		Net.push(p, "Activity", "ChessLeave", { table = t.id })
+	end
+	push(t)
+end
+
+local function sat(t: Table, c: string)
+	local seat = t.seats[c]
+	local hum = seat.Occupant
+	local player = if hum then Players:GetPlayerFromCharacter(hum.Parent) else nil
+	local current = t.players[c]
+	if current == player then
+		return
+	end
+	if current then
+		leave(t, c)
+	end
+	if not player or not hum then
+		return
+	end
+	if not A.claim(player, "Chess") then
+		hum.Sit = false
+		hum.Jump = true
+		return
+	end
+	t.players[c] = player
+	t.status = "waiting"
+	push(t)
+	startGame(t)
+end
+
+local function move(player: Player, id: number, from: number, to: number)
+	local t = tables[id]
+	local g = t and t.game
+	if not g or t.result or colourOf(t, player) ~= g.turn then
+		return
+	end
+	if not Rules.isLegal(g, from, to) then
+		push(t) -- resync a confused client
+		return
+	end
+	t.game = Rules.apply(g, from, to)
+	t.last = { from = from, to = to }
+	t.lastMoveAt = os.clock()
+	local status = Rules.status(t.game :: Rules.State)
+	t.status = status
+	if status == "checkmate" then
+		finish(t, g.turn, "checkmate")
+	elseif Rules.isOver(status) then
+		finish(t, "draw", status)
+	else
+		push(t)
+	end
+end
+
+local function build(folder: Folder, i: number, pos: Vector3): Table
+	local cf = CFrame.new(pos)
+	local wood = Color3.fromRGB(95, 65, 40)
+	local top = A.part({ Name = "Table" .. i, Size = Vector3.new(4.4, 0.3, 4.4), CFrame = cf * CFrame.new(0, 2.6, 0), Color = wood, Material = Enum.Material.Wood })
+	A.part({ Name = "Leg", Size = Vector3.new(0.6, 2.45, 0.6), CFrame = cf * CFrame.new(0, 1.225, 0), Color = wood, Material = Enum.Material.Wood }).Parent = top
+	local board = A.part({ Name = "Board", Size = Vector3.new(3.6, 0.06, 3.6), CFrame = cf * CFrame.new(0, 2.78, 0), Color = DARK, Material = Enum.Material.SmoothPlastic, CanCollide = false })
+	board.Parent = top
+	local sg = Instance.new("SurfaceGui")
+	sg.Face = Enum.NormalId.Top
+	sg.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+	sg.PixelsPerStud = 60
+	sg.LightInfluence = 0.4
+	local labels, squares = {}, {}
+	for s = 1, 64 do
+		local f, r = Rules.fileRank(s)
+		local sq = Instance.new("Frame")
+		sq.BorderSizePixel = 0
+		sq.Size = UDim2.fromScale(1 / 8, 1 / 8)
+		sq.Position = UDim2.fromScale((f - 1) / 8, (8 - r) / 8) -- rank 8 at the top edge (far side from white)
+		sq.BackgroundColor3 = if (f + r) % 2 == 0 then DARK else LIGHT
+		sq.Parent = sg
+		local l = Instance.new("TextLabel")
+		l.BackgroundTransparency = 1
+		l.Size = UDim2.fromScale(1, 1)
+		l.TextScaled = true
+		l.TextStrokeTransparency = 0.6
+		l.Text = ""
+		l.Parent = sq
+		labels[s] = l
+		squares[s] = sq
+	end
+	sg.Parent = board
+	local function seat(z: number, yaw: number): Seat
+		local s = A.part({ ClassName = "Seat", Name = "Seat", Size = Vector3.new(2, 0.4, 2), CFrame = cf * CFrame.new(0, 1.6, z) * CFrame.Angles(0, math.rad(yaw), 0), Color = wood, Material = Enum.Material.Wood }) :: Seat
+		s.Parent = top
+		return s
+	end
+	local t: Table = {
+		id = i,
+		seats = { w = seat(3.3, 0), b = seat(-3.3, 180) },
+		players = {},
+		game = nil,
+		status = "waiting",
+		last = nil,
+		lastMoveAt = 0,
+		labels = labels,
+		squares = squares,
+	}
+	top.Parent = folder
+	for _, c in { "w", "b" } do
+		local s = t.seats[c]
+		s:GetPropertyChangedSignal("Occupant"):Connect(function()
+			sat(t, c)
+		end)
+	end
+	return t
+end
+
+-- Stands this player up from any table (resigning a game in progress); called on a character switch.
+function ChessActivity.leave(player: Player)
+	for _, t in tables do
+		local c = colourOf(t, player)
+		if c then
+			leave(t, c)
+		end
+	end
+end
+
+function ChessActivity.init(framework: any)
+	A = framework
+	local folder = A.site("Chess")
+	for i, p in Config.CHESS_TABLES do
+		table.insert(tables, build(folder, i, A.ground(p.x, p.z)))
+	end
+	local first = Config.CHESS_TABLES[1]
+	A.board("Chess", "Chess Club", "wins", CFrame.new(A.ground(first.x - 12, first.z))).Parent = folder
+
+	local V = Net.V
+	Net.handle("Activity", "ChessMove", { schema = { table = V.int(1, #tables), from = V.int(1, 64), to = V.int(1, 64) }, rate = { count = 4, per = 1 } }, function(player, a)
+		move(player, a.table, a.from, a.to)
+		return nil
+	end)
+	Net.handle("Activity", "ChessResign", { schema = { table = V.int(1, #tables) }, rate = { count = 2, per = 1 } }, function(player, a)
+		local t = tables[a.table]
+		local c = colourOf(t, player)
+		if c and t.game and not t.result and t.game.plies > 0 then
+			finish(t, if c == "w" then "b" else "w", "resigned")
+		end
+		return nil
+	end)
+	-- lose on time
+	task.spawn(function()
+		while true do
+			task.wait(1)
+			for _, t in tables do
+				local g = t.game
+				if g and not t.result and os.clock() - t.lastMoveAt > Config.CHESS_MOVE_TIMEOUT then
+					finish(t, if g.turn == "w" then "b" else "w", "time")
+				end
+			end
+		end
+	end)
+	Players.PlayerRemoving:Connect(function(p)
+		for _, t in tables do
+			local c = colourOf(t, p)
+			if c then
+				leave(t, c)
+			end
+		end
+	end)
+end
+
+return ChessActivity
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX00000011"><Properties><string name="Name">Ducks</string><ProtectedString name="Source"><![CDATA[--!strict
+-- Activities.Ducks: feeding the ducks & pigeons at St James's Park lake (ACTIVITIES §2, wave 1).
+-- Buy a bag of seed (1d) at the stand; water birds swim over to the shore in front of you and
+-- pigeons land at your feet, for everyone to see. Which water bird comes depends on the in-game
+-- hour (pelicans at half past two, swans at dawn), never on chance. Pays no money (it costs 1d);
+-- gives Outdoors XP and collection entries.
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
+
+local Config = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Config"))
+local Profiles = require(script.Parent.Parent:WaitForChild("Profiles"))
+local WorldClock = require(script.Parent.Parent:WaitForChild("WorldClock"))
+
+local Ducks = {}
+local A: any -- the Activities framework, set in init
+
+type Look = { body: Color3, head: Color3, size: number, neck: number }
+local LOOKS: { [string]: Look } = {
+	bird_mallard = { body = Color3.fromRGB(120, 100, 80), head = Color3.fromRGB(30, 90, 50), size = 1, neck = 0.5 },
+	bird_swan = { body = Color3.fromRGB(245, 245, 240), head = Color3.fromRGB(245, 245, 240), size = 1.8, neck = 1.4 },
+	bird_pelican = { body = Color3.fromRGB(235, 230, 225), head = Color3.fromRGB(235, 200, 120), size = 2, neck = 0.9 },
+	bird_pigeon = { body = Color3.fromRGB(120, 120, 135), head = Color3.fromRGB(90, 100, 110), size = 0.6, neck = 0.3 },
+}
+
+local rng = Random.new()
+local live = 0
+local lastFeed: { [Player]: number } = {}
+local folder: Folder
+
+local function species(): string
+	local h = WorldClock.hour()
+	for _, s in Config.DUCKS_SPECIES do
+		if h >= s.from and h < s.to then
+			return s.id
+		end
+	end
+	return "bird_mallard"
+end
+
+local function makeBird(kind: string, at: CFrame): Model
+	local look = LOOKS[kind]
+	local s = look.size
+	local m = Instance.new("Model")
+	m.Name = kind
+	local body = Instance.new("Part")
+	body.Name = "Body"
+	body.Size = Vector3.new(1.4, 1, 2) * s -- a Ball part is always round; the sphere mesh makes it oval
+	local mesh = Instance.new("SpecialMesh")
+	mesh.MeshType = Enum.MeshType.Sphere
+	mesh.Parent = body
+	body.Color = look.body
+	body.Anchored = true
+	body.CanCollide = false
+	body.CanQuery = false
+	body.CastShadow = false
+	body.CFrame = at
+	body.Parent = m
+	local head = Instance.new("Part")
+	head.Name = "Head"
+	head.Shape = Enum.PartType.Ball
+	head.Size = Vector3.new(0.6, 0.6, 0.6) * s
+	head.Color = look.head
+	head.Anchored = true
+	head.CanCollide = false
+	head.CanQuery = false
+	head.CastShadow = false
+	head.CFrame = at * CFrame.new(0, look.neck * s, -0.9 * s)
+	head.Parent = m
+	m.PrimaryPart = body
+	return m
+end
+
+-- Moves a two-part bird (anchored) by tweening a CFrameValue.
+local function glide(m: Model, to: CFrame, seconds: number)
+	local body = m.PrimaryPart :: BasePart
+	local head = m:FindFirstChild("Head") :: BasePart
+	local offset = body.CFrame:ToObjectSpace(head.CFrame)
+	local v = Instance.new("CFrameValue")
+	v.Value = body.CFrame
+	v.Changed:Connect(function(cf)
+		body.CFrame = cf
+		head.CFrame = cf * offset
+	end)
+	local t = TweenService:Create(v, TweenInfo.new(seconds, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), { Value = to })
+	t.Completed:Connect(function()
+		v:Destroy()
+	end)
+	t:Play()
+end
+
+local function facing(from: Vector3, to: Vector3): CFrame
+	local flat = Vector3.new(to.X, from.Y, to.Z)
+	if (flat - from).Magnitude < 0.01 then
+		return CFrame.new(from)
+	end
+	return CFrame.lookAt(from, flat)
+end
+
+-- A point on the lake, `inset` (0-1) of the way from the shore to the centre, in the direction of `toward`.
+local function lakePoint(toward: Vector3, inset: number, spread: number): Vector3
+	local L = Config.DUCKS_LAKE
+	local dx, dz = (toward.X - L.cx) / L.rx, (toward.Z - L.cz) / L.rz
+	local a = math.atan2(dz, dx) + rng:NextNumber(-spread, spread)
+	local k = 1 - inset
+	return Vector3.new(L.cx + math.cos(a) * L.rx * k, L.surface + 0.3, L.cz + math.sin(a) * L.rz * k)
+end
+
+local function feed(player: Player, standPos: Vector3)
+	local now = os.clock()
+	if now - (lastFeed[player] or -math.huge) < Config.DUCKS_COOLDOWN then
+		return
+	end
+	local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart") :: BasePart?
+	if not hrp or (hrp.Position - standPos).Magnitude > 20 then
+		return
+	end
+	if live >= Config.DUCKS_MAX_LIVE then
+		A.notice(player, "The birds are busy. Try again in a moment.")
+		return
+	end
+	if not Profiles.addPence(player, -Config.DUCKS_SEED_PRICE) then
+		A.notice(player, string.format("A bag of seed costs %dd.", Config.DUCKS_SEED_PRICE))
+		return
+	end
+	lastFeed[player] = now
+	local kind = species()
+	local feet = hrp.Position - Vector3.new(0, 2.5, 0)
+	local birds: { Model } = {}
+	for _ = 1, Config.DUCKS_BIRDS do
+		local start = lakePoint(feet, 0.5, 0.25)
+		local stop = lakePoint(feet, 0.06, 0.06)
+		local m = makeBird(kind, facing(start, stop))
+		m.Parent = folder
+		glide(m, facing(stop, feet) * CFrame.new(rng:NextNumber(-3, 3), 0, rng:NextNumber(-2, 2)), rng:NextNumber(3, 5))
+		table.insert(birds, m)
+	end
+	for _ = 1, Config.DUCKS_PIGEONS do
+		local land = feet + Vector3.new(rng:NextNumber(-4, 4), 0.3, rng:NextNumber(-4, 4))
+		local m = makeBird("bird_pigeon", facing(land + Vector3.new(rng:NextNumber(-20, 20), 25, rng:NextNumber(-20, 20)), land))
+		m.Parent = folder
+		glide(m, facing(land, feet), rng:NextNumber(1.5, 2.5))
+		table.insert(birds, m)
+	end
+	live += #birds
+	A.reward(player, { activity = "Ducks", hobby = "Outdoors", xp = Config.DUCKS_XP, items = { kind, "bird_pigeon" } })
+	A.score("Ducks", player, 1, "sum")
+	task.delay(Config.DUCKS_STAY, function()
+		for _, m in birds do
+			local body = m.PrimaryPart :: BasePart
+			local away = if m.Name == "bird_pigeon"
+				then body.Position + Vector3.new(rng:NextNumber(-30, 30), 30, rng:NextNumber(-30, 30))
+				else lakePoint(body.Position, 0.6, 0.3)
+			glide(m, CFrame.lookAt(away, away + (away - body.Position).Unit), 4)
+		end
+		task.wait(4.2)
+		for _, m in birds do
+			m:Destroy()
+		end
+		live -= #birds
+	end)
+end
+
+function Ducks.init(framework: any)
+	A = framework
+	folder = A.site("Ducks")
+	local g = A.ground(Config.DUCKS_SITE.x, Config.DUCKS_SITE.z)
+	local L = Config.DUCKS_LAKE
+	local look = CFrame.lookAt(g, Vector3.new(L.cx, g.Y, Config.DUCKS_SITE.z)) -- face the water
+	local stand = A.part({ Name = "SeedStand", Size = Vector3.new(4, 3, 2), CFrame = look * CFrame.new(-5, 1.5, 0), Color = Color3.fromRGB(110, 70, 40), Material = Enum.Material.Wood })
+	A.part({ Name = "Awning", Size = Vector3.new(4.6, 0.3, 2.6), CFrame = look * CFrame.new(-5, 4.6, 0), Color = Color3.fromRGB(40, 90, 60), Material = Enum.Material.Fabric }).Parent = stand
+	stand.Parent = folder
+	local pp = A.prompt(stand, string.format("Feed the birds (%dd)", Config.DUCKS_SEED_PRICE), "Seed stand")
+	pp.Triggered:Connect(function(player)
+		feed(player, stand.Position)
+	end)
+	A.board("Ducks", "Feeding the Birds", "bags", look * CFrame.new(-10, 0, 1) * CFrame.Angles(0, math.rad(180), 0)).Parent = folder
+	Players.PlayerRemoving:Connect(function(p)
+		lastFeed[p] = nil
+	end)
+end
+
+return Ducks
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX00000012"><Properties><string name="Name">Mudlark</string><ProtectedString name="Source"><![CDATA[--!strict
+-- Activities.Mudlark: mudlarking on the Thames foreshore (ACTIVITIES §2, wave 1).
+-- At low tide (Config.TIDE_LOW, from the world clock) glints appear on the foreshore; hold the
+-- prompt to dig. Each find is rolled from Shared.Collection ("Mudlark" source; digging is free,
+-- so this is not paid chance), sold on the spot for its value, and added to the collection
+-- book. Glints are shared: first to dig gets it. At high tide they vanish and the sign says
+-- when the water goes out again.
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared:WaitForChild("Config"))
+local Collection = require(Shared:WaitForChild("Collection"))
+local WorldClock = require(script.Parent.Parent:WaitForChild("WorldClock"))
+
+local Mudlark = {}
+local A: any -- the Activities framework, set in init
+
+local rng = Random.new()
+local folder: Folder
+local glints: { [BasePart]: boolean } = {}
+local lowTide = false
+local signText: TextLabel
+
+function Mudlark.isLowTide(h: number): boolean
+	for _, w in Config.TIDE_LOW do
+		if h >= w.from and h < w.to then
+			return true
+		end
+	end
+	return false
+end
+
+-- In-game hour the next low tide starts.
+local function nextLow(h: number): number
+	local best, bestWait = Config.TIDE_LOW[1].from, math.huge
+	for _, w in Config.TIDE_LOW do
+		local wait = (w.from - h) % 24
+		if wait < bestWait then
+			best, bestWait = w.from, wait
+		end
+	end
+	return best
+end
+
+local function hourText(h: number): string
+	local hour = math.floor(h) % 24
+	return string.format("%d %s", if hour % 12 == 0 then 12 else hour % 12, if hour < 12 then "am" else "pm")
+end
+
+local function showGlint(g: BasePart, on: boolean)
+	g.Transparency = if on then 0.15 else 1
+	local sp = g:FindFirstChildOfClass("Sparkles")
+	if sp then
+		sp.Enabled = on
+	end
+	local pp = g:FindFirstChildOfClass("ProximityPrompt")
+	if pp then
+		pp.Enabled = on
+	end
+end
+
+local spawnGlint: () -> ()
+
+local function dig(g: BasePart, player: Player)
+	if not lowTide or not glints[g] or not A.near(player, g.Position, 12) then
+		return
+	end
+	glints[g] = nil
+	g:Destroy()
+	local item = Collection.roll("Mudlark", rng)
+	A.reward(player, { activity = "Mudlark", hobby = "Collecting", xp = Config.MUDLARK_XP, pence = item.value, items = { item.id } })
+	A.score("Mudlark", player, 1, "sum")
+	task.delay(rng:NextNumber(Config.MUDLARK_RESPAWN.min, Config.MUDLARK_RESPAWN.max), spawnGlint)
+end
+
+spawnGlint = function()
+	local area = Config.MUDLARK_AREA
+	local pos = A.ground(rng:NextNumber(area.x[1], area.x[2]), rng:NextNumber(math.min(area.z[1], area.z[2]), math.max(area.z[1], area.z[2])), Config.MUDLARK_RAY_FROM)
+	local g = A.part({ ClassName = "Part", Name = "Glint", Shape = Enum.PartType.Ball, Size = Vector3.new(0.7, 0.7, 0.7), CFrame = CFrame.new(pos + Vector3.new(0, 0.25, 0)), Color = Color3.fromRGB(255, 240, 190), Material = Enum.Material.Neon, CanCollide = false, CastShadow = false })
+	local sp = Instance.new("Sparkles")
+	sp.SparkleColor = Color3.fromRGB(255, 245, 210)
+	sp.Parent = g
+	local pp = A.prompt(g, "Dig", "Something glints in the mud", Config.MUDLARK_DIG_SECONDS)
+	pp.MaxActivationDistance = 8
+	pp.Triggered:Connect(function(player)
+		dig(g, player)
+	end)
+	showGlint(g, lowTide)
+	glints[g] = true
+	g.Parent = folder
+end
+
+local function updateTide()
+	local h = WorldClock.hour()
+	local low = Mudlark.isLowTide(h)
+	if low ~= lowTide then
+		lowTide = low
+		for g in glints do
+			showGlint(g, low)
+		end
+	end
+	signText.Text = if low
+		then "Low tide\nDig for curios on the foreshore"
+		else "The tide is in\nBack at low tide, " .. hourText(nextLow(h))
+end
+
+function Mudlark.init(framework: any)
+	A = framework
+	folder = A.site("Mudlark")
+	local top = A.ground(Config.MUDLARK_SIGN.x, Config.MUDLARK_SIGN.z) -- on the embankment by the river stairs
+	local face = CFrame.lookAt(top, top + Vector3.new(-1, 0, 0)) -- facing the street (west)
+	local sign = A.part({ Name = "TideSign", Size = Vector3.new(6, 3, 0.3), CFrame = face * CFrame.new(0, 4, 0), Color = Color3.fromRGB(40, 50, 60), Material = Enum.Material.Wood })
+	local sg = Instance.new("SurfaceGui")
+	sg.Face = Enum.NormalId.Front
+	sg.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+	sg.PixelsPerStud = 40
+	signText = Instance.new("TextLabel")
+	signText.Size = UDim2.fromScale(1, 1)
+	signText.BackgroundTransparency = 1
+	signText.Font = Enum.Font.Garamond
+	signText.TextScaled = true
+	signText.TextColor3 = Color3.fromRGB(235, 225, 200)
+	signText.Parent = sg
+	sg.Parent = sign
+	sign.Parent = folder
+	A.board("Mudlark", "Mudlarks", "finds", face * CFrame.new(8, 0, 0)).Parent = folder
+
+	lowTide = Mudlark.isLowTide(WorldClock.hour())
+	updateTide()
+	for _ = 1, Config.MUDLARK_GLINTS do
+		spawnGlint()
+	end
+	task.spawn(function()
+		while true do
+			task.wait(1)
+			updateTide()
+		end
+	end)
+end
+
+return Mudlark
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX00000013"><Properties><string name="Name">Strength</string><ProtectedString name="Source"><![CDATA[--!strict
+-- Activities.Strength: test your strength at the fairground (ACTIVITIES §2, wave 1).
+-- Step up, take Config.STRENGTH_SWINGS swings; each swing is a timing press on a meter
+-- (Shared.Meter). The puck flies up the pole for everyone to see and rings the bell at
+-- Config.STRENGTH_BELL+. Pays per bell, Sport XP from the best swing, board = best swing today.
+-- Remote: Activity.StrengthSwing { t = server time of the press }.
+-- Pushes: Activity.StrengthStart { start, period, swings }, StrengthResult { score, bell, left },
+--         StrengthEnd { best }.
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared:WaitForChild("Config"))
+local Net = require(Shared:WaitForChild("Net"))
+local Meter = require(Shared:WaitForChild("Meter"))
+
+local Strength = {}
+local A: any -- the Activities framework, set in init
+
+type Session = { player: Player, start: number, period: number, swings: number, best: number, bells: number, last: number }
+local session: Session? = nil
+local rng = Random.new()
+
+local puck: BasePart
+local bell: BasePart
+local puckHome: CFrame
+local padPos: Vector3
+local bellSound: Sound?
+
+local function finish(s: Session)
+	if session ~= s then
+		return
+	end
+	session = nil
+	A.release(s.player, "Strength")
+	if s.player.Parent ~= Players then
+		return
+	end
+	Net.push(s.player, "Activity", "StrengthEnd", { best = s.best })
+	if s.swings > 0 then
+		A.reward(s.player, {
+			activity = "Strength",
+			hobby = "Sport",
+			xp = Config.STRENGTH_XP.base + (s.best // 10) * Config.STRENGTH_XP.perTen,
+			pence = s.bells * Config.STRENGTH_PAY_BELL,
+		})
+		A.score("Strength", s.player, s.best, "max")
+	end
+end
+
+local function ring()
+	local old = bell.Color
+	bell.Material = Enum.Material.Neon
+	bell.Color = Color3.fromRGB(255, 230, 120)
+	if bellSound then
+		bellSound:Play()
+	end
+	task.delay(0.6, function()
+		bell.Material = Enum.Material.Metal
+		bell.Color = old
+	end)
+end
+
+local function launch(score: number)
+	local up = Config.STRENGTH_POLE * score / 100
+	local flyUp = TweenService:Create(puck, TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { CFrame = puckHome * CFrame.new(0, up, 0) })
+	flyUp.Completed:Connect(function()
+		if score >= Config.STRENGTH_BELL then
+			ring()
+		end
+		TweenService:Create(puck, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.In), { CFrame = puckHome }):Play()
+	end)
+	flyUp:Play()
+end
+
+local function start(player: Player)
+	if session then
+		if session.player ~= player then
+			A.notice(player, "Someone's swinging. Wait your turn!")
+		end
+		return
+	end
+	if not A.claim(player, "Strength") then
+		return
+	end
+	local s: Session = {
+		player = player,
+		start = workspace:GetServerTimeNow() + 0.5,
+		period = rng:NextNumber(Config.STRENGTH_PERIOD.min, Config.STRENGTH_PERIOD.max),
+		swings = 0,
+		best = 0,
+		bells = 0,
+		last = 0,
+	}
+	session = s
+	Net.push(player, "Activity", "StrengthStart", { start = s.start, period = s.period, swings = Config.STRENGTH_SWINGS })
+	task.delay(Config.STRENGTH_TIMEOUT, function()
+		if session == s then
+			finish(s)
+		end
+	end)
+end
+
+local function swing(player: Player, t: number)
+	local s = session
+	if not s or s.player ~= player then
+		return
+	end
+	local now = workspace:GetServerTimeNow()
+	if t < s.start or t > now + 0.3 or t < s.last + 0.6 then
+		return -- pressed before the meter started, from the future, or too fast after the last swing
+	end
+	if not A.near(player, padPos, Config.STRENGTH_RANGE) then
+		finish(s)
+		return
+	end
+	s.last = t
+	s.swings += 1
+	local score = math.clamp(math.floor(Meter.value(t - s.start, s.period) * 100 + 0.5), 0, 100)
+	local isBell = score >= Config.STRENGTH_BELL
+	s.best = math.max(s.best, score)
+	if isBell then
+		s.bells += 1
+	end
+	launch(score)
+	local left = Config.STRENGTH_SWINGS - s.swings
+	Net.push(player, "Activity", "StrengthResult", { score = score, bell = isBell, left = left })
+	if left <= 0 then
+		task.delay(1, finish, s)
+	end
+end
+
+-- Ends this player's go (rewarding what they did); the framework calls it on a character switch.
+function Strength.leave(player: Player)
+	local s = session
+	if s and s.player == player then
+		finish(s)
+	end
+end
+
+function Strength.init(framework: any)
+	A = framework
+	local folder = A.site("Strength")
+	local g = A.ground(Config.STRENGTH_SITE.x, Config.STRENGTH_SITE.z)
+	local base = CFrame.new(g) -- faces -Z (east, toward the market)
+	local wood = Color3.fromRGB(150, 40, 35)
+	local pad = A.part({ Name = "Pad", Size = Vector3.new(3, 0.6, 3), CFrame = base * CFrame.new(0, 0.3, 0), Color = Color3.fromRGB(60, 50, 40), Material = Enum.Material.Wood })
+	pad.Parent = folder
+	padPos = pad.Position
+	local pole = A.part({ Name = "Pole", Size = Vector3.new(1.2, Config.STRENGTH_POLE + 2, 0.6), CFrame = base * CFrame.new(0, 0.6 + (Config.STRENGTH_POLE + 2) / 2, -2.5), Color = wood, Material = Enum.Material.Wood })
+	pole.Parent = folder
+	for i = 1, 10 do -- painted marks every tenth
+		A.part({ Name = "Mark", Size = Vector3.new(1.3, 0.12, 0.62), CFrame = base * CFrame.new(0, 1.2 + Config.STRENGTH_POLE * i / 10, -2.5), Color = Color3.fromRGB(240, 220, 160), Material = Enum.Material.SmoothPlastic, CanCollide = false }).Parent = folder
+	end
+	puckHome = base * CFrame.new(0, 1.2, -2.0)
+	puck = A.part({ Name = "Puck", Size = Vector3.new(0.8, 0.5, 0.4), CFrame = puckHome, Color = Color3.fromRGB(30, 30, 30), Material = Enum.Material.Metal, CanCollide = false })
+	puck.Parent = folder
+	bell = A.part({ ClassName = "Part", Name = "Bell", Shape = Enum.PartType.Ball, Size = Vector3.new(1.8, 1.8, 1.8), CFrame = base * CFrame.new(0, 1.2 + Config.STRENGTH_POLE + 0.9, -2.0), Color = Color3.fromRGB(200, 160, 60), Material = Enum.Material.Metal })
+	bell.Parent = folder
+	if Config.STRENGTH_BELL_SOUND ~= "" then
+		local snd = Instance.new("Sound")
+		snd.SoundId = Config.STRENGTH_BELL_SOUND
+		snd.RollOffMaxDistance = 150
+		snd.Parent = bell
+		bellSound = snd
+	end
+	local sign = A.part({ Name = "Sign", Size = Vector3.new(6, 1.6, 0.3), CFrame = base * CFrame.new(0, Config.STRENGTH_POLE + 5, -2.5), Color = Color3.fromRGB(30, 60, 40), Material = Enum.Material.Wood, CanCollide = false })
+	local sg = Instance.new("SurfaceGui")
+	sg.Face = Enum.NormalId.Back -- the side facing the pad (+Z)
+	sg.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+	sg.PixelsPerStud = 40
+	local t = Instance.new("TextLabel")
+	t.Size = UDim2.fromScale(1, 1)
+	t.BackgroundTransparency = 1
+	t.Font = Enum.Font.GaramondBold
+	t.TextScaled = true
+	t.TextColor3 = Color3.fromRGB(250, 220, 120)
+	t.Text = "TEST YOUR STRENGTH"
+	t.Parent = sg
+	sg.Parent = sign
+	sign.Parent = folder
+	local pp = A.prompt(pad, "Swing the mallet", "Test your strength")
+	pp.Triggered:Connect(start)
+	A.board("Strength", "Test Your Strength", "", base * CFrame.new(6, 0, 0) * CFrame.Angles(0, math.rad(180), 0)).Parent = folder
+
+	Net.handle("Activity", "StrengthSwing", { schema = { t = Net.V.num(0, 2 ^ 40) }, rate = { count = 4, per = 1 } }, function(player, a)
+		swing(player, a.t)
+		return nil
+	end)
+	Players.PlayerRemoving:Connect(function(p)
+		local s = session
+		if s and s.player == p then
+			finish(s)
+		end
+	end)
+end
+
+return Strength
+]]></ProtectedString></Properties></Item></Item><Item class="ModuleScript" referent="RBX00000015"><Properties><string name="Name">Admin</string><ProtectedString name="Source"><![CDATA[--!strict
+-- LondonServer.Admin: staff kick / ban / mute. Ban check on join, cross-server bans over
+-- MessagingService, chat commands (/kick /ban /unban /smute /sunmute /logs; /mute is taken by
+-- Roblox's own local mute) and "Admin" remotes for the future staff panel.
+-- Every action is checked here with Roles.can (actor nil = server/console) and logged.
+-- M0 limit: mutes need the target in this server (stored on their profile, record.mutedUntil).
+local MessagingService = game:GetService("MessagingService")
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TextChatService = game:GetService("TextChatService")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared:WaitForChild("Config"))
+local Net = require(Shared:WaitForChild("Net"))
+local Roles = require(Shared:WaitForChild("Roles"))
+local Text = require(Shared:WaitForChild("Text"))
+local Types = require(Shared:WaitForChild("Types"))
+local Store = require(script.Parent:WaitForChild("Store"))
+local Profiles = require(script.Parent:WaitForChild("Profiles"))
+local AdminLog = require(script.Parent:WaitForChild("AdminLog"))
+
+local V = Net.V
+local Admin = {}
+local bans = Store.open(Config.BANS_STORE)
+local muted: { [number]: number } = {} -- userId -> mutedUntil (os.time)
+
+local function banKey(userId: number): string
+	return "u_" .. userId
+end
+
+local function actorId(actor: Player?): number
+	return if actor then actor.UserId else 0
+end
+
+local function authorize(actor: Player?, action: string, target: number?): (boolean, string?)
+	if actor == nil or Roles.can(actor, action, target) then
+		return true, nil
+	end
+	return false, "not permitted"
+end
+
+local function cleanReason(reason: string?): string
+	return Text.sanitize(reason or "", Config.REASON_MAX) or ""
+end
+
+-- The reason the target sees goes through the filter; a failed filter shows a generic line.
+local function reasonFor(by: number, reason: string, toUserId: number): string
+	if reason == "" then
+		return "No reason given."
+	end
+	return Text.filterFor(reason, if by ~= 0 then by else toUserId, toUserId) or "See the rules."
+end
+
+local function describe(minutes: number): string
+	if minutes == 0 then
+		return "permanently"
+	elseif minutes % 1440 == 0 then
+		return string.format("for %d day(s)", minutes // 1440)
+	elseif minutes % 60 == 0 then
+		return string.format("for %d hour(s)", minutes // 60)
+	end
+	return string.format("for %d minute(s)", minutes)
+end
+
+local function notify(player: Player?, text: string)
+	if player and player.Parent == Players then
+		Net.push(player, "Admin", "Notice", { text = text })
+	end
+end
+
+local function banMessage(rec: any, toUserId: number): string
+	local untilT = tonumber(rec.untilT) or 0
+	local span = if untilT == 0
+		then "permanently"
+		else describe(math.max(1, math.ceil((untilT - os.time()) / 60))) .. " more"
+	return string.format("You are banned %s. Reason: %s", span, reasonFor(tonumber(rec.by) or 0, tostring(rec.reason or ""), toUserId))
+end
+
+local function writeBan(userId: number, record: any?): boolean
+	for _ = 1, Config.SAVE_RETRIES do
+		local ok, err = pcall(function()
+			if record then
+				bans:update(banKey(userId), function()
+					return record
+				end)
+			else
+				bans:remove(banKey(userId))
+			end
+		end)
+		if ok then
+			return true
+		end
+		warn("[Admin] ban store error: " .. tostring(err))
+		task.wait(Config.SAVE_RETRY_SECONDS)
+	end
+	return false
+end
+
+local function broadcast(kind: string, userId: number)
+	if Store.isMock then
+		return
+	end
+	task.spawn(function()
+		pcall(MessagingService.PublishAsync, MessagingService, Config.ADMIN_TOPIC, { kind = kind, userId = userId })
+	end)
+end
+
+-- Kicks the player if banned. Store errors let the player in (logged).
+function Admin.checkBan(player: Player): boolean
+	local ok, rec = pcall(function()
+		return bans:get(banKey(player.UserId))
+	end)
+	if not ok then
+		warn("[Admin] ban check failed: " .. tostring(rec))
+		return false
+	end
+	if type(rec) ~= "table" then
+		return false
+	end
+	local untilT = tonumber(rec.untilT) or 0
+	if untilT ~= 0 and untilT <= os.time() then
+		task.spawn(writeBan, player.UserId, nil)
+		return false
+	end
+	player:Kick(banMessage(rec, player.UserId))
+	return true
+end
+
+function Admin.kick(actor: Player?, userId: number, reason: string?): (boolean, string?)
+	local ok, err = authorize(actor, "admin.kick", userId)
+	if not ok then
+		return false, err
+	end
+	local target = Players:GetPlayerByUserId(userId)
+	if not target then
+		return false, "player not in this server"
+	end
+	local r = cleanReason(reason)
+	AdminLog.add(actorId(actor), "kick", userId, r)
+	target:Kick("Removed by staff. Reason: " .. reasonFor(actorId(actor), r, userId))
+	return true, nil
+end
+
+-- minutes = 0 is permanent.
+function Admin.ban(actor: Player?, userId: number, minutes: number, reason: string?): (boolean, string?)
+	local ok, err = authorize(actor, "admin.ban", userId)
+	if not ok then
+		return false, err
+	end
+	if minutes % 1 ~= 0 or minutes < 0 or minutes > Config.MAX_BAN_MINUTES then
+		return false, "bad duration"
+	end
+	local r = cleanReason(reason)
+	local now = os.time()
+	local record = { reason = r, by = actorId(actor), at = now, untilT = if minutes == 0 then 0 else now + minutes * 60 }
+	if not writeBan(userId, record) then
+		return false, "ban store unavailable"
+	end
+	AdminLog.add(actorId(actor), "ban", userId, r, minutes)
+	local target = Players:GetPlayerByUserId(userId)
+	if target then
+		target:Kick(banMessage(record, userId))
+	end
+	broadcast("ban", userId)
+	return true, nil
+end
+
+function Admin.unban(actor: Player?, userId: number): (boolean, string?)
+	local ok, err = authorize(actor, "admin.unban", userId)
+	if not ok then
+		return false, err
+	end
+	if not writeBan(userId, nil) then
+		return false, "ban store unavailable"
+	end
+	AdminLog.add(actorId(actor), "unban", userId)
+	return true, nil
+end
+
+function Admin.isMuted(userId: number): boolean
+	local u = muted[userId]
+	return u ~= nil and os.time() < u
+end
+
+local function applyMute(userId: number)
+	local on = Admin.isMuted(userId)
+	for _, d in TextChatService:GetDescendants() do
+		if d:IsA("TextSource") and d.UserId == userId then
+			d.CanSend = not on
+		end
+	end
+end
+
+local function lift(userId: number)
+	muted[userId] = nil
+	local p = Players:GetPlayerByUserId(userId)
+	local prof = if p then Profiles.get(p) else nil
+	if prof then
+		prof.record.mutedUntil = 0
+	end
+	applyMute(userId)
+end
+
+function Admin.mute(actor: Player?, userId: number, minutes: number, reason: string?): (boolean, string?)
+	local ok, err = authorize(actor, "admin.mute", userId)
+	if not ok then
+		return false, err
+	end
+	if minutes % 1 ~= 0 or minutes < 1 or minutes > Config.MAX_MUTE_MINUTES then
+		return false, "bad duration"
+	end
+	local target = Players:GetPlayerByUserId(userId)
+	if not target then
+		return false, "player not in this server"
+	end
+	local r = cleanReason(reason)
+	local untilT = os.time() + minutes * 60
+	muted[userId] = untilT
+	local prof = Profiles.get(target)
+	if prof then
+		prof.record.mutedUntil = untilT
+	end
+	applyMute(userId)
+	AdminLog.add(actorId(actor), "mute", userId, r, minutes)
+	notify(target, string.format("You have been muted %s. Reason: %s", describe(minutes), reasonFor(actorId(actor), r, userId)))
+	return true, nil
+end
+
+function Admin.unmute(actor: Player?, userId: number): (boolean, string?)
+	local ok, err = authorize(actor, "admin.unmute", userId)
+	if not ok then
+		return false, err
+	end
+	if muted[userId] == nil then
+		return false, "not muted"
+	end
+	lift(userId)
+	AdminLog.add(actorId(actor), "unmute", userId)
+	notify(Players:GetPlayerByUserId(userId), "You may speak again.")
+	return true, nil
+end
+
+function Admin.logs(actor: Player?, count: number): ({ Types.LogEntry }?, string?)
+	local ok, err = authorize(actor, "admin.logs")
+	if not ok then
+		return nil, err
+	end
+	return AdminLog.recent(count), nil
+end
+
+function Admin.onProfileLoaded(player: Player, profile: Types.Profile)
+	if profile.record.mutedUntil > os.time() then
+		muted[player.UserId] = profile.record.mutedUntil
+		applyMute(player.UserId)
+	end
+end
+
+function Admin.onPlayerRemoving(player: Player)
+	muted[player.UserId] = nil
+end
+
+-- Chat commands -------------------------------------------------------------------
+-- Player by exact name, unique name/display-name prefix, or a userId number.
+local function findTarget(token: string?): number?
+	if not token then
+		return nil
+	end
+	local id = tonumber(token)
+	if id and id % 1 == 0 then
+		return id
+	end
+	local lower = string.lower(token)
+	local found: Player? = nil
+	for _, p in Players:GetPlayers() do
+		local n, dn = string.lower(p.Name), string.lower(p.DisplayName)
+		if n == lower then
+			return p.UserId
+		end
+		if string.sub(n, 1, #lower) == lower or string.sub(dn, 1, #lower) == lower then
+			if found then
+				return nil -- ambiguous
+			end
+			found = p
+		end
+	end
+	return if found then found.UserId else nil
+end
+
+-- "perm"/"0" -> 0, "30" or "30m" -> 30, "2h" -> 120, "3d" -> 4320.
+local function parseMinutes(token: string?): number?
+	if not token then
+		return nil
+	end
+	local t = string.lower(token)
+	if t == "perm" or t == "0" then
+		return 0
+	end
+	local n, unit = string.match(t, "^(%d+)([mhd]?)$")
+	local num = tonumber(n)
+	if not num then
+		return nil
+	end
+	return num * (if unit == "h" then 60 elseif unit == "d" then 1440 else 1)
+end
+
+local USAGE = {
+	kick = "/kick <player> [reason]",
+	ban = "/ban <player|userId> <30m|2h|3d|perm> [reason]",
+	unban = "/unban <userId>",
+	smute = "/smute <player> <30m|2h> [reason]",
+	sunmute = "/sunmute <player>",
+	logs = "/logs",
+}
+
+local function runCommand(actor: Player, name: string, text: string)
+	local words = {}
+	for _, w in string.split(text, " ") do
+		if w ~= "" then
+			table.insert(words, w)
+		end
+	end
+	if name == "logs" then
+		local list, err = Admin.logs(actor, Config.ADMIN_LOG_SHOW)
+		if not list then
+			notify(actor, "Failed: " .. tostring(err))
+			return
+		end
+		if #list == 0 then
+			notify(actor, "No staff actions in this server yet.")
+		end
+		for _, e in list do
+			notify(actor, string.format("%s by %d -> %s %s", e.action, e.by, tostring(e.target), e.reason or ""))
+		end
+		return
+	end
+	local targetId = findTarget(words[2])
+	if not targetId then
+		notify(actor, "Player not found. Usage: " .. USAGE[name])
+		return
+	end
+	local ok, err
+	if name == "kick" then
+		ok, err = Admin.kick(actor, targetId, table.concat(words, " ", 3))
+	elseif name == "ban" or name == "smute" then
+		local minutes = parseMinutes(words[3])
+		if not minutes then
+			notify(actor, "Usage: " .. USAGE[name])
+			return
+		end
+		if name == "ban" then
+			ok, err = Admin.ban(actor, targetId, minutes, table.concat(words, " ", 4))
+		else
+			ok, err = Admin.mute(actor, targetId, minutes, table.concat(words, " ", 4))
+		end
+	elseif name == "unban" then
+		ok, err = Admin.unban(actor, targetId)
+	elseif name == "sunmute" then
+		ok, err = Admin.unmute(actor, targetId)
+	end
+	notify(actor, if ok then string.format("Done: %s %d", name, targetId) else "Failed: " .. tostring(err))
+end
+
+local function result(ok: boolean, err: string?): (any, string?)
+	if ok then
+		return true, nil
+	end
+	return nil, err or "failed"
+end
+
+function Admin.init()
+	-- chat commands
+	local cmdFolder = Instance.new("Folder")
+	cmdFolder.Name = "LondonCommands"
+	for name in USAGE do
+		local cmd = Instance.new("TextChatCommand")
+		cmd.Name = "London_" .. name
+		cmd.PrimaryAlias = "/" .. name
+		cmd.Triggered:Connect(function(source: TextSource, text: string)
+			local actor = Players:GetPlayerByUserId(source.UserId)
+			if actor then
+				runCommand(actor, name, text)
+			end
+		end)
+		cmd.Parent = cmdFolder
+	end
+	cmdFolder.Parent = TextChatService
+
+	-- new chat sources pick up an existing mute
+	TextChatService.DescendantAdded:Connect(function(d)
+		if d:IsA("TextSource") and Admin.isMuted(d.UserId) then
+			d.CanSend = false
+		end
+	end)
+	task.spawn(function()
+		while true do
+			task.wait(Config.MUTE_CHECK_SECONDS)
+			for userId, untilT in muted do
+				if os.time() >= untilT then
+					lift(userId)
+					notify(Players:GetPlayerByUserId(userId), "Your mute has ended.")
+				end
+			end
+		end
+	end)
+
+	-- remotes for the staff panel
+	local rate = Config.ADMIN_RATE
+	local reason = V.optional(V.str(Config.REASON_MAX, true))
+	Net.handle("Admin", "Kick", { schema = { userId = V.userId(), reason = reason }, can = "admin.kick", target = "userId", rate = rate }, function(p, a)
+		return result(Admin.kick(p, a.userId, a.reason))
+	end)
+	Net.handle("Admin", "Ban", { schema = { userId = V.userId(), minutes = V.int(0, Config.MAX_BAN_MINUTES), reason = reason }, can = "admin.ban", target = "userId", rate = rate }, function(p, a)
+		return result(Admin.ban(p, a.userId, a.minutes, a.reason))
+	end)
+	Net.handle("Admin", "Unban", { schema = { userId = V.userId() }, can = "admin.unban", rate = rate }, function(p, a)
+		return result(Admin.unban(p, a.userId))
+	end)
+	Net.handle("Admin", "Mute", { schema = { userId = V.userId(), minutes = V.int(1, Config.MAX_MUTE_MINUTES), reason = reason }, can = "admin.mute", target = "userId", rate = rate }, function(p, a)
+		return result(Admin.mute(p, a.userId, a.minutes, a.reason))
+	end)
+	Net.handle("Admin", "Unmute", { schema = { userId = V.userId() }, can = "admin.unmute", rate = rate }, function(p, a)
+		return result(Admin.unmute(p, a.userId))
+	end)
+	Net.handle("Admin", "Logs", { schema = { count = V.int(1, Config.ADMIN_LOG_MEMORY) }, can = "admin.logs", rate = rate, call = true }, function(p, a)
+		return Admin.logs(p, a.count)
+	end)
+
+	-- cross-server bans
+	if not Store.isMock then
+		pcall(function()
+			MessagingService:SubscribeAsync(Config.ADMIN_TOPIC, function(m)
+				local d = m.Data
+				if type(d) == "table" and d.kind == "ban" and type(d.userId) == "number" then
+					local p = Players:GetPlayerByUserId(d.userId)
+					if p then
+						Admin.checkBan(p)
+					end
+				end
+			end)
+		end)
+	end
+end
+
+return Admin
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX00000016"><Properties><string name="Name">AdminLog</string><ProtectedString name="Source"><![CDATA[--!strict
+-- LondonServer.AdminLog: staff action log. Newest Config.ADMIN_LOG_MEMORY kept in this server,
+-- and appended to Config.ADMIN_LOG_STORE under "d_<yyyymmdd>" (UTC, capped per day).
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared:WaitForChild("Config"))
+local Types = require(Shared:WaitForChild("Types"))
+local Store = require(script.Parent:WaitForChild("Store"))
+
+local AdminLog = {}
+local store = Store.open(Config.ADMIN_LOG_STORE)
+local recent: { Types.LogEntry } = {}
+
+function AdminLog.dayKey(t: number): string
+	local d = os.date("!*t", t)
+	return string.format("d_%04d%02d%02d", d.year, d.month, d.day)
+end
+
+function AdminLog.add(by: number, action: string, target: number?, reason: string?, minutes: number?)
+	local entry: Types.LogEntry = {
+		at = os.time(),
+		by = by,
+		action = action,
+		target = target,
+		reason = reason,
+		minutes = minutes,
+		server = game.JobId,
+	}
+	table.insert(recent, 1, entry)
+	if #recent > Config.ADMIN_LOG_MEMORY then
+		table.remove(recent)
+	end
+	print(string.format("[Admin] %d %s %s %s", by, action, tostring(target), reason or ""))
+	task.spawn(function()
+		local ok, err = pcall(function()
+			store:update(AdminLog.dayKey(entry.at), function(list: any)
+				list = if type(list) == "table" then list else {}
+				if #list >= Config.ADMIN_LOG_DAY_CAP then
+					return nil
+				end
+				table.insert(list, entry)
+				return list
+			end)
+		end)
+		if not ok then
+			warn("[AdminLog] store error: " .. tostring(err))
+		end
+	end)
+end
+
+-- Newest first.
+function AdminLog.recent(n: number): { Types.LogEntry }
+	local out = {}
+	for i = 1, math.min(n, #recent) do
+		out[i] = recent[i]
+	end
+	return out
+end
+
+-- Stored entries for one UTC day (yields).
+function AdminLog.day(t: number): { Types.LogEntry }
+	local ok, list = pcall(function()
+		return store:get(AdminLog.dayKey(t))
+	end)
+	return if ok and type(list) == "table" then list else {}
+end
+
+return AdminLog
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX00000017"><Properties><string name="Name">Analytics</string><ProtectedString name="Source"><![CDATA[--!strict
+-- LondonServer.Analytics: AnalyticsService wrapper (systems/PLAYER_GATHERING.md §7).
+-- Onboarding funnel steps (Config.ONBOARDING_STEPS, first join only, each step once per
+-- session) and custom events. In Studio nothing is sent unless Config.ANALYTICS_IN_STUDIO;
+-- events are kept in memory either way (Analytics.recent) for tests and the staff summary.
+-- D1/D7/D30 retention comes from Roblox's own dashboard; no code needed.
+local AnalyticsService = game:GetService("AnalyticsService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local Config = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Config"))
+
+local Analytics = {}
+local SEND = not RunService:IsStudio() or Config.ANALYTICS_IN_STUDIO
+local stepIndex: { [string]: number } = {}
+for i, name in Config.ONBOARDING_STEPS do
+	stepIndex[name] = i
+end
+local done: { [Player]: { [string]: boolean } } = {}
+local joinedAt: { [Player]: number } = {}
+local recent: { { player: number, kind: string, name: string, value: number? } } = {}
+
+local function remember(player: Player, kind: string, name: string, value: number?)
+	table.insert(recent, 1, { player = player.UserId, kind = kind, name = name, value = value })
+	if #recent > Config.ANALYTICS_MEMORY then
+		table.remove(recent)
+	end
+end
+
+function Analytics.onboardingStep(player: Player, step: string)
+	local i = stepIndex[step]
+	local d = done[player]
+	if not i or not d or d[step] then
+		return
+	end
+	d[step] = true
+	remember(player, "onboarding", step, i)
+	if SEND then
+		pcall(AnalyticsService.LogOnboardingFunnelStepEvent, AnalyticsService, player, i, step)
+	end
+end
+
+function Analytics.event(player: Player, name: string, value: number?)
+	remember(player, "custom", name, value)
+	if SEND then
+		pcall(AnalyticsService.LogCustomEvent, AnalyticsService, player, name, value or 1)
+	end
+end
+
+-- isNew = first join (only new players walk the onboarding funnel).
+function Analytics.onProfileLoaded(player: Player, isNew: boolean)
+	joinedAt[player] = joinedAt[player] or os.clock()
+	if isNew then
+		done[player] = done[player] or {}
+		Analytics.onboardingStep(player, "ProfileLoaded")
+	end
+end
+
+function Analytics.onPlayerRemoving(player: Player)
+	local t = joinedAt[player]
+	if t then
+		Analytics.event(player, "SessionSeconds", math.floor(os.clock() - t))
+	end
+	done[player] = nil
+	joinedAt[player] = nil
+end
+
+function Analytics.recent(n: number): { any }
+	local out = {}
+	for i = 1, math.min(n, #recent) do
+		out[i] = recent[i]
+	end
+	return out
+end
+
+return Analytics
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX00000018"><Properties><string name="Name">Characters</string><ProtectedString name="Source"><![CDATA[--!strict
+-- LondonServer.Characters: character creation and save slots (Shared.Types Slot / Progress).
+-- Every session starts at the character menu; the avatar only spawns once a slot is picked
+-- (Players.CharacterAutoLoads is off, and this module respawns players after death).
+--   Create  a fresh character in an empty slot (first slot free, then Config.SLOT_NEW_PRICE)
+--   Link    a new slot sharing an existing character's progress (Config.SLOT_LINK_PRICE): own name
+--           and look, same job ranks / hobbies / licences / bests, and progress counts for both
+--   Select  play as a slot (Config.CHARACTER_SWITCH_COOLDOWN between switches)
+--   Rename  a slot (Config.NAME_CHANGE_COOLDOWN from creation or the last rename)
+--   Delete  a slot (must send its full name to confirm); its progress is deleted only if no
+--           other slot links to it
+-- Character purchases and changes save immediately (Profiles.save).
+-- Remotes (Character domain, calls): List, Create, Link, Select, Rename, Delete. Push: List.
+-- Player attributes: RPName (Identity tags), CharSlot.
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared:WaitForChild("Config"))
+local Net = require(Shared:WaitForChild("Net"))
+local Text = require(Shared:WaitForChild("Text"))
+local Money = require(Shared:WaitForChild("Money"))
+local Names = require(Shared:WaitForChild("Names"))
+local Looks = require(Shared:WaitForChild("Looks"))
+local Hobbies = require(Shared:WaitForChild("Hobbies"))
+local Types = require(Shared:WaitForChild("Types"))
+local Profiles = require(script.Parent:WaitForChild("Profiles"))
+local Analytics = require(script.Parent:WaitForChild("Analytics"))
+local Identity = require(script.Parent:WaitForChild("Identity"))
+
+local V = Net.V
+local Characters = {}
+Characters.SLOT_ATTR = "CharSlot"
+
+local baseDescription: { [Player]: HumanoidDescription } = {} -- the player's own avatar, fetched once
+local beforeChange: { (Player) -> () } = {}
+local switchedAt: { [Player]: number } = {}
+local busy: { [Player]: boolean } = {} -- one character change at a time per player
+
+local function slotKey(i: number): string
+	return tostring(i)
+end
+
+local function fullName(slot: Types.Slot): string
+	return slot.name.first .. " " .. slot.name.last
+end
+
+-- Seconds until a slot may be renamed. A character never renamed gets one free fix within
+-- Config.NAME_FIX_GRACE of its creation; after that, Config.NAME_CHANGE_COOLDOWN applies.
+local function renameIn(slot: Types.Slot): number
+	local now = os.time()
+	if slot.name.changedAt == slot.createdAt and now - slot.createdAt < Config.NAME_FIX_GRACE then
+		return 0
+	end
+	return math.max(0, Config.NAME_CHANGE_COOLDOWN - (now - slot.name.changedAt))
+end
+
+-- How many slots point at a progress id.
+local function linkCount(p: Types.Profile, char: string): number
+	local n = 0
+	for _, s in p.slots do
+		if s.char == char then
+			n += 1
+		end
+	end
+	return n
+end
+
+local function usedSlots(p: Types.Profile): number
+	local n = 0
+	for _ in p.slots do
+		n += 1
+	end
+	return n
+end
+
+-- A line under the name in the menu: best hobby levels so players recognise their characters.
+local function summary(prog: Types.Progress?): string
+	if not prog then
+		return ""
+	end
+	local parts = {}
+	for hobby, xp in prog.hobbies do
+		local lvl = Hobbies.level(xp)
+		if lvl > 1 then
+			table.insert(parts, { hobby = hobby, lvl = lvl })
+		end
+	end
+	table.sort(parts, function(a, b)
+		return a.lvl > b.lvl
+	end)
+	local out = {}
+	for i = 1, math.min(3, #parts) do
+		table.insert(out, string.format("%s %d", parts[i].hobby, parts[i].lvl))
+	end
+	return if #out > 0 then table.concat(out, " · ") else "New to the city"
+end
+
+function Characters.list(player: Player): { [string]: any }
+	local p = Profiles.get(player)
+	if not p then
+		return { loaded = false }
+	end
+	local slots = {}
+	for i = 1, Config.MAX_SLOTS do
+		local s = p.slots[slotKey(i)]
+		if s then
+			slots[slotKey(i)] = {
+				first = s.name.first,
+				last = s.name.last,
+				look = s.look,
+				summary = summary(p.progress[s.char]),
+				linked = linkCount(p, s.char) > 1,
+				shared = linkCount(p, s.char), -- slots sharing this progress (incl. this one)
+				renameIn = renameIn(s),
+			}
+		end
+	end
+	return {
+		loaded = true,
+		slots = slots,
+		active = p.active,
+		maxSlots = Config.MAX_SLOTS,
+		newPrice = if usedSlots(p) == 0 then 0 else Config.SLOT_NEW_PRICE,
+		linkPrice = Config.SLOT_LINK_PRICE,
+		newPriceText = Money.format(if usedSlots(p) == 0 then 0 else Config.SLOT_NEW_PRICE),
+		linkPriceText = Money.format(Config.SLOT_LINK_PRICE),
+		money = p.pence + p.bank,
+		switchIn = math.max(0, Config.CHARACTER_SWITCH_COOLDOWN - (os.clock() - (switchedAt[player] or -math.huge))),
+	}
+end
+
+local function pushList(player: Player)
+	Net.push(player, "Character", "List", Characters.list(player))
+end
+
+-- Names -----------------------------------------------------------------------------------
+-- Returns first, last (tidied, filtered) or nil, nil, reason.
+local function checkName(player: Player, first: any, last: any): (string?, string?, string?)
+	local f, whyF = Names.cleanPart(first)
+	if not f then
+		return nil, nil, whyF
+	end
+	local l, whyL = Names.cleanPart(last)
+	if not l then
+		return nil, nil, whyL
+	end
+	if Names.isBlocked(f, l) then
+		return nil, nil, "That's a real person's name. Please pick a fictional one."
+	end
+	local full = f .. " " .. l
+	local filtered = Text.filterBroadcast(full, player.UserId)
+	if filtered == nil then
+		return nil, nil, "The name check isn't answering. Please try again."
+	end
+	if filtered ~= full then
+		return nil, nil, "That name isn't allowed. Please pick another."
+	end
+	return f, l, nil
+end
+
+-- Looks -------------------------------------------------------------------------------------
+local function avatarDescription(player: Player): HumanoidDescription
+	local cached = baseDescription[player]
+	if cached then
+		return cached
+	end
+	local desc: HumanoidDescription
+	local ok, res = pcall(Players.GetHumanoidDescriptionFromUserId, Players, player.UserId)
+	if ok and res then
+		desc = res
+	else
+		desc = Instance.new("HumanoidDescription") -- Studio test players (negative ids) and outages
+	end
+	baseDescription[player] = desc
+	return desc
+end
+
+-- The player's avatar (face, head, body shape, animations) in the character's look. Modern
+-- clothing and accessories are removed (PROPERTY_WARDROBE §3: period clothing everywhere).
+function Characters.describe(player: Player, look: Types.Look): HumanoidDescription
+	local desc = avatarDescription(player):Clone()
+	local hair = Looks.hair(look.hair) or Config.HAIR_STYLES[1]
+	local outfit = Looks.outfit(look.outfit) or Config.OUTFITS[1]
+	local keep = {}
+	if hair.id == "own" then
+		for _, a in desc:GetAccessories(true) do
+			if a.AccessoryType == Enum.AccessoryType.Hair then
+				table.insert(keep, a)
+			end
+		end
+	end
+	for _, id in hair.assets do
+		table.insert(keep, { AssetId = id, AccessoryType = Enum.AccessoryType.Hair, IsLayered = false })
+	end
+	for i, piece in outfit.layered do
+		table.insert(keep, { AssetId = piece.id, AccessoryType = (Enum.AccessoryType :: any)[piece.type], IsLayered = true, Order = i })
+	end
+	desc:SetAccessories(keep, true)
+	desc.Shirt = outfit.shirt
+	desc.Pants = outfit.pants
+	desc.GraphicTShirt = 0
+	local skin = Config.SKIN_TONES[look.skin] or Config.SKIN_TONES[1]
+	desc.HeadColor = skin
+	desc.TorsoColor = outfit.coat
+	desc.LeftArmColor = outfit.coat
+	desc.RightArmColor = outfit.coat
+	desc.LeftLegColor = outfit.lower
+	desc.RightLegColor = outfit.lower
+	return desc
+end
+
+-- Spawning ----------------------------------------------------------------------------------
+function Characters.spawn(player: Player)
+	local slot = Profiles.activeSlot(player)
+	if not slot or player.Parent ~= Players then
+		return
+	end
+	local desc = Characters.describe(player, slot.look)
+	local ok, err = pcall(player.LoadCharacterWithHumanoidDescription, player, desc)
+	if not ok then
+		warn(string.format("[Characters] spawn with look failed for %s: %s", player.Name, tostring(err)))
+		pcall(player.LoadCharacter, player) -- never leave a player without a body
+	end
+end
+
+local function despawn(player: Player)
+	local c = player.Character
+	player.Character = nil
+	if c then
+		c:Destroy()
+	end
+end
+
+-- fn(player) runs right before the active character changes or is deleted, while
+-- Profiles.progress(player) is still the old character: settle activities there. Plain
+-- callbacks, not a signal, because deferred signals would run after the switch.
+function Characters.onBeforeChange(fn: (Player) -> ())
+	table.insert(beforeChange, fn)
+end
+
+local function leaving(player: Player)
+	for _, fn in beforeChange do
+		local ok, err = pcall(fn, player)
+		if not ok then
+			warn("[Characters] before-change hook failed: " .. tostring(err))
+		end
+	end
+end
+
+-- Slot actions -------------------------------------------------------------------------------
+local function play(player: Player, p: Types.Profile, key: string)
+	if p.active ~= "" then
+		leaving(player)
+	end
+	local slot = p.slots[key]
+	p.active = key
+	switchedAt[player] = os.clock()
+	player:SetAttribute(Characters.SLOT_ATTR, key)
+	player:SetAttribute(Identity.NAME_ATTR, fullName(slot))
+	Identity.resetRole(player)
+	Characters.spawn(player)
+end
+
+local function newSlot(p: Types.Profile, key: string, char: string, first: string, last: string, look: Types.Look)
+	local now = os.time()
+	p.slots[key] = {
+		char = char,
+		name = { first = first, last = last, changedAt = now }, -- == createdAt marks "never renamed"
+		look = look,
+		createdAt = now,
+	}
+end
+
+-- Shared checks for Create / Link. Returns the profile, or nil and a reason.
+local function canFill(player: Player, key: string): (Types.Profile?, string?)
+	local p = Profiles.get(player)
+	if not p then
+		return nil, "Your profile isn't loaded yet."
+	end
+	local i = tonumber(key)
+	if not i or i < 1 or i > Config.MAX_SLOTS or i % 1 ~= 0 then
+		return nil, "That slot doesn't exist."
+	end
+	if p.slots[key] then
+		return nil, "That slot is already in use."
+	end
+	return p, nil
+end
+
+function Characters.create(player: Player, key: string, first: any, last: any, look: Types.Look): string?
+	local p, why = canFill(player, key)
+	if not p then
+		return why
+	end
+	local isFirst = usedSlots(p) == 0
+	local price = if isFirst then 0 else Config.SLOT_NEW_PRICE
+	local f, l, whyName = checkName(player, first, last)
+	if not f or not l then
+		return whyName
+	end
+	if p.slots[key] then -- the name check yields; another request may have filled the slot
+		return "That slot is already in use."
+	end
+	if price > 0 and not Profiles.charge(player, price) then
+		return string.format("A new character costs %s.", Money.format(price))
+	end
+	local char = "c" .. p.nextChar
+	p.nextChar += 1
+	p.progress[char] = Profiles.progressDefaults()
+	newSlot(p, key, char, f, l, look)
+	Profiles.save(player)
+	if isFirst then
+		Analytics.onboardingStep(player, "Name")
+		Analytics.onboardingStep(player, "Look")
+	end
+	Analytics.event(player, "CharacterCreated", tonumber(key))
+	return nil
+end
+
+function Characters.link(player: Player, key: string, fromKey: string, first: any, last: any, look: Types.Look): string?
+	local p, why = canFill(player, key)
+	if not p then
+		return why
+	end
+	local from = p.slots[fromKey]
+	if not from then
+		return "Pick a character to share progress with."
+	end
+	local f, l, whyName = checkName(player, first, last)
+	if not f or not l then
+		return whyName
+	end
+	if p.slots[key] or p.slots[fromKey] ~= from then -- changed while the name check yielded
+		return "Your slots changed. Please try again."
+	end
+	if not Profiles.charge(player, Config.SLOT_LINK_PRICE) then
+		return string.format("Sharing a character's progress costs %s.", Money.format(Config.SLOT_LINK_PRICE))
+	end
+	newSlot(p, key, from.char, f, l, look)
+	Profiles.save(player)
+	Analytics.event(player, "CharacterLinked", tonumber(key))
+	return nil
+end
+
+function Characters.select(player: Player, key: string): string?
+	local p = Profiles.get(player)
+	if not p then
+		return "Your profile isn't loaded yet."
+	end
+	if not p.slots[key] then
+		return "That slot is empty."
+	end
+	if p.active == key and player.Character then
+		return "You're already playing as this character."
+	end
+	local since = os.clock() - (switchedAt[player] or -math.huge)
+	if p.active ~= "" and since < Config.CHARACTER_SWITCH_COOLDOWN then
+		return string.format("You can switch character again in %d s.", math.ceil(Config.CHARACTER_SWITCH_COOLDOWN - since))
+	end
+	play(player, p, key)
+	return nil
+end
+
+function Characters.rename(player: Player, key: string, first: any, last: any): string?
+	local p = Profiles.get(player)
+	local slot = p and p.slots[key]
+	if not p or not slot then
+		return "That slot is empty."
+	end
+	local left = renameIn(slot)
+	if left > 0 then
+		return string.format("This character can be renamed again in %d days.", math.ceil(left / 86400))
+	end
+	local f, l, whyName = checkName(player, first, last)
+	if not f or not l then
+		return whyName
+	end
+	if p.slots[key] ~= slot then
+		return "Your slots changed. Please try again."
+	end
+	slot.name = { first = f, last = l, changedAt = os.time() }
+	if p.active == key then
+		player:SetAttribute(Identity.NAME_ATTR, fullName(slot))
+	end
+	Profiles.save(player)
+	return nil
+end
+
+function Characters.delete(player: Player, key: string, confirm: string): string?
+	local p = Profiles.get(player)
+	local slot = p and p.slots[key]
+	if not p or not slot then
+		return "That slot is empty."
+	end
+	if confirm ~= fullName(slot) then
+		return "Type the character's full name to confirm."
+	end
+	if p.active == key then
+		leaving(player)
+	end
+	p.slots[key] = nil
+	if linkCount(p, slot.char) == 0 then
+		p.progress[slot.char] = nil -- nothing links to it any more
+	end
+	if p.active == key then
+		p.active = ""
+		player:SetAttribute(Characters.SLOT_ATTR, nil)
+		player:SetAttribute(Identity.NAME_ATTR, nil)
+		Identity.resetRole(player)
+		despawn(player)
+	end
+	Profiles.save(player)
+	Analytics.event(player, "CharacterDeleted", tonumber(key))
+	return nil
+end
+
+-- Lifecycle ----------------------------------------------------------------------------------
+function Characters.onProfileLoaded(player: Player)
+	local p = Profiles.get(player)
+	if p then
+		for _, s in p.slots do
+			s.look = Looks.repair(s.look) -- a preset may have been removed from Config since it was saved
+		end
+	end
+	task.spawn(avatarDescription, player) -- warm the cache while they read the menu
+	pushList(player)
+end
+
+function Characters.onPlayerRemoving(player: Player)
+	baseDescription[player] = nil
+	switchedAt[player] = nil
+	busy[player] = nil
+end
+
+-- Studio test hook: create (or reuse) slot "1" with a test name and play it.
+function Characters.debugQuickStart(player: Player): boolean
+	local p = Profiles.get(player)
+	if not p then
+		return false
+	end
+	if not p.slots["1"] then
+		local char = "c" .. p.nextChar
+		p.nextChar += 1
+		p.progress[char] = Profiles.progressDefaults()
+		newSlot(p, "1", char, "Test", "Player" .. math.abs(player.UserId), Looks.default())
+	end
+	play(player, p, "1")
+	pushList(player)
+	return true
+end
+
+function Characters.init()
+	Players.CharacterAutoLoads = false
+
+	-- Every call: one at a time per player, then the fresh list (or the reason it failed).
+	local function handle(action: string, schema: { [string]: Net.Validator }, rate: { count: number, per: number }, fn: (Player, any) -> string?)
+		Net.handle("Character", action, { schema = schema, rate = rate, call = true }, function(player, a)
+			if busy[player] then
+				return nil, "One moment..."
+			end
+			busy[player] = true
+			local ok, why = pcall(fn, player, a)
+			busy[player] = nil
+			if not ok then
+				warn(string.format("[Characters] %s failed for %s: %s", action, player.Name, tostring(why)))
+				return nil, "Something went wrong. Please try again."
+			end
+			if why then
+				return nil, why
+			end
+			return Characters.list(player)
+		end)
+	end
+	local slot = V.enum((function()
+		local keys = {}
+		for i = 1, Config.MAX_SLOTS do
+			table.insert(keys, slotKey(i))
+		end
+		return keys
+	end)())
+	local nameField = V.str(Config.NAME_MAX * 2)
+	local lookSchema = {
+		skin = V.int(1, #Config.SKIN_TONES),
+		hair = V.str(32),
+		outfit = V.str(32),
+	}
+	local function withLook(extra: { [string]: Net.Validator }): { [string]: Net.Validator }
+		local s = table.clone(lookSchema)
+		for k, v in extra do
+			s[k] = v
+		end
+		return s
+	end
+
+	Net.handle("Character", "List", { call = true }, function(player)
+		return Characters.list(player)
+	end)
+	handle("Create", withLook({ slot = slot, first = nameField, last = nameField }), Config.NAME_RATE, function(player, a)
+		local look = Looks.clean(a.skin, a.hair, a.outfit)
+		if not look then
+			return "Please pick a look."
+		end
+		local why = Characters.create(player, a.slot, a.first, a.last, look)
+		if not why then
+			local p = Profiles.get(player)
+			if p and p.active == "" then
+				play(player, p, a.slot) -- straight into the city with a new character
+			end
+		end
+		return why
+	end)
+	handle("Link", withLook({ slot = slot, from = slot, first = nameField, last = nameField }), Config.NAME_RATE, function(player, a)
+		local look = Looks.clean(a.skin, a.hair, a.outfit)
+		if not look then
+			return "Please pick a look."
+		end
+		return Characters.link(player, a.slot, a.from, a.first, a.last, look)
+	end)
+	handle("Select", { slot = slot }, Config.CHARACTER_RATE, function(player, a)
+		return Characters.select(player, a.slot)
+	end)
+	handle("Rename", { slot = slot, first = nameField, last = nameField }, Config.NAME_RATE, function(player, a)
+		return Characters.rename(player, a.slot, a.first, a.last)
+	end)
+	handle("Delete", { slot = slot, confirm = V.str(Config.NAME_MAX * 2 + 1) }, Config.CHARACTER_RATE, function(player, a)
+		return Characters.delete(player, a.slot, a.confirm)
+	end)
+
+	-- Respawn after death (CharacterAutoLoads is off).
+	local function watch(player: Player)
+		player.CharacterAdded:Connect(function(character)
+			local hum = character:WaitForChild("Humanoid", 10)
+			if hum and hum:IsA("Humanoid") then
+				hum.Died:Connect(function()
+					task.delay(Config.RESPAWN_SECONDS, function()
+						if player.Character == character and player.Parent == Players then
+							Characters.spawn(player)
+						end
+					end)
+				end)
+			end
+		end)
+	end
+	Players.PlayerAdded:Connect(watch)
+	for _, p in Players:GetPlayers() do
+		watch(p)
+	end
+end
+
+return Characters
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX00000019"><Properties><string name="Name">Debug</string><ProtectedString name="Source"><![CDATA[--!strict
+-- LondonServer.Debug: Studio-only test bindable, ServerStorage.LondonDebug (never created live).
+-- From the Server datamodel: game.ServerStorage.LondonDebug:Invoke("givePence", userId, 120)
+-- Commands: profile, givePence, setStaff, rejoin, lockTest, raw, setRaw, admin, net, analytics,
+-- setRole, clock, play.
+local HttpService = game:GetService("HttpService")
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local ServerStorage = game:GetService("ServerStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Net = require(Shared:WaitForChild("Net"))
+local Roles = require(Shared:WaitForChild("Roles"))
+local Store = require(script.Parent:WaitForChild("Store"))
+local Profiles = require(script.Parent:WaitForChild("Profiles"))
+local Admin = require(script.Parent:WaitForChild("Admin")) :: any
+local Analytics = require(script.Parent:WaitForChild("Analytics"))
+local Identity = require(script.Parent:WaitForChild("Identity"))
+local Characters = require(script.Parent:WaitForChild("Characters"))
+local WorldClock = require(script.Parent:WaitForChild("WorldClock"))
+
+local Debug = {}
+
+local function plr(userId: number): Player
+	return assert(Players:GetPlayerByUserId(userId), "no player " .. tostring(userId))
+end
+
+local cmds: { [string]: (...any) -> any } = {
+	analytics = function(n)
+		return HttpService:JSONEncode(Analytics.recent(n or 10))
+	end,
+	profile = function(userId)
+		return HttpService:JSONEncode(Profiles.get(plr(userId)))
+	end,
+	givePence = function(userId, n)
+		return Profiles.addPence(plr(userId), n)
+	end,
+	setStaff = function(userId, lvl)
+		plr(userId):SetAttribute(Roles.STAFF_ATTR, lvl)
+		return true
+	end,
+	rejoin = function(userId)
+		return Profiles.debugRejoin(plr(userId))
+	end,
+	-- a second "server" tries to load a key: expect "locked" while it is held
+	lockTest = function(userId, maxWait)
+		local data, why = Profiles.load(userId, "debug-other-server", maxWait or 4)
+		return if data then "loaded" else why
+	end,
+	raw = function(storeName, key)
+		return Store.debugRaw(storeName, key)
+	end,
+	setRaw = function(storeName, key, json)
+		Store.debugSetRaw(storeName, key, json)
+		return true
+	end,
+	-- admin(action, actorUserId (0 = console), ...args)
+	admin = function(action, actorUserId, ...)
+		local actor = if actorUserId == 0 then nil else plr(actorUserId)
+		return Admin[action](actor, ...)
+	end,
+	-- setRole(userId, roleId): skips cooldowns, seat checks still count the seat
+	setRole = function(userId, roleId)
+		return Identity.debugSetRole(plr(userId), roleId)
+	end,
+	-- play(userId): skip the character menu (makes slot 1 "Test Player<id>" if empty)
+	play = function(userId)
+		return Characters.debugQuickStart(plr(userId))
+	end,
+	-- clock(hour): jump the world clock, e.g. clock(18) for dusk
+	clock = function(hour)
+		return WorldClock.debugSetHour(hour)
+	end,
+	-- net(userId, domain, msg, isCall): runs the server validator path as that player
+	net = function(userId, domain, msg, isCall)
+		return Net._dispatch(plr(userId), domain, msg, isCall == true)
+	end,
+}
+
+function Debug.init()
+	if not RunService:IsStudio() then
+		return
+	end
+	local bf = Instance.new("BindableFunction")
+	bf.Name = "LondonDebug"
+	bf.OnInvoke = function(cmd: string, ...)
+		local f = cmds[cmd]
+		if not f then
+			return "unknown command"
+		end
+		return f(...)
+	end
+	bf.Parent = ServerStorage
+end
+
+return Debug
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX0000001A"><Properties><string name="Name">Doors</string><ProtectedString name="Source"><![CDATA[--!strict
+-- Doors: swinging door leaves. Any BasePart tagged Config.DOOR_TAG with attributes
+--   DoorHinge   Vector3  world point on the pintle axis (closed position)
+--   DoorOpenDeg number   swing about +Y that opens it (sign from the model, e.g. Parliament manifest)
+--   DoorGroup   string   leaves sharing a group open and close together (double doors)
+--   DoorLocked  boolean  optional; true hides the prompt (Property system sets it later)
+-- gets one ProximityPrompt per group, on the leaf whose name sorts first. Server-authoritative.
+local CollectionService = game:GetService("CollectionService")
+local TweenService = game:GetService("TweenService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Config = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Config"))
+
+local Doors = {}
+
+type Leaf = { part: BasePart, closed: CFrame, open: CFrame }
+type Group = { leaves: { Leaf }, isOpen: boolean, prompt: ProximityPrompt?, busy: boolean, openedAt: number }
+
+local groups: { [string]: Group } = {}
+
+local function swing(g: Group, open: boolean)
+	g.isOpen = open
+	local info = TweenInfo.new(Config.DOOR_SWING_TIME, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+	for _, leaf in g.leaves do
+		TweenService:Create(leaf.part, info, { CFrame = if open then leaf.open else leaf.closed }):Play()
+	end
+	if g.prompt then
+		g.prompt.ActionText = if open then "Close" else "Open"
+	end
+end
+
+function Doors.toggle(groupName: string)
+	local g = groups[groupName]
+	if not g or g.busy then
+		return
+	end
+	g.busy = true
+	swing(g, not g.isOpen)
+	task.delay(Config.DOOR_SWING_TIME, function()
+		g.busy = false
+	end)
+	if g.isOpen and Config.DOOR_AUTO_CLOSE > 0 then
+		local stamp = os.clock()
+		g.openedAt = stamp
+		task.delay(Config.DOOR_AUTO_CLOSE, function()
+			if g.isOpen and g.openedAt == stamp then
+				swing(g, false)
+			end
+		end)
+	end
+end
+
+function Doors.isOpen(groupName: string): boolean
+	local g = groups[groupName]
+	return g ~= nil and g.isOpen
+end
+
+local function refreshPrompt(g: Group)
+	if g.prompt then
+		g.prompt:Destroy()
+		g.prompt = nil
+	end
+	table.sort(g.leaves, function(a, b)
+		return a.part.Name < b.part.Name
+	end)
+	local leaf = g.leaves[1]
+	local hinge = leaf.part:GetAttribute("DoorHinge") :: Vector3
+	local at = Instance.new("Attachment")
+	at.Name = "DoorPromptAt"
+	at.Parent = leaf.part
+	at.WorldPosition = Vector3.new(leaf.part.Position.X, hinge.Y + Config.DOOR_PROMPT_HEIGHT, leaf.part.Position.Z)
+	local p = Instance.new("ProximityPrompt")
+	p.ActionText = "Open"
+	p.ObjectText = "Door"
+	p.HoldDuration = 0
+	p.MaxActivationDistance = Config.DOOR_PROMPT_DISTANCE
+	p.RequiresLineOfSight = false
+	p.Enabled = not leaf.part:GetAttribute("DoorLocked")
+	p.Parent = at
+	g.prompt = p
+	local name = leaf.part:GetAttribute("DoorGroup") :: string
+	p.Triggered:Connect(function(player: Player)
+		local char = player.Character
+		local root = char and char:FindFirstChild("HumanoidRootPart") :: BasePart?
+		if not root or (root.Position - at.WorldPosition).Magnitude > Config.DOOR_PROMPT_DISTANCE + 4 then
+			return -- server-side distance check
+		end
+		if leaf.part:GetAttribute("DoorLocked") then
+			return
+		end
+		Doors.toggle(name)
+	end)
+	leaf.part:GetAttributeChangedSignal("DoorLocked"):Connect(function()
+		p.Enabled = not leaf.part:GetAttribute("DoorLocked")
+	end)
+end
+
+local function addLeaf(inst: Instance)
+	if not inst:IsA("BasePart") or not inst:IsDescendantOf(workspace) then
+		return
+	end
+	local hinge = inst:GetAttribute("DoorHinge")
+	local deg = inst:GetAttribute("DoorOpenDeg")
+	if typeof(hinge) ~= "Vector3" or typeof(deg) ~= "number" then
+		warn("[Doors] missing DoorHinge / DoorOpenDeg on " .. inst:GetFullName())
+		return
+	end
+	local name = inst:GetAttribute("DoorGroup")
+	if typeof(name) ~= "string" then
+		name = inst:GetFullName()
+		inst:SetAttribute("DoorGroup", name)
+	end
+	inst.Anchored = true
+	local pivot = CFrame.new(hinge)
+	local leaf: Leaf = {
+		part = inst,
+		closed = inst.CFrame,
+		open = pivot * CFrame.Angles(0, math.rad(deg), 0) * pivot:Inverse() * inst.CFrame,
+	}
+	local g = groups[name]
+	if not g then
+		g = { leaves = {}, isOpen = false, prompt = nil, busy = false, openedAt = 0 }
+		groups[name] = g
+	end
+	table.insert(g.leaves, leaf)
+	refreshPrompt(g)
+end
+
+function Doors.init()
+	for _, inst in CollectionService:GetTagged(Config.DOOR_TAG) do
+		addLeaf(inst)
+	end
+	CollectionService:GetInstanceAddedSignal(Config.DOOR_TAG):Connect(addLeaf)
+end
+
+return Doors
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX0000001B"><Properties><string name="Name">Identity</string><ProtectedString name="Source"><![CDATA[--!strict
+-- LondonServer.Identity: station roles and overhead tags (M1, DESIGN §5-6.1). RP names come
+-- from the character being played (LondonServer.Characters sets RPName). Roles are per server
+-- (Q4): held in memory, with seat limits and playtime gates from Shared.Stations, and reset to
+-- Config.DEFAULT_ROLE whenever the player switches character.
+-- Player attributes (read by tags, Roles.roleOf and the client): RPName, Role.
+-- Remotes (Identity domain, calls): Get, ChooseRole { role }.
+-- Pushes: Identity.State (to one player), Identity.Seats (to everyone, on any seat change).
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared:WaitForChild("Config"))
+local Net = require(Shared:WaitForChild("Net"))
+local Roles = require(Shared:WaitForChild("Roles"))
+local Stations = require(Shared:WaitForChild("Stations"))
+local Profiles = require(script.Parent:WaitForChild("Profiles"))
+
+local V = Net.V
+local Identity = {}
+Identity.NAME_ATTR = "RPName"
+
+local holders: { [string]: { Player } } = {} -- roleId -> players holding a limited seat
+local switchedAt: { [Player]: number } = {}
+
+local function rpName(player: Player): string?
+	local a = player:GetAttribute(Identity.NAME_ATTR)
+	return if type(a) == "string" and a ~= "" then a else nil
+end
+
+local function seatCounts(): { [string]: number }
+	local out = {}
+	for id, list in holders do
+		out[id] = #list
+	end
+	return out
+end
+
+local function state(player: Player): { [string]: any }
+	return {
+		hasCharacter = rpName(player) ~= nil,
+		role = Roles.roleOf(player),
+		roleCooldown = math.max(0, Config.ROLE_SWITCH_COOLDOWN - (os.clock() - (switchedAt[player] or -math.huge))),
+		playtime = Profiles.playtime(player),
+		seats = seatCounts(),
+	}
+end
+
+local function pushState(player: Player)
+	Net.push(player, "Identity", "State", state(player))
+end
+
+-- Overhead tags ----------------------------------------------------------------
+local function label(parent: Instance, name: string, y: number, h: number, bold: boolean): TextLabel
+	local l = Instance.new("TextLabel")
+	l.Name = name
+	l.BackgroundTransparency = 1
+	l.Position = UDim2.fromScale(0, y)
+	l.Size = UDim2.fromScale(1, h)
+	l.Font = if bold then Enum.Font.GaramondBold else Enum.Font.Garamond
+	l.TextScaled = true
+	l.TextColor3 = Color3.fromRGB(240, 232, 214)
+	l.TextStrokeTransparency = 0.4
+	l.Parent = parent
+	return l
+end
+
+local function refreshTag(player: Player)
+	local head = player.Character and player.Character:FindFirstChild("Head")
+	local tag = head and head:FindFirstChild("RPTag")
+	if not tag then
+		return
+	end
+	local name = tag:FindFirstChild("RPName") :: TextLabel
+	local role = tag:FindFirstChild("RPRole") :: TextLabel
+	name.Text = rpName(player) or player.DisplayName
+	name.TextTransparency = if rpName(player) then 0 else 0.35
+	local r = Stations.BY_ID[Roles.roleOf(player)]
+	role.Text = if r and r.id ~= Config.DEFAULT_ROLE then r.name else ""
+end
+
+local function buildTag(player: Player, character: Model)
+	local head = character:WaitForChild("Head", 10)
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+	if not head or not head:IsA("BasePart") then
+		return
+	end
+	if humanoid then
+		humanoid.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
+	end
+	local old = head:FindFirstChild("RPTag")
+	if old then
+		old:Destroy()
+	end
+	local bb = Instance.new("BillboardGui")
+	bb.Name = "RPTag"
+	bb.Size = UDim2.fromScale(Config.TAG_SIZE.w, Config.TAG_SIZE.h)
+	bb.StudsOffsetWorldSpace = Vector3.new(0, Config.TAG_OFFSET, 0)
+	bb.MaxDistance = Config.TAG_MAX_DISTANCE
+	bb.LightInfluence = 0
+	label(bb, "RPName", 0, 0.6, true)
+	label(bb, "RPRole", 0.6, 0.4, false)
+	bb.Adornee = head
+	bb.Parent = head
+	refreshTag(player)
+end
+
+-- Seats --------------------------------------------------------------------------
+local function leaveSeat(player: Player)
+	local current = Roles.roleOf(player)
+	local list = holders[current]
+	if list then
+		local i = table.find(list, player)
+		if i then
+			table.remove(list, i)
+		end
+	end
+end
+
+local function setRole(player: Player, roleId: string)
+	leaveSeat(player)
+	local r = Stations.BY_ID[roleId]
+	if r.seats then
+		local list = holders[roleId] or {}
+		holders[roleId] = list
+		table.insert(list, player)
+	end
+	player:SetAttribute(Roles.ROLE_ATTR, roleId)
+	Net.pushAll("Identity", "Seats", { seats = seatCounts() })
+end
+
+-- Returns nil if the player may take the role, else the reason.
+function Identity.canTake(player: Player, roleId: string): string?
+	local r = Stations.BY_ID[roleId]
+	if not r or not Stations.selectable(r) then
+		return "That role can't be chosen from the menu."
+	end
+	if Roles.roleOf(player) == roleId then
+		return "You already hold that role."
+	end
+	if not rpName(player) then
+		return "Choose a character first."
+	end
+	local since = os.clock() - (switchedAt[player] or -math.huge)
+	if since < Config.ROLE_SWITCH_COOLDOWN then
+		return string.format("You can change role again in %d s.", math.ceil(Config.ROLE_SWITCH_COOLDOWN - since))
+	end
+	if r.minPlaytime and Profiles.playtime(player) < r.minPlaytime then
+		return string.format("Needs %d h of playtime.", math.ceil(r.minPlaytime / 3600))
+	end
+	if r.seats and #(holders[roleId] or {}) >= r.seats then
+		return "All seats are taken in this server."
+	end
+	return nil
+end
+
+-- Lifecycle --------------------------------------------------------------------------
+-- Back to the default role (frees any limited seat). Called when the character changes, so
+-- a seat earned as one character isn't carried into another. Clears the role cooldown so the
+-- new character can pick a role at once (switching character has its own cooldown).
+function Identity.resetRole(player: Player)
+	switchedAt[player] = nil
+	if Roles.roleOf(player) ~= Config.DEFAULT_ROLE or player:GetAttribute(Roles.ROLE_ATTR) == nil then
+		setRole(player, Config.DEFAULT_ROLE)
+	end
+	pushState(player)
+end
+
+function Identity.onProfileLoaded(player: Player)
+	player:SetAttribute(Roles.ROLE_ATTR, Config.DEFAULT_ROLE)
+	pushState(player)
+end
+
+function Identity.onPlayerRemoving(player: Player)
+	local held = Stations.BY_ID[Roles.roleOf(player)]
+	leaveSeat(player)
+	switchedAt[player] = nil
+	if held and held.seats then
+		Net.pushAll("Identity", "Seats", { seats = seatCounts() })
+	end
+end
+
+-- Studio test hook: skips cooldowns and playtime gates.
+function Identity.debugSetRole(player: Player, roleId: string): boolean
+	if not Stations.BY_ID[roleId] then
+		return false
+	end
+	setRole(player, roleId)
+	pushState(player)
+	return true
+end
+
+function Identity.init()
+	Net.handle("Identity", "Get", { call = true }, function(player)
+		return state(player)
+	end)
+	Net.handle("Identity", "ChooseRole", {
+		schema = { role = V.enum(Stations.IDS) },
+		rate = Config.ROLE_RATE,
+		call = true,
+	}, function(player, a)
+		local why = Identity.canTake(player, a.role)
+		if why then
+			return nil, why
+		end
+		setRole(player, a.role)
+		switchedAt[player] = os.clock()
+		return state(player)
+	end)
+
+	local function watch(player: Player)
+		player.CharacterAdded:Connect(function(character)
+			buildTag(player, character)
+		end)
+		player:GetAttributeChangedSignal(Identity.NAME_ATTR):Connect(function()
+			refreshTag(player)
+		end)
+		player:GetAttributeChangedSignal(Roles.ROLE_ATTR):Connect(function()
+			refreshTag(player)
+		end)
+	end
+	Players.PlayerAdded:Connect(watch)
+	for _, p in Players:GetPlayers() do
+		watch(p)
+	end
+end
+
+return Identity
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX0000001C"><Properties><string name="Name">Profiles</string><ProtectedString name="Source"><![CDATA[--!strict
+-- LondonServer.Profiles: player profiles (schema v2, Shared.Types) in Config.PROFILE_STORE under
+-- "u_<userId>". Stored record: { data = Profile, lock = { id, t }?, savedAt }.
+-- One profile per account: account-wide money/purchases/collection/record plus character slots
+-- (LondonServer.Characters). Profiles.progress(player) is the active character's shared progress.
+-- Session lock: a server claims the record with UpdateAsync; other servers wait LOCK_RETRY and
+-- give up after LOCK_MAX_WAIT, unless the lock is older than LOCK_STALE (dead server: taken over).
+-- Saves on leave (releases the lock), every AUTOSAVE_SECONDS (refreshes it) and on BindToClose.
+local HttpService = game:GetService("HttpService")
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared:WaitForChild("Config"))
+local Net = require(Shared:WaitForChild("Net"))
+local Types = require(Shared:WaitForChild("Types"))
+local Store = require(script.Parent:WaitForChild("Store"))
+
+type Profile = Types.Profile
+type Entry = { data: Profile, token: string, saving: boolean, lastTick: number, isNew: boolean }
+
+local Profiles = {}
+Profiles.VERSION = 2
+Profiles.TOKEN = (if game.JobId ~= "" then game.JobId else "studio") .. "/" .. HttpService:GenerateGUID(false)
+
+local store = Store.open(Config.PROFILE_STORE)
+local active: { [number]: Entry } = {}
+local loading: { [number]: boolean } = {}
+local pending = 0 -- releases in flight (BindToClose waits for these)
+local loadedEvent = Instance.new("BindableEvent")
+Profiles.Loaded = loadedEvent.Event -- (player, profile)
+
+-- MIGRATIONS[n] upgrades a v(n) profile to v(n+1) in place.
+local MIGRATIONS: { [number]: (any) -> () } = {}
+
+function Profiles.progressDefaults(): Types.Progress
+	return {
+		jobs = {},
+		hobbies = {},
+		bests = {},
+		licences = { cab = false, omnibus = false, motor = false },
+		honours = {},
+	}
+end
+
+-- v1 -> v2 (2026-10-27): the single identity becomes character slot "1"; per-character grind
+-- moves into progress "c1". Offices are per server (Q4) and are dropped.
+MIGRATIONS[1] = function(d)
+	local prog = Profiles.progressDefaults()
+	prog.jobs = if type(d.jobs) == "table" then d.jobs else {}
+	prog.hobbies = if type(d.hobbies) == "table" then d.hobbies else {}
+	prog.bests = if type(d.bests) == "table" then d.bests else {}
+	prog.honours = if type(d.titles) == "table" then d.titles else {}
+	if type(d.licences) == "table" then
+		prog.licences = d.licences
+	end
+	d.slots, d.progress, d.active, d.nextChar = {}, {}, "", 1
+	local name = d.name
+	if type(name) == "table" and type(name.first) == "string" and name.first ~= "" then
+		d.progress.c1 = prog
+		d.slots["1"] = {
+			char = "c1",
+			name = { first = name.first, last = tostring(name.last or ""), changedAt = tonumber(name.changedAt) or 0 },
+			look = { skin = 1, hair = Config.HAIR_STYLES[1].id, outfit = Config.OUTFITS[1].id },
+			createdAt = tonumber(d.firstJoin) or os.time(),
+		}
+		d.nextChar = 2
+	end
+	d.name, d.jobs, d.hobbies, d.bests, d.titles, d.offices, d.licences = nil, nil, nil, nil, nil, nil, nil
+end
+
+local function key(userId: number): string
+	return "u_" .. userId
+end
+
+function Profiles.defaults(): Profile
+	return {
+		v = Profiles.VERSION,
+		pence = Config.START_PENCE,
+		bank = 0,
+		collection = {},
+		purchases = {},
+		outfits = { owned = {}, equipped = {} },
+		rental = { houseId = nil, paidUntil = 0 },
+		vehicles = {},
+		record = { arrests = 0, warnings = {}, mutedUntil = 0 },
+		limits = { activityWindow = 0, activityPaid = 0 },
+		settings = {},
+		firstJoin = os.time(),
+		playtime = 0,
+		slots = {},
+		active = "",
+		progress = {},
+		nextChar = 1,
+	}
+end
+
+-- Adds keys missing from older saves. Only recurses into non-empty default tables (structs);
+-- maps and lists (jobs, titles...) are kept as saved.
+local function reconcile(data: any, defaults: any)
+	for k, v in defaults do
+		if data[k] == nil then
+			data[k] = v
+		elseif type(v) == "table" and type(data[k]) == "table" and next(v) ~= nil then
+			reconcile(data[k], v)
+		end
+	end
+end
+
+local function upgrade(data: any): (Profile?, string?)
+	if type(data) ~= "table" then
+		return Profiles.defaults()
+	end
+	local v = tonumber(data.v) or 1
+	if v > Profiles.VERSION then
+		return nil, "newer"
+	end
+	while v < Profiles.VERSION do
+		MIGRATIONS[v](data)
+		v += 1
+		data.v = v
+	end
+	reconcile(data, Profiles.defaults())
+	for id, prog in data.progress do
+		if type(prog) == "table" then
+			reconcile(prog, Profiles.progressDefaults())
+		else
+			data.progress[id] = Profiles.progressDefaults()
+		end
+	end
+	data.active = "" -- every session starts at the character menu
+	return data
+end
+
+-- One UpdateAsync attempt to claim the lock. Returns "ok" or "locked", and the saved data.
+local function claim(userId: number, token: string): (string, any)
+	local status, saved = "locked", nil
+	store:update(key(userId), function(rec: any)
+		rec = if type(rec) == "table" then rec else {}
+		local now = os.time()
+		local lock = rec.lock
+		if type(lock) == "table" and lock.id ~= token and now - (tonumber(lock.t) or 0) < Config.LOCK_STALE_SECONDS then
+			status = "locked"
+			return nil
+		end
+		status, saved = "ok", rec.data
+		rec.lock = { id = token, t = now }
+		return rec
+	end)
+	return status, saved
+end
+
+local function unlock(userId: number, token: string)
+	pcall(function()
+		store:update(key(userId), function(rec: any)
+			if type(rec) ~= "table" or type(rec.lock) ~= "table" or rec.lock.id ~= token then
+				return nil
+			end
+			rec.lock = nil
+			return rec
+		end)
+	end)
+end
+
+-- Loads and locks a profile (does not register it). Reasons: "locked", "store error", "newer".
+-- Third result is true when nothing was saved before (first join).
+function Profiles.load(userId: number, token: string?, maxWait: number?): (Profile?, string?, boolean)
+	local tok = token or Profiles.TOKEN
+	local deadline = os.clock() + (maxWait or Config.LOCK_MAX_WAIT)
+	local errors = 0
+	while true do
+		local ok, status, saved = pcall(claim, userId, tok)
+		if ok and status == "ok" then
+			local data, why = upgrade(saved)
+			if not data then
+				unlock(userId, tok)
+			end
+			return data, why, type(saved) ~= "table"
+		end
+		if not ok then
+			errors += 1
+			warn(string.format("[Profiles] load error for %d: %s", userId, tostring(status)))
+			if errors >= Config.LOAD_RETRIES then
+				return nil, "store error", false
+			end
+		elseif os.clock() >= deadline then
+			return nil, "locked", false
+		end
+		task.wait(Config.LOCK_RETRY_SECONDS)
+	end
+end
+
+-- Writes the entry. Returns "ok", "error" or "lost" (another server owns the lock now).
+local function commit(userId: number, entry: Entry, release: boolean): string
+	while entry.saving do
+		task.wait()
+	end
+	entry.saving = true
+	local now = os.time()
+	entry.data.playtime += now - entry.lastTick
+	entry.lastTick = now
+	local result = "error"
+	for _ = 1, Config.SAVE_RETRIES do
+		local lost = false
+		local ok, err = pcall(function()
+			store:update(key(userId), function(rec: any)
+				rec = if type(rec) == "table" then rec else {}
+				if type(rec.lock) == "table" and rec.lock.id ~= entry.token then
+					lost = true
+					return nil
+				end
+				lost = false
+				rec.data = entry.data
+				rec.savedAt = os.time()
+				rec.lock = if release then nil else { id = entry.token, t = os.time() }
+				return rec
+			end)
+		end)
+		if ok then
+			result = if lost then "lost" else "ok"
+			break
+		end
+		warn(string.format("[Profiles] save error for %d: %s", userId, tostring(err)))
+		task.wait(Config.SAVE_RETRY_SECONDS)
+	end
+	entry.saving = false
+	if result == "lost" then
+		warn(string.format("[Profiles] session for %d was taken by another server; not saved", userId))
+	end
+	return result
+end
+
+function Profiles.get(player: Player): Profile?
+	local e = active[player.UserId]
+	return if e then e.data else nil
+end
+
+-- Saved playtime plus this session's unsaved seconds.
+function Profiles.playtime(player: Player): number
+	local e = active[player.UserId]
+	return if e then e.data.playtime + (os.time() - e.lastTick) else 0
+end
+
+-- The slot being played, and its key.
+function Profiles.activeSlot(player: Player): (Types.Slot?, string)
+	local p = Profiles.get(player)
+	if not p or p.active == "" then
+		return nil, ""
+	end
+	return p.slots[p.active], p.active
+end
+
+-- Progress of the character being played (shared with its linked slots), or nil at the menu.
+function Profiles.progress(player: Player): Types.Progress?
+	local p = Profiles.get(player)
+	local slot = Profiles.activeSlot(player)
+	return if p and slot then p.progress[slot.char] else nil
+end
+
+-- Takes pence from the wallet, then the bank. False (and nothing taken) if they can't afford it.
+function Profiles.charge(player: Player, pence: number): boolean
+	local p = Profiles.get(player)
+	if not p or pence % 1 ~= 0 or pence < 0 or p.pence + p.bank < pence then
+		return false
+	end
+	local fromWallet = math.min(p.pence, pence)
+	p.pence -= fromWallet
+	p.bank -= pence - fromWallet
+	Profiles.pushWallet(player)
+	return true
+end
+
+-- Saves now (keeps the session lock). Use after purchases and character changes so a server
+-- crash can't lose them. Returns "ok", "error", "lost" or "none" (no profile).
+function Profiles.save(player: Player): string
+	local e = active[player.UserId]
+	if not e then
+		return "none"
+	end
+	return commit(player.UserId, e, false)
+end
+
+-- True when this session created the profile (first join).
+function Profiles.isNew(player: Player): boolean
+	local e = active[player.UserId]
+	return e ~= nil and e.isNew
+end
+
+function Profiles.pushWallet(player: Player)
+	local p = Profiles.get(player)
+	if p then
+		Net.push(player, "Profile", "Wallet", { pence = p.pence, bank = p.bank })
+	end
+end
+
+-- Integer wallet change; refuses to go below 0 or above PENCE_MAX.
+function Profiles.addPence(player: Player, delta: number): boolean
+	local p = Profiles.get(player)
+	if not p or type(delta) ~= "number" or delta % 1 ~= 0 then
+		return false
+	end
+	local new = p.pence + delta
+	if new < 0 or new > Config.PENCE_MAX then
+		return false
+	end
+	p.pence = new
+	Profiles.pushWallet(player)
+	return true
+end
+
+function Profiles.onPlayerAdded(player: Player): Profile?
+	local userId = player.UserId
+	local existing = active[userId]
+	if existing then
+		return existing.data
+	end
+	if loading[userId] then
+		return nil
+	end
+	loading[userId] = true
+	local data, why, isNew = Profiles.load(userId)
+	loading[userId] = nil
+	if not data then
+		if player.Parent == Players then
+			player:Kick(if why == "locked"
+				then "Your profile is still open on another server. Please rejoin in a minute."
+				else "Your profile could not be loaded. Please rejoin.")
+		end
+		return nil
+	end
+	local entry: Entry = { data = data, token = Profiles.TOKEN, saving = false, lastTick = os.time(), isNew = isNew }
+	active[userId] = entry
+	if player.Parent ~= Players then
+		Profiles.release(userId)
+		return nil
+	end
+	player:SetAttribute("ProfileLoaded", true)
+	Profiles.pushWallet(player)
+	loadedEvent:Fire(player, data)
+	return data
+end
+
+function Profiles.release(userId: number): boolean
+	local entry = active[userId]
+	if not entry then
+		return false
+	end
+	active[userId] = nil
+	pending += 1
+	local result = commit(userId, entry, true)
+	pending -= 1
+	return result == "ok"
+end
+
+function Profiles.onPlayerRemoving(player: Player)
+	Profiles.release(player.UserId)
+end
+
+function Profiles.closeAll()
+	for userId in active do
+		task.spawn(Profiles.release, userId)
+	end
+	local deadline = os.clock() + Config.CLOSE_SAVE_TIMEOUT
+	while pending > 0 and os.clock() < deadline do
+		task.wait()
+	end
+end
+
+-- Studio test hook: the leave + join path on the same Player (save, unlock, load again).
+function Profiles.debugRejoin(player: Player): boolean
+	player:SetAttribute("ProfileLoaded", nil)
+	if not Profiles.release(player.UserId) then
+		return false
+	end
+	return Profiles.onPlayerAdded(player) ~= nil
+end
+
+function Profiles.init()
+	Net.domain("Profile")
+	task.spawn(function()
+		while true do
+			task.wait(Config.AUTOSAVE_SECONDS)
+			for userId, entry in active do
+				task.spawn(function()
+					if commit(userId, entry, false) == "lost" and active[userId] == entry then
+						active[userId] = nil
+						local p = Players:GetPlayerByUserId(userId)
+						if p then
+							p:Kick("Your profile was opened on another server.")
+						end
+					end
+				end)
+			end
+		end
+	end)
+end
+
+return Profiles
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX0000001D"><Properties><string name="Name">Store</string><ProtectedString name="Source"><![CDATA[--!strict
+-- LondonServer.Store: thin DataStore wrapper. In Studio, unless Config.STUDIO_USE_REAL_STORE is
+-- on, every store is an in-memory mock that JSON round-trips values like a real save and yields
+-- Config.MOCK_LATENCY per call. Mock data lasts until Play stops. Methods raise; callers pcall.
+local DataStoreService = game:GetService("DataStoreService")
+local HttpService = game:GetService("HttpService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local Config = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Config"))
+
+export type Handle = {
+	name: string,
+	get: (self: Handle, key: string) -> any,
+	update: (self: Handle, key: string, fn: (any) -> any) -> any, -- fn returns nil to cancel
+	remove: (self: Handle, key: string) -> (),
+}
+
+local Store = {}
+Store.isMock = RunService:IsStudio() and not Config.STUDIO_USE_REAL_STORE
+
+local mock: { [string]: { [string]: string } } = {} -- store name -> key -> JSON
+local handles: { [string]: Handle } = {}
+
+local function decode(s: string?): any
+	if s == nil then
+		return nil
+	end
+	return HttpService:JSONDecode(s)
+end
+
+function Store.open(name: string): Handle
+	local existing = handles[name]
+	if existing then
+		return existing
+	end
+	local h: Handle
+	if Store.isMock then
+		local data = mock[name] or {}
+		mock[name] = data
+		h = {
+			name = name,
+			get = function(_, key)
+				task.wait(Config.MOCK_LATENCY)
+				return decode(data[key])
+			end,
+			update = function(_, key, fn)
+				task.wait(Config.MOCK_LATENCY)
+				local new = fn(decode(data[key]))
+				if new == nil then
+					return nil
+				end
+				data[key] = HttpService:JSONEncode(new)
+				return decode(data[key])
+			end,
+			remove = function(_, key)
+				task.wait(Config.MOCK_LATENCY)
+				data[key] = nil
+			end,
+		}
+	else
+		local ds = DataStoreService:GetDataStore(name)
+		h = {
+			name = name,
+			get = function(_, key)
+				return ds:GetAsync(key)
+			end,
+			update = function(_, key, fn)
+				return ds:UpdateAsync(key, function(old)
+					return fn(old)
+				end)
+			end,
+			remove = function(_, key)
+				ds:RemoveAsync(key)
+			end,
+		}
+	end
+	handles[name] = h
+	return h
+end
+
+-- Studio test hooks (mock only): raw JSON of a key, or overwrite it (nil deletes).
+function Store.debugRaw(name: string, key: string): string?
+	local d = mock[name]
+	return if d then d[key] else nil
+end
+
+function Store.debugSetRaw(name: string, key: string, json: string?)
+	mock[name] = mock[name] or {}
+	mock[name][key] = json
+end
+
+return Store
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX0000001E"><Properties><string name="Name">WorldClock</string><ProtectedString name="Source"><![CDATA[--!strict
+-- LondonServer.WorldClock: the in-game day (Q10: Config.DAY_MINUTES real minutes per day).
+-- The clock is derived from server time, so every server shows the same hour; that lets the
+-- cross-server "What's on" feed (M3b) and clock-time events line up. Drives Lighting.ClockTime
+-- (replicates to clients) and sets Lighting attribute "Phase" (Dawn / Day / Dusk / Night).
+-- Other systems: WorldClock.hour(), WorldClock.phase(), WorldClock.PhaseChanged:Connect(fn(name)).
+local Lighting = game:GetService("Lighting")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+
+local Config = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Config"))
+
+local WorldClock = {}
+local phaseEvent = Instance.new("BindableEvent")
+WorldClock.PhaseChanged = phaseEvent.Event
+
+local debugShift = 0 -- hours added in Studio by WorldClock.debugSetHour
+local currentPhase = ""
+
+-- In-game hour, 0 <= h < 24.
+function WorldClock.hour(): number
+	local dayLength = Config.DAY_MINUTES * 60
+	local h = (workspace:GetServerTimeNow() / dayLength) * 24 + Config.CLOCK_OFFSET_HOURS + debugShift
+	return h % 24
+end
+
+function WorldClock.phaseAt(h: number): string
+	local name = Config.CLOCK_PHASES[#Config.CLOCK_PHASES].name -- before the first start = last phase (night)
+	for _, p in Config.CLOCK_PHASES do
+		if h >= p.hour then
+			name = p.name
+		end
+	end
+	return name
+end
+
+function WorldClock.phase(): string
+	return currentPhase
+end
+
+local function update()
+	local h = WorldClock.hour()
+	Lighting.ClockTime = h
+	local p = WorldClock.phaseAt(h)
+	if p ~= currentPhase then
+		currentPhase = p
+		Lighting:SetAttribute("Phase", p)
+		phaseEvent:Fire(p)
+	end
+end
+
+-- Studio test hook: jump the clock to an hour (0-24).
+function WorldClock.debugSetHour(h: number): boolean
+	if not RunService:IsStudio() then
+		return false
+	end
+	debugShift = 0
+	debugShift = (h - WorldClock.hour()) % 24
+	update()
+	return true
+end
+
+function WorldClock.init()
+	Lighting:SetAttribute("DayMinutes", Config.DAY_MINUTES)
+	update()
+	task.spawn(function()
+		while true do
+			task.wait(Config.CLOCK_TICK)
+			update()
+		end
+	end)
+end
+
+return WorldClock
+]]></ProtectedString></Properties></Item></Item></roblox>

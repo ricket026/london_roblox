@@ -29,6 +29,9 @@ Every session:
 `.luau` = ModuleScript, `.server.luau` = Script, `.client.luau` = LocalScript, and a folder with
 `init.*.luau` is a script with child modules.
 
+**Without Rojo:** `import/` has five drag-in model files with every script, one per Studio
+location; see `import/README.md`. Rebuild them after code changes with `python3 tools/build_rbxmx.py`.
+
 # System specs
 
 Detailed specs behind DESIGN.md. Numbers are starting values for `Shared.Config`, tuned in M9.

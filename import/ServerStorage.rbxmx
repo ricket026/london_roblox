@@ -1,0 +1,838 @@
+<roblox xmlns:xmime="http://www.w3.org/2005/05/xmlmime" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://www.roblox.com/roblox.xsd" version="4"><Item class="ModuleScript" referent="RBX00000020"><Properties><string name="Name">MapGreybox</string><ProtectedString name="Source"><![CDATA[-- MapGreybox v3: builds the London greybox from ServerStorage.MapLayoutData (JSON).
+-- Ground, grass, paths, pavements and roads are Terrain (one surface at Y 0, no z-fighting).
+-- Curved roads ("s":1) are Chaikin-smoothed; kerbs are rotated stone strips along carriageway edges.
+-- Building lots are raised slabs from an 8-stud raster that keeps clear of every pavement.
+local M = {}
+local X0, X1, Z0, Z1 = -1150, 1900, -3320, 850
+local RIVER_LO, RIVER_HI = 1144, 1456 -- terrain/kerbs skip this X band (river + walls, bridges are parts)
+local Mt = Enum.Material
+local rgb = Color3.fromRGB
+local T = workspace.Terrain
+local LOTCOL = {
+	Townhouse = rgb(214,200,170), Shop = rgb(205,176,140), Club = rgb(200,196,184), Terrace = rgb(184,140,116),
+	Office = rgb(190,186,176), Government = rgb(222,220,210), Workshop = rgb(160,130,104),
+	Warehouse = rgb(140,104,86), Lodging = rgb(150,132,112),
+}
+local TERRAIN_COL = {
+	[Mt.Pavement] = rgb(172,168,160), [Mt.Cobblestone] = rgb(108,102,94), [Mt.Sandstone] = rgb(160,98,80),
+	[Mt.Ground] = rgb(170,150,114), [Mt.Sand] = rgb(196,176,130), [Mt.Grass] = rgb(92,124,60),
+	[Mt.LeafyGrass] = rgb(72,108,50), [Mt.Limestone] = rgb(196,190,176), [Mt.Mud] = rgb(72,64,50),
+}
+local ROADMAT = {grand = Mt.Sandstone, main = Mt.Cobblestone, second = Mt.Cobblestone, mews = Mt.Cobblestone, lane = Mt.Cobblestone}
+local ORDER = {lane = 1, mews = 2, second = 3, main = 4, grand = 5}
+local KERB_COL = rgb(150,146,138)
+
+local count = 0
+local function tick(n) count += n or 1; if count % 300 == 0 then task.wait() end end
+local function part(parent, name, x1, x2, y1, y2, z1, z2, mat, col)
+	local p = Instance.new("Part")
+	p.Name = name
+	p.Anchored = true
+	p.TopSurface, p.BottomSurface = Enum.SurfaceType.Smooth, Enum.SurfaceType.Smooth
+	p.Size = Vector3.new(math.abs(x2 - x1), math.abs(y2 - y1), math.abs(z2 - z1))
+	p.CFrame = CFrame.new((x1 + x2) / 2, (y1 + y2) / 2, (z1 + z2) / 2)
+	p.Material = mat or Mt.SmoothPlastic
+	p.Color = col or rgb(180, 180, 180)
+	p:SetAttribute("Greybox", true)
+	p.Parent = parent
+	tick()
+	return p
+end
+local function tiled(parent, name, x1, x2, y1, y2, z1, z2, mat, col)
+	local nx, nz = math.ceil(math.abs(x2 - x1) / 1000), math.ceil(math.abs(z2 - z1) / 1000)
+	for a = 0, nx - 1 do for b = 0, nz - 1 do
+		part(parent, name, x1 + (x2 - x1) * a / nx, x1 + (x2 - x1) * (a + 1) / nx, y1, y2, z1 + (z2 - z1) * b / nz, z1 + (z2 - z1) * (b + 1) / nz, mat, col)
+	end end
+end
+local function folder(parent, name)
+	local f = parent:FindFirstChild(name)
+	if f then f:Destroy() end
+	f = Instance.new("Folder"); f.Name = name; f.Parent = parent
+	return f
+end
+local function tag(p, text, y, maxd, w)
+	local g = Instance.new("BillboardGui")
+	g.Size = UDim2.fromOffset(w or 200, 36)
+	g.StudsOffsetWorldSpace = Vector3.new(0, y, 0)
+	g.MaxDistance = maxd
+	g.LightInfluence = 0
+	local t = Instance.new("TextLabel")
+	t.Size = UDim2.fromScale(1, 1); t.BackgroundTransparency = 1; t.Text = text; t.TextScaled = true
+	t.Font = Enum.Font.SourceSansBold; t.TextColor3 = Color3.new(1, 1, 1); t.TextStrokeTransparency = 0.3
+	t.Parent = g
+	g.Parent = p
+end
+local function ghost(p) p.Transparency, p.CanCollide, p.CanQuery, p.CanTouch = 1, false, false, false; return p end
+local function marker(parent, name, x, z, h, col)
+	local p = part(parent, name, x - 1, x + 1, 0, h, z - 1, z + 1, Mt.SmoothPlastic, col)
+	p.CanCollide, p.CanQuery, p.CanTouch = false, false, false
+	tag(p, name, h / 2 + 3, 400, 180)
+	return p
+end
+local function spans(a, b, gaps)
+	table.sort(gaps, function(p, q) return p[1] < q[1] end)
+	local out, cur = {}, a
+	for _, g in gaps do
+		if g[1] > cur then table.insert(out, {cur, math.min(g[1], b)}) end
+		cur = math.max(cur, g[2])
+	end
+	if cur < b then table.insert(out, {cur, b}) end
+	return out
+end
+
+-- terrain helpers: Roblox shows a filled surface 2 studs above the fill top, so fills stop at Y -2 for a surface at 0
+local function tBlock(x1, x2, z1, z2, y1, y2, mat)
+	if x1 > x2 then x1, x2 = x2, x1 end
+	if z1 > z2 then z1, z2 = z2, z1 end
+	local nx, nz = math.ceil((x2 - x1) / 1000), math.ceil((z2 - z1) / 1000)
+	for a = 0, nx - 1 do for b = 0, nz - 1 do
+		local ax, bx = x1 + (x2 - x1) * a / nx, x1 + (x2 - x1) * (a + 1) / nx
+		local az, bz = z1 + (z2 - z1) * b / nz, z1 + (z2 - z1) * (b + 1) / nz
+		T:FillBlock(CFrame.new((ax + bx) / 2, (y1 + y2) / 2, (az + bz) / 2), Vector3.new(bx - ax, y2 - y1, bz - az), mat)
+		tick(20)
+	end end
+end
+-- land-only rectangle (skips the river band)
+local function tLand(x1, x2, z1, z2, y1, y2, mat)
+	if x1 > x2 then x1, x2 = x2, x1 end
+	if x1 < RIVER_LO then tBlock(x1, math.min(x2, RIVER_LO), z1, z2, y1, y2, mat) end
+	if x2 > RIVER_HI then tBlock(math.max(x1, RIVER_HI), x2, z1, z2, y1, y2, mat) end
+end
+-- clip a segment to the parts outside the river band
+local function clipRiver(ax, az, bx, bz)
+	local function inR(x) return x > RIVER_LO and x < RIVER_HI end
+	if not inR(ax) and not inR(bx) and ((ax <= RIVER_LO and bx <= RIVER_LO) or (ax >= RIVER_HI and bx >= RIVER_HI)) then return {{ax, az, bx, bz}} end
+	local dx = bx - ax
+	if math.abs(dx) < 1e-6 then return if inR(ax) then {} else {{ax, az, bx, bz}} end
+	local out = {}
+	local ts = {0}
+	for _, X in {RIVER_LO, RIVER_HI} do local t = (X - ax) / dx; if t > 0 and t < 1 then table.insert(ts, t) end end
+	table.insert(ts, 1); table.sort(ts)
+	for i = 1, #ts - 1 do
+		local t1, t2 = ts[i], ts[i + 1]
+		local mx = ax + dx * (t1 + t2) / 2
+		if not inR(mx) then table.insert(out, {ax + dx * t1, az + (bz - az) * t1, ax + dx * t2, az + (bz - az) * t2}) end
+	end
+	return out
+end
+-- FillCylinder ignores the -2 offset (surface lands at +2), so joints are mitred blocks and discs are rows
+local function tSeg(ax, az, bx, bz, hw, mat, ea, eb)
+	local dx, dz = bx - ax, bz - az
+	local L = math.sqrt(dx * dx + dz * dz)
+	if L < 0.05 then return end
+	local ux, uz = dx / L, dz / L
+	for _, s in clipRiver(ax - ux * ea, az - uz * ea, bx + ux * eb, bz + uz * eb) do
+		local a, b = Vector3.new(s[1], -8, s[2]), Vector3.new(s[3], -8, s[4])
+		local SL = (b - a).Magnitude
+		if SL > 0.05 then T:FillBlock(CFrame.lookAt((a + b) / 2, b), Vector3.new(hw * 2, 12, SL), mat) end
+	end
+	tick(2)
+end
+-- polyline as blocks; each block is lengthened by hw*tan(turn/2) at bends so outer corners stay filled
+local function tPoly(P, hw, mat)
+	local n = #P
+	local closed = n > 2 and (P[1][1] - P[n][1]) ^ 2 + (P[1][2] - P[n][2]) ^ 2 < 1
+	local function dir(i)
+		local dx, dz = P[i + 1][1] - P[i][1], P[i + 1][2] - P[i][2]
+		local L = math.max(1e-6, math.sqrt(dx * dx + dz * dz))
+		return dx / L, dz / L
+	end
+	local ext = {}
+	for v = 1, n do
+		local a, b = v - 1, v
+		if closed and v == 1 then a = n - 1 elseif closed and v == n then a, b = n - 1, 1 end
+		if a >= 1 and b <= n - 1 then
+			local ax, az = dir(a)
+			local bx, bz = dir(b)
+			local c = math.clamp(ax * bx + az * bz, -1, 1)
+			ext[v] = math.min(hw * 2, hw * math.tan(math.acos(c) / 2))
+		else
+			ext[v] = 0
+		end
+	end
+	for i = 1, n - 1 do tSeg(P[i][1], P[i][2], P[i + 1][1], P[i + 1][2], hw, mat, ext[i], ext[i + 1]) end
+end
+local function tDisc(x0, z0, r, mat)
+	for z = z0 - r, z0 + r - 2, 2 do
+		local f = 1 - ((z + 1 - z0) / r) ^ 2
+		if f > 0 then
+			local hx = r * math.sqrt(f)
+			T:FillBlock(CFrame.new(x0, -8, z + 1), Vector3.new(hx * 2, 12, 2), mat)
+		end
+	end
+	tick(4)
+end
+
+local function chaikin(P, it)
+	for _ = 1, it do
+		local Q = {P[1]}
+		for i = 1, #P - 1 do
+			local a, b = P[i], P[i + 1]
+			table.insert(Q, {0.75 * a[1] + 0.25 * b[1], 0.75 * a[2] + 0.25 * b[2]})
+			table.insert(Q, {0.25 * a[1] + 0.75 * b[1], 0.25 * a[2] + 0.75 * b[2]})
+		end
+		table.insert(Q, P[#P])
+		P = Q
+	end
+	return P
+end
+-- smooth "s" roads, keeping vertices that other roads attach to
+local function smoothRoads(roads)
+	local pts = {}
+	for ri, r in roads do for _, p in r.p do table.insert(pts, {p[1], p[2], ri}) end end
+	for ri, r in roads do
+		if r.s then
+			local pin = {}
+			for vi, p in r.p do
+				if vi == 1 or vi == #r.p then pin[vi] = true else
+					for _, q in pts do if q[3] ~= ri and (q[1] - p[1]) ^ 2 + (q[2] - p[2]) ^ 2 <= 36 then pin[vi] = true; break end end
+				end
+			end
+			local out, piece = {r.p[1]}, {r.p[1]}
+			for vi = 2, #r.p do
+				table.insert(piece, r.p[vi])
+				if pin[vi] then
+					local sm = chaikin(piece, 3)
+					for k = 2, #sm do table.insert(out, sm[k]) end
+					piece = {r.p[vi]}
+				end
+			end
+			r.p = out
+		end
+	end
+end
+
+local function buildGraph(data, map)
+	local R = folder(map, "Roads")
+	local GF = folder(R, "_Graph")
+	local nodes, grid = {}, {}
+	local function node(x, z)
+		local gx, gz = math.floor(x / 12), math.floor(z / 12)
+		for a = -1, 1 do for b = -1, 1 do
+			local l = grid[(gx + a) * 100000 + gz + b]
+			if l then for _, n in l do if (n.x - x) ^ 2 + (n.z - z) ^ 2 <= 36 then return n end end end
+		end end
+		local n = {x = x, z = z, id = #nodes + 1, links = {}}
+		nodes[n.id] = n
+		local k = gx * 100000 + gz
+		grid[k] = grid[k] or {}
+		table.insert(grid[k], n)
+		return n
+	end
+	local function link(a, b, road, cls, w)
+		if a == b or a.links[b] then return end
+		local mx = (a.x + b.x) / 2
+		local info = {road = road, cls = cls, w = w, bridge = mx > 1146 and mx < 1454}
+		a.links[b], b.links[a] = info, info
+	end
+	local segs = {}
+	for _, r in data.roads do
+		for s = 1, #r.p - 1 do table.insert(segs, {r.p[s][1], r.p[s][2], r.p[s + 1][1], r.p[s + 1][2], r.n, r.c, data.classes[r.c].w}) end
+	end
+	local rings = {}
+	for _, c in data.circuses do
+		local rm = (c.r[1] + c.r[2]) / 2
+		local ring = {}
+		for k = 0, 15 do ring[k + 1] = node(c.x + rm * math.cos(k * math.pi / 8), c.z + rm * math.sin(k * math.pi / 8)) end
+		for k = 1, 16 do link(ring[k], ring[k % 16 + 1], c.n, c.c, data.classes[c.c].w) end
+		table.insert(rings, {c = c, ring = ring})
+		local keep, R2 = {}, (c.r[2] + 4) ^ 2
+		for _, sg in segs do
+			local inA = (sg[1] - c.x) ^ 2 + (sg[2] - c.z) ^ 2 <= R2
+			local inB = (sg[3] - c.x) ^ 2 + (sg[4] - c.z) ^ 2 <= R2
+			if not (inA and inB) then
+				if inA or inB then
+					local dx, dz = sg[3] - sg[1], sg[4] - sg[2]
+					local fx, fz = sg[1] - c.x, sg[2] - c.z
+					local a, b, q = dx * dx + dz * dz, 2 * (fx * dx + fz * dz), fx * fx + fz * fz - rm * rm
+					local disc = b * b - 4 * a * q
+					if disc >= 0 then
+						local t = if inA then (-b + math.sqrt(disc)) / (2 * a) else (-b - math.sqrt(disc)) / (2 * a)
+						if t >= 0 and t <= 1 then
+							if inA then sg[1], sg[2] = sg[1] + t * dx, sg[2] + t * dz else sg[3], sg[4] = sg[1] + t * dx, sg[2] + t * dz end
+						end
+					end
+				end
+				table.insert(keep, sg)
+			end
+		end
+		segs = keep
+	end
+	for si, s in segs do
+		local ax, az, bx, bz = s[1], s[2], s[3], s[4]
+		local dx, dz = bx - ax, bz - az
+		local L2 = dx * dx + dz * dz
+		if L2 >= 1 then
+			local ts = {0, 1}
+			for sj, o in segs do
+				if sj ~= si then
+					local ex, ez = o[3] - o[1], o[4] - o[2]
+					local den = dx * ez - dz * ex
+					if math.abs(den) > 1e-6 then
+						local t = ((o[1] - ax) * ez - (o[2] - az) * ex) / den
+						local u = ((o[1] - ax) * dz - (o[2] - az) * dx) / den
+						if t > 1e-4 and t < 1 - 1e-4 and u >= -1e-4 and u <= 1 + 1e-4 then table.insert(ts, t) end
+					end
+					for e = 1, 3, 2 do
+						local t = ((o[e] - ax) * dx + (o[e + 1] - az) * dz) / L2
+						if t > 0 and t < 1 and (ax + t * dx - o[e]) ^ 2 + (az + t * dz - o[e + 1]) ^ 2 <= 36 then table.insert(ts, t) end
+					end
+				end
+			end
+			table.sort(ts)
+			local prev = node(ax, az)
+			for _, t in ts do
+				local n = node(ax + t * dx, az + t * dz)
+				if n ~= prev then link(prev, n, s[5], s[6], s[7]); prev = n end
+			end
+		end
+		if si % 100 == 0 then task.wait() end
+	end
+	for _, rg in rings do
+		local c, member = rg.c, {}
+		for _, n in rg.ring do member[n] = true end
+		for _, n in nodes do
+			if not member[n] and (n.x - c.x) ^ 2 + (n.z - c.z) ^ 2 <= (c.r[2] + 6) ^ 2 then
+				local best, bd = nil, math.huge
+				for _, r in rg.ring do local d = (r.x - n.x) ^ 2 + (r.z - n.z) ^ 2; if d < bd then best, bd = r, d end end
+				link(n, best, c.n, c.c, data.classes[c.c].w)
+			end
+		end
+	end
+	local parts, nl = {}, 0
+	for _, n in nodes do
+		local p = Instance.new("Part")
+		p.Name = "N" .. n.id
+		p.Anchored, p.CanCollide, p.CanQuery, p.CanTouch = true, false, false, false
+		p.Transparency = 1
+		p.Size = Vector3.new(2, 2, 2)
+		p.Position = Vector3.new(n.x, 1, n.z)
+		p:SetAttribute("Greybox", true)
+		parts[n] = p
+	end
+	for i, n in nodes do
+		for o, info in n.links do
+			local v = Instance.new("ObjectValue")
+			v.Name = "L"; v.Value = parts[o]
+			v:SetAttribute("Road", info.road); v:SetAttribute("Class", info.cls)
+			v:SetAttribute("Width", info.w); v:SetAttribute("Bridge", info.bridge)
+			v.Parent = parts[n]
+			nl += 1
+		end
+		parts[n].Parent = GF
+		if i % 300 == 0 then task.wait() end
+	end
+	local NF = folder(R, "_Names")
+	for _, r in data.roads do
+		local best, bl = 1, -1
+		for s = 1, #r.p - 1 do local l = (r.p[s + 1][1] - r.p[s][1]) ^ 2 + (r.p[s + 1][2] - r.p[s][2]) ^ 2; if l > bl then best, bl = s, l end end
+		local a, b = r.p[best], r.p[best + 1]
+		local x, z = (a[1] + b[1]) / 2, (a[2] + b[2]) / 2
+		tag(ghost(part(NF, r.n, x - 0.5, x + 0.5, 0, 1, z - 0.5, z + 0.5)), r.n, 5, 260, 220)
+	end
+	return #nodes, nl // 2
+end
+
+function M.Build(data, map)
+	local function status(s) map:SetAttribute("BuildStatus", s) end
+	count = 0
+	smoothRoads(data.roads)
+	local w, rv = data.water, data.water.river
+	local roads = table.clone(data.roads)
+	table.sort(roads, function(a, b) return ORDER[a.c] < ORDER[b.c] end)
+
+	status("terrain")
+	for m, c in TERRAIN_COL do T:SetMaterialColor(m, c) end
+	tLand(X0, X1, Z0, Z1, -2, 60, Mt.Air)
+	-- paint materials on the 4-stud voxel grid, then fill merged axis-aligned rects
+	-- (rotated FillBlocks drop voxels on diagonals; FillCylinder ignores the -2 offset)
+	local VC, VX0, VZ0 = 4, -1152, -3324
+	local VNX, VNZ = (1904 - VX0) // VC, (852 - VZ0) // VC
+	local MATS = {Mt.Pavement, Mt.Grass, Mt.LeafyGrass, Mt.Limestone, Mt.Ground, Mt.Sand, Mt.Cobblestone, Mt.Sandstone}
+	local vb = buffer.create(VNX * VNZ)
+	buffer.fill(vb, 0, 1)
+	local function vr(a, b, o, n)
+		if a > b then a, b = b, a end
+		return math.max(0, math.ceil((a - o) / VC - 0.5)), math.min(n - 1, math.floor((b - o) / VC - 0.5))
+	end
+	local function vRect(xr, zr, v)
+		local a1, a2 = vr(xr[1], xr[2], VX0, VNX)
+		local b1, b2 = vr(zr[1], zr[2], VZ0, VNZ)
+		for j = b1, b2 do for i = a1, a2 do buffer.writeu8(vb, j * VNX + i, v) end end
+	end
+	local function vCap(ax, az, bx, bz, hw, v, only)
+		local dx, dz = bx - ax, bz - az
+		local L2 = dx * dx + dz * dz
+		local a1, a2 = vr(math.min(ax, bx) - hw, math.max(ax, bx) + hw, VX0, VNX)
+		local b1, b2 = vr(math.min(az, bz) - hw, math.max(az, bz) + hw, VZ0, VNZ)
+		for j = b1, b2 do
+			local z = VZ0 + (j + 0.5) * VC
+			for i = a1, a2 do
+				local x = VX0 + (i + 0.5) * VC
+				local t = if L2 > 0 then math.clamp(((x - ax) * dx + (z - az) * dz) / L2, 0, 1) else 0
+				if (ax + t * dx - x) ^ 2 + (az + t * dz - z) ^ 2 <= hw * hw then
+					local k = j * VNX + i
+					if not only or only[buffer.readu8(vb, k)] then buffer.writeu8(vb, k, v) end
+				end
+			end
+		end
+	end
+	local function vPoly(P, hw, v, only) for q = 1, #P - 1 do vCap(P[q][1], P[q][2], P[q + 1][1], P[q + 1][2], hw, v, only) end end
+	local function vRing(x0, z0, r1, r2, v, only)
+		local a1, a2 = vr(x0 - r2, x0 + r2, VX0, VNX)
+		local b1, b2 = vr(z0 - r2, z0 + r2, VZ0, VNZ)
+		for j = b1, b2 do
+			local z = VZ0 + (j + 0.5) * VC - z0
+			for i = a1, a2 do
+				local x = VX0 + (i + 0.5) * VC - x0
+				local d2 = x * x + z * z
+				if d2 >= r1 * r1 and d2 <= r2 * r2 then
+					local k = j * VNX + i
+					if not only or only[buffer.readu8(vb, k)] then buffer.writeu8(vb, k, v) end
+				end
+			end
+		end
+	end
+	for _, a in data.parks do vRect(a.x, a.z, 2) end
+	for _, a in data.gardens do vRect(a.x, a.z, 3) end
+	for _, a in data.plazas do vRect(a.x, a.z, 4) end
+	local green = {[2] = true, [3] = true}
+	for _, pth in data.paths do vPoly(pth.p, pth.w / 2, if pth.sand then 6 else 5, green) end
+	for _, r in roads do local cl = data.classes[r.c]; if cl.p > 0 then vPoly(r.p, cl.w / 2 + cl.p, 1) end end
+	for _, r in roads do vPoly(r.p, data.classes[r.c].w / 2, if r.c == "grand" then 8 else 7) end
+	for _, c in data.circuses do
+		vRing(c.x, c.z, c.r[2], c.r[2] + 8, 1, {[1] = true, [2] = true, [3] = true, [4] = true, [5] = true, [6] = true})
+		vRing(c.x, c.z, c.r[1], c.r[2], 7)
+		vRing(c.x, c.z, 0, c.r[1], 4)
+	end
+	task.wait()
+	local nFill = 0
+	for j = 0, VNZ - 1 do
+		for i = 0, VNX - 1 do
+			local k = j * VNX + i
+			local v = buffer.readu8(vb, k)
+			if v ~= 0 then
+				local e = i
+				while e + 1 < VNX and buffer.readu8(vb, k + e + 1 - i) == v do e += 1 end
+				local f = j
+				while f + 1 < VNZ do
+					local base, ok = (f + 1) * VNX, true
+					for ii = i, e do if buffer.readu8(vb, base + ii) ~= v then ok = false; break end end
+					if not ok then break end
+					f += 1
+				end
+				for jj = j, f do local base = jj * VNX; for ii = i, e do buffer.writeu8(vb, base + ii, 0) end end
+				tLand(VX0 + i * VC, VX0 + (e + 1) * VC, VZ0 + j * VC, VZ0 + (f + 1) * VC, -14, -2, MATS[v])
+				nFill += 1
+			end
+		end
+		if j % 25 == 0 then task.wait() end
+	end
+	-- palace garden sits at -4.5; Parliament's yard floor is at +0.05, so drop terrain under it
+	local pg = data.palaceGarden
+	tBlock(pg.x[1], pg.x[2], pg.z[1], pg.z[2], -12, 8, Mt.Air)
+	tBlock(pg.x[1], pg.x[2], pg.z[1], pg.z[2], -14, pg.top - 2, Mt.Grass)
+	local parl = data.protected[2]
+	tBlock(parl.x[1] + 4, math.min(parl.x[2], RIVER_LO) - 2, parl.z[1] - 4, parl.z[2] + 4, -6, 4, Mt.Air)
+	-- St James's Park lake: 4-stud rows of an ellipse
+	local lk = w.lake
+	for z = lk.cz - lk.rz, lk.cz + lk.rz, 4 do
+		local f = 1 - ((z + 2 - lk.cz) / lk.rz) ^ 2
+		if f > 0 then
+			local hx = lk.rx * math.sqrt(f)
+			tBlock(lk.cx - hx, lk.cx + hx, z, z + 4, lk.bed - 2, 4, Mt.Air)
+			tBlock(lk.cx - hx, lk.cx + hx, z, z + 4, -14, lk.bed - 2, Mt.Mud)
+			tBlock(lk.cx - hx, lk.cx + hx, z, z + 4, lk.bed - 2, lk.surface, Mt.Water)
+		end
+	end
+	local dk = w.docks
+	for _, r in dk.rects do
+		tBlock(r.x[1], r.x[2], r.z[1], r.z[2], dk.bed - 4, 4, Mt.Air)
+		tBlock(r.x[1], r.x[2], r.z[1], r.z[2], dk.bed, dk.surface, Mt.Water)
+	end
+
+	status("kerbs")
+	for _, n in {"Districts","JobSites","Ground","Plots","Kerbs","Water","Landmarks_Greybox","Roads","BusStops","CabRanks","Routes","Bounds","Bridges","Labels"} do
+		local f = map:FindFirstChild(n); if f then f:Destroy() end
+	end
+	local K = folder(map, "Kerbs")
+	-- spatial buckets of carriageway segments (100-stud cells)
+	local buckets, segList = {}, {}
+	for ri, r in data.roads do
+		local hw = data.classes[r.c].w / 2
+		local closed = (r.p[1][1] - r.p[#r.p][1]) ^ 2 + (r.p[1][2] - r.p[#r.p][2]) ^ 2 < 1
+		r._closed = closed
+		for s = 1, #r.p - 1 do
+			local a, b = r.p[s], r.p[s + 1]
+			local sg = {a[1], a[2], b[1], b[2], hw, ri, s}
+			table.insert(segList, sg)
+			for gx = math.floor((math.min(a[1], b[1]) - hw - 2) / 100), math.floor((math.max(a[1], b[1]) + hw + 2) / 100) do
+				for gz = math.floor((math.min(a[2], b[2]) - hw - 2) / 100), math.floor((math.max(a[2], b[2]) + hw + 2) / 100) do
+					local k = gx * 100000 + gz
+					buckets[k] = buckets[k] or {}
+					table.insert(buckets[k], sg)
+				end
+			end
+		end
+	end
+	local function open(x, z, ri, si, nseg, closed)
+		if x > RIVER_LO - 1 and x < RIVER_HI + 1 then return true end
+		for _, c in data.circuses do if (x - c.x) ^ 2 + (z - c.z) ^ 2 < (c.r[2] + 1) ^ 2 then return true end end
+		local l = buckets[math.floor(x / 100) * 100000 + math.floor(z / 100)]
+		if not l then return false end
+		for _, sg in l do
+			local same = sg[6] == ri and (math.abs(sg[7] - si) <= 1 or (closed and math.abs(sg[7] - si) == nseg - 1))
+			if not same then
+				local dx, dz = sg[3] - sg[1], sg[4] - sg[2]
+				local L2 = dx * dx + dz * dz
+				local t = if L2 > 0 then math.clamp(((x - sg[1]) * dx + (z - sg[2]) * dz) / L2, 0, 1) else 0
+				if (sg[1] + t * dx - x) ^ 2 + (sg[2] + t * dz - z) ^ 2 < (sg[5] + 0.4) ^ 2 then return true end
+			end
+		end
+		return false
+	end
+	local function kerbPiece(ax, az, bx, bz)
+		local a, b = Vector3.new(ax, -0.25, az), Vector3.new(bx, -0.25, bz) -- kerb stands 0.5 above the road
+		local L = (b - a).Magnitude
+		if L < 0.5 then return end
+		local p = Instance.new("Part")
+		p.Name = "Kerb"; p.Anchored = true; p.Material = Mt.Concrete; p.Color = KERB_COL
+		p.TopSurface, p.BottomSurface = Enum.SurfaceType.Smooth, Enum.SurfaceType.Smooth
+		p.Size = Vector3.new(1, 1.5, L + 0.4)
+		p.CFrame = CFrame.lookAt((a + b) / 2, b)
+		p:SetAttribute("Greybox", true)
+		p.Parent = K
+		tick()
+	end
+	local nk = 0
+	for ri, r in data.roads do
+		local cl = data.classes[r.c]
+		if cl.p > 0 then
+			local P, n = r.p, #r.p
+			local nseg = n - 1
+			local norms = {}
+			for i = 1, nseg do
+				local dx, dz = P[i + 1][1] - P[i][1], P[i + 1][2] - P[i][2]
+				local L = math.max(1e-6, math.sqrt(dx * dx + dz * dz))
+				norms[i] = {-dz / L, dx / L}
+			end
+			local function miter(v)
+				local na = norms[v - 1] or (r._closed and norms[nseg])
+				local nb = norms[v] or (r._closed and norms[1])
+				na, nb = na or nb, nb or na
+				local mx, mz = na[1] + nb[1], na[2] + nb[2]
+				local ml = math.sqrt(mx * mx + mz * mz)
+				if ml < 1e-6 then return nb end
+				mx, mz = mx / ml, mz / ml
+				local d = math.max(0.35, mx * nb[1] + mz * nb[2])
+				return {mx / d, mz / d}
+			end
+			local mit = {}
+			for v = 1, n do mit[v] = miter(v) end
+			local o = cl.w / 2 + 0.5
+			for _, sgn in {1, -1} do
+				for i = 1, nseg do
+					local ax, az = P[i][1] + sgn * o * mit[i][1], P[i][2] + sgn * o * mit[i][2]
+					local bx, bz = P[i + 1][1] + sgn * o * mit[i + 1][1], P[i + 1][2] + sgn * o * mit[i + 1][2]
+					local L = math.sqrt((bx - ax) ^ 2 + (bz - az) ^ 2)
+					local steps = math.max(1, math.floor(L))
+					local runStart = nil
+					for k = 0, steps do
+						local t = k / steps
+						local x, z = ax + (bx - ax) * t, az + (bz - az) * t
+						local closedHere = k < steps and not open(x, z, ri, i, nseg, r._closed)
+						if closedHere and not runStart then runStart = t end
+						if (not closedHere or k == steps) and runStart then
+							local t2 = if closedHere then 1 else t
+							kerbPiece(ax + (bx - ax) * runStart, az + (bz - az) * runStart, ax + (bx - ax) * t2, az + (bz - az) * t2)
+							nk += 1
+							runStart = nil
+						end
+					end
+				end
+			end
+		end
+	end
+	for _, c in data.circuses do
+		for _, rad in {c.r[1] - 0.5, c.r[2] + 0.5} do
+			for k = 0, 47 do
+				local a1, a2 = k * math.pi / 24, (k + 1) * math.pi / 24
+				local ax, az = c.x + rad * math.cos(a1), c.z + rad * math.sin(a1)
+				local bx, bz = c.x + rad * math.cos(a2), c.z + rad * math.sin(a2)
+				local mx, mz = (ax + bx) / 2, (az + bz) / 2
+				local blocked = false
+				if rad > c.r[1] then
+					local l = buckets[math.floor(mx / 100) * 100000 + math.floor(mz / 100)] or {}
+					for _, sg in l do
+						local dx, dz = sg[3] - sg[1], sg[4] - sg[2]
+						local L2 = dx * dx + dz * dz
+						local t = if L2 > 0 then math.clamp(((mx - sg[1]) * dx + (mz - sg[2]) * dz) / L2, 0, 1) else 0
+						if (sg[1] + t * dx - mx) ^ 2 + (sg[2] + t * dz - mz) ^ 2 < (sg[5] + 1) ^ 2 then blocked = true; break end
+					end
+				end
+				if not blocked then kerbPiece(ax, az, bx, bz); nk += 1 end
+			end
+		end
+	end
+
+	status("lots")
+	local LC = 8
+	local LNX, LNZ = math.ceil((X1 - X0) / LC), math.ceil((Z1 - Z0) / LC)
+	local lot, ldis = buffer.create(LNX * LNZ), buffer.create(LNX * LNZ)
+	local function inside(a, b, o, n) if a > b then a, b = b, a end; return math.max(0, math.ceil((a - o) / LC)), math.min(n - 1, math.floor((b - o) / LC) - 1) end
+	local function touching(a, b, o, n) if a > b then a, b = b, a end; return math.max(0, math.floor((a - o) / LC)), math.min(n - 1, math.ceil((b - o) / LC) - 1) end
+	for d, a in data.districts do
+		local i1, i2 = inside(a.x[1], a.x[2], X0, LNX); local j1, j2 = inside(a.z[1], a.z[2], Z0, LNZ)
+		for j = j1, j2 do for i = i1, i2 do buffer.writeu8(lot, j * LNX + i, 1); buffer.writeu8(ldis, j * LNX + i, d) end end
+	end
+	local function clear(xr, zr, m)
+		local i1, i2 = touching(xr[1] - m, xr[2] + m, X0, LNX); local j1, j2 = touching(math.min(zr[1], zr[2]) - m, math.max(zr[1], zr[2]) + m, Z0, LNZ)
+		for j = j1, j2 do for i = i1, i2 do buffer.writeu8(lot, j * LNX + i, 0) end end
+	end
+	local function clearCapsule(ax, az, bx, bz, r)
+		local i1, i2 = touching(math.min(ax, bx) - r, math.max(ax, bx) + r, X0, LNX)
+		local j1, j2 = touching(math.min(az, bz) - r, math.max(az, bz) + r, Z0, LNZ)
+		local dx, dz = bx - ax, bz - az
+		local L2 = dx * dx + dz * dz
+		for j = j1, j2 do
+			local z = Z0 + (j + 0.5) * LC
+			for i = i1, i2 do
+				local x = X0 + (i + 0.5) * LC
+				local t = if L2 > 0 then math.clamp(((x - ax) * dx + (z - az) * dz) / L2, 0, 1) else 0
+				if (ax + t * dx - x) ^ 2 + (az + t * dz - z) ^ 2 <= r * r then buffer.writeu8(lot, j * LNX + i, 0) end
+			end
+		end
+	end
+	for _, a in data.protected do clear(a.x, a.z, 0) end
+	clear(pg.x, pg.z, 0)
+	clear({RIVER_LO, RIVER_HI}, {Z0, Z1}, 0)
+	for _, r in dk.rects do clear(r.x, r.z, 2) end
+	clear({lk.cx - lk.rx, lk.cx + lk.rx}, {lk.cz - lk.rz, lk.cz + lk.rz}, 4)
+	for _, list in {data.parks, data.gardens, data.plazas, data.promenades} do for _, a in list do clear(a.x, a.z, 0) end end
+	for _, l in data.landmarks do clear(l.x, l.z, 4) end
+	for _, r in data.roads do
+		local cl = data.classes[r.c]
+		for s = 1, #r.p - 1 do local a, b = r.p[s], r.p[s + 1]; clearCapsule(a[1], a[2], b[1], b[2], cl.w / 2 + cl.p + 5.7) end
+	end
+	for _, c in data.circuses do clearCapsule(c.x, c.z, c.x, c.z, c.r[2] + 8 + 5.7) end
+	local rail = data.rail
+	clearCapsule(rail.p[1][1], rail.p[1][2], rail.p[2][1], rail.p[2][2], rail.w / 2 + 5.7)
+	task.wait()
+	local P = folder(map, "Plots")
+	local lotId = 0
+	for j = 0, LNZ - 1 do
+		for i = 0, LNX - 1 do
+			local k = j * LNX + i
+			if buffer.readu8(lot, k) == 1 then
+				local d = buffer.readu8(ldis, k)
+				local function free(ii, jj) local kk = jj * LNX + ii; return buffer.readu8(lot, kk) == 1 and buffer.readu8(ldis, kk) == d end
+				local ra = i
+				while ra + 1 < LNX and free(ra + 1, j) do ra += 1 end
+				local rb = j
+				while rb + 1 < LNZ do
+					local ok = true
+					for ii = i, ra do if not free(ii, rb + 1) then ok = false; break end end
+					if not ok then break end
+					rb += 1
+				end
+				local cb = j
+				while cb + 1 < LNZ and free(i, cb + 1) do cb += 1 end
+				local ca = i
+				while ca + 1 < LNX do
+					local ok = true
+					for jj = j, cb do if not free(ca + 1, jj) then ok = false; break end end
+					if not ok then break end
+					ca += 1
+				end
+				local i2, j2 = ra, rb
+				if (ca - i + 1) * (cb - j + 1) > (ra - i + 1) * (rb - j + 1) then i2, j2 = ca, cb end
+				for jj = j, j2 do local base = jj * LNX; for ii = i, i2 do buffer.writeu8(lot, base + ii, 0) end end
+				local x1, x2, z1, z2 = X0 + i * LC, X0 + (i2 + 1) * LC, Z0 + j * LC, Z0 + (j2 + 1) * LC
+				local sx, sz = x2 - x1, z2 - z1
+				if sx >= 14 and sz >= 14 then
+					local dd = data.districts[d]
+					local f = dd.f
+					local dmax = math.max(36, f * 1.6)
+					local alongX = sx >= sz
+					local L, S = if alongX then sx else sz, if alongX then sz else sx
+					local rows, cols = math.max(1, math.floor(S / dmax + 0.5)), math.max(1, math.floor(L / f + 0.5))
+					local base = LOTCOL[dd.lot]
+					for rr = 0, rows - 1 do
+						for cc = 0, cols - 1 do
+							lotId += 1
+							local a1, a2, b1, b2 = L * cc / cols, L * (cc + 1) / cols, S * rr / rows, S * (rr + 1) / rows
+							local px1, px2, pz1, pz2
+							if alongX then px1, px2, pz1, pz2 = x1 + a1, x1 + a2, z1 + b1, z1 + b2
+							else px1, px2, pz1, pz2 = x1 + b1, x1 + b2, z1 + a1, z1 + a2 end
+							local sh = if (rr + cc) % 2 == 0 then 1 else 0.9
+							local p = part(P, "Lot_" .. lotId, px1, px2, -2, 0.6, pz1, pz2, Mt.SmoothPlastic, Color3.new(base.R * sh, base.G * sh, base.B * sh))
+							p:SetAttribute("LotId", lotId); p:SetAttribute("District", dd.n); p:SetAttribute("LotType", dd.lot)
+							p:SetAttribute("Frontage", math.floor(L / cols)); p:SetAttribute("Depth", math.floor(S / rows))
+						end
+					end
+				end
+			end
+		end
+		if j % 60 == 0 then task.wait() end
+	end
+
+	status("water")
+	local Wt = folder(map, "Water")
+	local mud = rgb(72, 64, 50)
+	for _, r in dk.rects do
+		part(Wt, "DockBed", r.x[1], r.x[2], dk.bed - 2, dk.bed, r.z[1], r.z[2], Mt.Mud, mud)
+		local zl, zh = math.min(r.z[1], r.z[2]), math.max(r.z[1], r.z[2])
+		part(Wt, "Quay", r.x[1], r.x[1] + 2, dk.bed, 0.6, zl, zh, Mt.Concrete, rgb(150,144,132))
+		part(Wt, "Quay", r.x[2] - 2, r.x[2], dk.bed, 0.6, zl, zh, Mt.Concrete, rgb(150,144,132))
+		part(Wt, "Quay", r.x[1] + 2, r.x[2] - 2, dk.bed, 0.6, zl, zl + 2, Mt.Concrete, rgb(150,144,132))
+		part(Wt, "Quay", r.x[1] + 2, r.x[2] - 2, dk.bed, 0.6, zh - 2, zh, Mt.Concrete, rgb(150,144,132))
+	end
+	local wallCol, stone = rgb(150, 144, 132), Mt.Concrete
+	tiled(Wt, "RiverBed", rv.x[1], rv.x[2], rv.bed - 4, rv.bed, Z0, Z1, Mt.Mud, mud)
+	local bridgeGaps, stairGaps = {}, {}
+	for _, b in data.bridges do table.insert(bridgeGaps, {b.z - 20, b.z + 20}) end
+	for _, s in w.stairs do table.insert(stairGaps, {s - 10, s}) end
+	for _, side in {{RIVER_LO, rv.x[1], RIVER_LO, RIVER_LO + 1}, {rv.x[2], RIVER_HI, RIVER_HI - 1, RIVER_HI}} do
+		for _, g in bridgeGaps do part(Wt, "RiverWall", side[1], side[2], rv.bed - 4, -3, g[1], g[2], stone, wallCol) end
+		for _, s in spans(Z0, Z1, table.clone(bridgeGaps)) do tiled(Wt, "RiverWall", side[1], side[2], rv.bed - 4, 0, s[1], s[2], stone, wallCol) end
+		local gaps = table.clone(bridgeGaps)
+		if side[1] < 1200 then for _, g in stairGaps do table.insert(gaps, g) end end
+		for _, s in spans(Z0, Z1, gaps) do tiled(Wt, "Parapet", side[3], side[4], 0, 3.5, s[1], s[2], stone, wallCol) end
+	end
+	local fs = w.foreshore
+	part(Wt, "Foreshore", fs.x[1], fs.x[2], rv.bed, fs.top, fs.z[1], fs.z[2], Mt.Mud, rgb(96, 84, 64))
+	for _, s in w.stairs do
+		part(Wt, "StairLanding", rv.x[1], rv.x[1] + 10, fs.top, 0, s - 10, s, stone, wallCol)
+		local wd = Instance.new("WedgePart")
+		wd.Name = "Stairs"; wd.Anchored = true; wd.Material = stone; wd.Color = wallCol
+		wd.Size = Vector3.new(10, -fs.top, 40)
+		wd.CFrame = CFrame.new(rv.x[1] + 5, fs.top / 2, s - 30)
+		wd:SetAttribute("Greybox", true)
+		wd.Parent = Wt
+	end
+
+	status("bridges")
+	local BR = folder(map, "Bridges")
+	local roadCol, paveCol = TERRAIN_COL[Mt.Cobblestone], TERRAIN_COL[Mt.Pavement]
+	local bx1, bx2 = RIVER_LO, RIVER_HI
+	for _, b in data.bridges do
+		local f = Instance.new("Folder"); f.Name = b.n; f.Parent = BR
+		local deck = part(f, "Carriageway", bx1, bx2, -3, 0, b.z - 12, b.z + 12, Mt.Cobblestone, roadCol)
+		deck:SetAttribute("Bridge", true)
+		for _, sgn in {1, -1} do
+			part(f, "Pavement", bx1, bx2, -3, 0.6, b.z + sgn * 12, b.z + sgn * 20, Mt.Pavement, paveCol)
+			part(f, "Parapet", bx1, bx2, 0.6, 3.6, b.z + sgn * 19, b.z + sgn * 20, stone, wallCol)
+		end
+		for _, px in b.towers or {1210, 1300, 1390} do
+			local hw = if b.towers then 20 else 6
+			part(f, "Pier", px - hw, px + hw, rv.bed - 4, -3, b.z - 30, b.z + 30, stone, wallCol)
+		end
+		if b.towers then
+			for _, px in b.towers do
+				for _, sgn in {1, -1} do part(f, "TowerLeg", px - 15, px + 15, 0.6, 40, b.z + sgn * 20.5, b.z + sgn * 31, stone, rgb(170, 160, 140)) end
+				tag(part(f, "Tower", px - 15, px + 15, 40, 120, b.z - 31, b.z + 31, stone, rgb(170, 160, 140)), b.n, 46, 2500, 200)
+			end
+			part(f, "HighWalkway", b.towers[1] + 15, b.towers[2] - 15, 100, 106, b.z - 5, b.z + 5, stone, rgb(120, 140, 160))
+		else
+			tag(deck, b.n, 8, 900, 200)
+		end
+	end
+	local RF = Instance.new("Folder"); RF.Name = "Hungerford Railway Bridge"; RF.Parent = BR
+	local hw, rz = rail.w / 2, rail.p[1][2]
+	tag(part(RF, "Viaduct", rail.p[1][1], rail.p[2][1], rail.deck - 4, rail.deck, rz - hw, rz + hw, Mt.Brick, rgb(120, 70, 56)), rail.n, 8, 900, 220)
+	for _, sgn in {1, -1} do part(RF, "Parapet", rail.p[1][1], rail.p[2][1], rail.deck, rail.deck + 3, rz + sgn * (hw - 1), rz + sgn * hw, Mt.Brick, rgb(120, 70, 56)) end
+	local nPier = 0
+	for x = rail.p[1][1] + 30, rail.p[2][1] - 10, 40 do
+		local onRoad = false
+		for _, sg in buckets[math.floor(x / 100) * 100000 + math.floor(rz / 100)] or {} do
+			local dx, dz = sg[3] - sg[1], sg[4] - sg[2]
+			local L2 = dx * dx + dz * dz
+			local t = if L2 > 0 then math.clamp(((x - sg[1]) * dx + (rz - sg[2]) * dz) / L2, 0, 1) else 0
+			if (sg[1] + t * dx - x) ^ 2 + (sg[2] + t * dz - rz) ^ 2 < (sg[5] + 12) ^ 2 then onRoad = true end
+		end
+		if not onRoad then
+			local wet = x > RIVER_LO and x < RIVER_HI
+			part(RF, "Pier", x - 4, x + 4, if wet then rv.bed - 4 else -2, rail.deck - 4, rz - hw, rz + hw, Mt.Brick, rgb(110, 64, 50))
+			nPier += 1
+		end
+	end
+
+	status("landmarks")
+	local LM = folder(map, "Landmarks_Greybox")
+	for _, l in data.landmarks do
+		local p = part(LM, l.n, l.x[1], l.x[2], -2, l.h, l.z[1], l.z[2], Mt.SmoothPlastic, rgb(214, 208, 192))
+		if l.n:find("Column") or l.n:find("Monument") or l.n:find("Dome") then
+			local s = p.Size
+			p.Shape = Enum.PartType.Cylinder
+			p.Size = Vector3.new(s.Y, s.X, s.Z)
+			p.CFrame = p.CFrame * CFrame.Angles(0, 0, math.pi / 2)
+		end
+		if not l.n:find("Dome") then tag(p, l.n, l.h / 2 + 8, 1500, 220) end
+	end
+	for _, c in data.circuses do
+		tag(part(LM, c.monument, c.x - 6, c.x + 6, -2, c.h, c.z - 6, c.z + 6, Mt.SmoothPlastic, rgb(214, 208, 192)), c.n, c.h / 2 + 6, 1200, 220)
+	end
+	local LB = folder(map, "Labels")
+	local seen = {}
+	for _, a in data.districts do
+		if not seen[a.n] then
+			seen[a.n] = true
+			local x, z = (a.x[1] + a.x[2]) / 2, (a.z[1] + a.z[2]) / 2
+			tag(ghost(part(LB, a.n, x - 0.5, x + 0.5, 80, 81, z - 0.5, z + 0.5)), a.n:upper(), 0, 4000, 320)
+		end
+	end
+
+	status("graph")
+	local nNodes, nLinks = buildGraph(data, map)
+
+	status("markers")
+	local BS = folder(map, "BusStops")
+	local route = Instance.new("Folder"); route.Name = "_Route"; route.Parent = BS
+	for i, pt in data.bus.p do ghost(part(route, "W" .. i, pt[1] - 0.5, pt[1] + 0.5, 0, 1, pt[2] - 0.5, pt[2] + 0.5)):SetAttribute("Index", i) end
+	for _, s in data.bus.stops do marker(BS, s[1], s[2], s[3], 9, rgb(200, 60, 50)):SetAttribute("BusStop", true) end
+	local CR = folder(map, "CabRanks")
+	for _, c in data.cabRanks do
+		local lx, lz = if c[4] == "x" then 20 else 4, if c[4] == "z" then 20 else 4
+		local p = part(CR, c[1], c[2] - lx, c[2] + lx, 0, 0.15, c[3] - lz, c[3] + lz, Mt.SmoothPlastic, rgb(240, 200, 60))
+		p.Transparency, p.CanCollide, p.CanQuery, p.CanTouch = 0.5, false, false, false
+		tag(p, "Cab rank: " .. c[1], 6, 400, 200)
+	end
+	local JS = folder(map, "JobSites")
+	for _, s in data.spots do marker(JS, s[1], s[2], s[3], 6, rgb(60, 140, 220)) end
+	local RT = folder(map, "Routes")
+	for _, e in data.events do
+		local f = Instance.new("Folder"); f.Name = e.n; f.Parent = RT
+		for i, pt in e.p do ghost(part(f, "W" .. i, pt[1] - 0.5, pt[1] + 0.5, 0, 1, pt[2] - 0.5, pt[2] + 0.5)):SetAttribute("Index", i) end
+	end
+	local BD = folder(map, "Bounds")
+	for _, wl in {{X0 - 2, X0, Z0, Z1}, {X1, X1 + 2, Z0, Z1}, {X0, X1, Z0 - 2, Z0}, {X0, X1, Z1, Z1 + 2}} do
+		tiled(BD, "Bound", wl[1], wl[2], -40, 300, wl[3], wl[4])
+	end
+	for _, p in BD:GetChildren() do p.Transparency = 1; p.CanQuery = false end
+	status("done")
+	return {parts = count, kerbs = nk, lots = lotId, nodes = nNodes, links = nLinks, railPiers = nPier}
+end
+return M
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX00000021"><Properties><string name="Name">MapLayoutData</string><ProtectedString name="Source"><![CDATA[-- Map layout v2 JSON (source: London/systems/map_layout_v2.json). Built by ServerStorage.MapGreybox.
+return [==[{"version":2,"bounds":{"x":[-1150,1900],"z":[850,-3320]},"cell":2,
+"classes":{"grand":{"w":28,"p":10},"main":{"w":24,"p":8},"second":{"w":16,"p":6},"mews":{"w":12,"p":0},"lane":{"w":10,"p":3}},
+"protected":[{"n":"Buckingham Palace","x":[-244,244],"z":[56,531]},{"n":"Houses of Parliament","x":[978,1148],"z":[-748,-1162]}],
+"palaceGarden":{"x":[-250,250],"z":[531,645],"top":-4.5},
+"districts":[{"n":"Mayfair","x":[-1150,-505],"z":[648,-990],"lot":"Townhouse","f":30},{"n":"Soho","x":[-1150,-505],"z":[-760,-1185],"lot":"Shop","f":24},{"n":"St James's","x":[-505,-24],"z":[-440,-975],"lot":"Club","f":40},{"n":"West End","x":[-505,-165],"z":[-975,-1185],"lot":"Shop","f":30},{"n":"Covent Garden","x":[-415,210],"z":[-1185,-1650],"lot":"Shop","f":26},{"n":"Holborn & Bloomsbury","x":[-1150,-415],"z":[-1185,-1990],"lot":"Terrace","f":28},{"n":"Fleet Street","x":[-415,210],"z":[-1650,-1990],"lot":"Office","f":24},{"n":"Strand & Temple","x":[250,1146],"z":[-1185,-1990],"lot":"Office","f":34},{"n":"Whitehall","x":[24,690],"z":[-900,-1185],"lot":"Government","f":60},{"n":"Westminster","x":[660,1146],"z":[-40,-1185],"lot":"Terrace","f":32},{"n":"Belgravia","x":[254,1146],"z":[850,-40],"lot":"Townhouse","f":30},{"n":"Belgravia","x":[-310,254],"z":[850,648],"lot":"Townhouse","f":30},{"n":"Clerkenwell & Moorfields","x":[-1150,-415],"z":[-1990,-2730],"lot":"Workshop","f":30},{"n":"The City","x":[-415,1146],"z":[-1990,-2690],"lot":"Office","f":28},{"n":"Tower","x":[560,1146],"z":[-2690,-2990],"lot":"Warehouse","f":50},{"n":"East End","x":[-1150,700],"z":[-2730,-3320],"lot":"Lodging","f":22},{"n":"Docks","x":[700,1146],"z":[-2990,-3320],"lot":"Warehouse","f":60},{"n":"Lambeth","x":[1454,1900],"z":[850,-1500],"lot":"Terrace","f":26},{"n":"Bankside","x":[1454,1900],"z":[-1500,-2350],"lot":"Warehouse","f":45},{"n":"Southwark","x":[1454,1900],"z":[-2350,-3320],"lot":"Warehouse","f":40}],
+"parks":[{"n":"Hyde Park","x":[-1150,-320],"z":[850,690]},{"n":"Green Park","x":[-485,-295],"z":[640,-60]},{"n":"","x":[-485,-24],"z":[-60,-440]},{"n":"St James's Park","x":[24,620],"z":[-44,-900]},{"n":"Victoria Tower Gardens","x":[1010,1146],"z":[-560,-756]},{"n":"Embankment Gardens","x":[830,1088],"z":[-1300,-1600]},{"n":"Inner Temple Gardens","x":[560,1088],"z":[-1780,-1980]},{"n":"","x":[735,1088],"z":[-2735,-2985]}],
+"gardens":[{"n":"Grosvenor Sq","x":[-980,-890],"z":[524,416]},{"n":"Berkeley Sq","x":[-732,-648],"z":[234,56]},{"n":"St James's Sq","x":[-420,-282],"z":[-666,-774]},{"n":"Leicester Sq","x":[-470,-305],"z":[-1028,-1144]},{"n":"Soho Sq","x":[-1085,-1000],"z":[-1040,-1145]},{"n":"Lincoln's Inn Fields","x":[-790,-560],"z":[-1675,-1800]},{"n":"Finsbury Circus","x":[-640,-520],"z":[-2470,-2600]},{"n":"Belgrave Sq","x":[520,640],"z":[560,440]},{"n":"Eaton Sq","x":[700,780],"z":[360,120]},{"n":"Parliament Sq","x":[710,935],"z":[-935,-1055]}],
+"plazas":[{"n":"Palace Place","x":[-254,254],"z":[-46,55]},{"n":"Horse Guards Parade","x":[24,420],"z":[-932,-1000]},{"n":"Trafalgar Sq","x":[-145,125],"z":[-995,-1145]},{"n":"Covent Garden Piazza","x":[-222,-58],"z":[-1300,-1500]},{"n":"","x":[252,290],"z":[-1230,-1470]},{"n":"","x":[665,820],"z":[-420,-520]},{"n":"Dean's Yard","x":[880,930],"z":[-560,-745]},{"n":"Tower Hill","x":[560,680],"z":[-2740,-2980]},{"n":"Borough Market","x":[1610,1680],"z":[-2470,-2580]},{"n":"Spitalfields Market","x":[-500,-380],"z":[-2960,-3080]},{"n":"","x":[915,1000],"z":[120,420]}],
+"promenades":[{"n":"Victoria Embankment","x":[1130,1146],"z":[-1192,-2735]},{"n":"Tower Wharf","x":[1090,1146],"z":[-2735,-2990]},{"n":"South Bank","x":[1454,1470],"z":[850,-3320]}],
+"landmarks":[{"n":"St James's Palace","x":[-235,-30],"z":[-460,-600],"h":30},{"n":"Wellington Barracks","x":[662,738],"z":[-140,-362],"h":30},{"n":"Horse Guards","x":[160,330],"z":[-1000,-1036],"h":35},{"n":"Westminster Abbey","x":[785,935],"z":[-760,-890],"h":60},{"n":"Tate Gallery","x":[1010,1140],"z":[-120,-330],"h":35},{"n":"National Gallery","x":[-275,-190],"z":[-1030,-1156],"h":40},{"n":"Nelson's Column","x":[-28,-12],"z":[-1062,-1078],"h":170},{"n":"Charing Cross Terminus","x":[290,820],"z":[-1230,-1470],"h":50},{"n":"Scotland Yard","x":[880,1065],"z":[-1230,-1300],"h":45},{"n":"Savoy Hotel","x":[270,470],"z":[-1500,-1600],"h":50},{"n":"Somerset House","x":[270,520],"z":[-1640,-1760],"h":40},{"n":"Royal Courts of Justice","x":[60,205],"z":[-1665,-1790],"h":50},{"n":"St Paul's, Covent Garden","x":[-200,-80],"z":[-1268,-1296],"h":30},{"n":"Covent Garden Market","x":[-190,-90],"z":[-1340,-1460],"h":22},{"n":"Royal Opera House","x":[-380,-280],"z":[-1505,-1545],"h":40},{"n":"Bow Street Police Court","x":[-360,-280],"z":[-1576,-1620],"h":30},{"n":"Theatre Royal, Drury Lane","x":[-330,-230],"z":[-1665,-1740],"h":40},{"n":"British Museum","x":[-1100,-960],"z":[-1300,-1460],"h":40},{"n":"St Paul's Cathedral","x":[70,410],"z":[-2140,-2330],"h":60},{"n":"St Paul's Dome","x":[180,300],"z":[-2180,-2300],"h":150},{"n":"Newgate Prison","x":[-200,-74],"z":[-2030,-2085],"h":35},{"n":"Old Bailey","x":[-40,200],"z":[-2030,-2084],"h":40},{"n":"Smithfield Market","x":[-684,-520],"z":[-2028,-2128],"h":25},{"n":"Bank of England","x":[-200,-20],"z":[-2440,-2640],"h":40},{"n":"Royal Exchange","x":[16,94],"z":[-2648,-2700],"h":45},{"n":"Mansion House","x":[100,225],"z":[-2480,-2560],"h":40},{"n":"The Monument","x":[922,938],"z":[-2552,-2568],"h":200},{"n":"Liverpool Street Station","x":[-800,-560],"z":[-2622,-2714],"h":45},{"n":"Tower of London","x":[790,1080],"z":[-2750,-2975],"h":50},{"n":"Royal Mint","x":[560,680],"z":[-3030,-3150],"h":35},{"n":"Leman Street Police Station","x":[280,380],"z":[-3100,-3160],"h":30},{"n":"St Thomas' Hospital","x":[1470,1640],"z":[-620,-1150],"h":40},{"n":"Lambeth Palace","x":[1506,1630],"z":[-400,-505],"h":35},{"n":"Southwark Cathedral","x":[1504,1600],"z":[-2480,-2570],"h":45},{"n":"Victoria Station","x":[1000,1140],"z":[120,420],"h":40}],
+"water":{"river":{"x":[1150,1450],"wall":4,"surface":-14,"bed":-30},"foreshore":{"x":[1150,1186],"z":[-1700,-2560],"top":-10},"stairs":[-1720,-2400],"lake":{"n":"St James's Park Lake","cx":330,"cz":-470,"rx":55,"rz":280,"surface":-1,"bed":-4.5},"docks":{"n":"St Katharine Docks","rects":[{"x":[800,1080],"z":[-3070,-3160]},{"x":[800,1080],"z":[-3190,-3280]}],"surface":-3,"bed":-14}},
+"bridges":[{"n":"Lambeth Bridge","z":-530},{"n":"Westminster Bridge","z":-1192},{"n":"Blackfriars Bridge","z":-2000},{"n":"London Bridge","z":-2620},{"n":"Tower Bridge","z":-3010,"towers":[1255,1345]}],
+"circuses":[{"n":"Hyde Park Corner","x":-300,"z":668,"r":[18,46],"c":"main","monument":"Wellington Arch","h":30},{"n":"Piccadilly Circus","x":-505,"z":-1000,"r":[14,44],"c":"main","monument":"Shaftesbury Fountain (Eros)","h":18}],
+"roads":[{"n":"Park Lane","c":"main","p":[[-1150,668],[-300,668]]},{"n":"Grosvenor Place","c":"main","p":[[-300,668],[620,668]]},{"n":"Ebury Street","c":"second","p":[[620,668],[1146,668]]},{"n":"Knightsbridge","c":"main","p":[[-300,668],[-300,850]]},{"n":"Wilton Place","c":"second","p":[[-300,780],[254,780]]},{"n":"Constitution Hill","c":"main","s":1,"p":[[-300,630],[-292,400],[-282,150],[-268,-60]]},{"n":"Piccadilly","c":"main","s":1,"p":[[-320,640],[-430,560],[-505,420],[-505,-956]]},{"n":"Oxford Street","c":"main","p":[[-1125,648],[-1125,-2150]]},{"n":"Regent Street","c":"main","s":1,"p":[[-1125,-760],[-820,-760],[-640,-790],[-545,-880],[-505,-956]]},{"n":"Shaftesbury Avenue","c":"main","s":1,"p":[[-540,-1030],[-640,-1100],[-760,-1170]]},{"n":"Coventry Street","c":"main","p":[[-505,-1044],[-505,-1170]]},{"n":"Charing Cross Road","c":"main","p":[[-1125,-1170],[-165,-1170]]},{"n":"Haymarket","c":"main","p":[[-461,-1000],[-165,-1000]]},{"n":"Pall Mall","c":"main","s":1,"p":[[-250,-440],[-250,-930],[-215,-968],[-165,-975]]},{"n":"Trafalgar Square","c":"main","p":[[-165,-975],[145,-975],[145,-1165],[-165,-1165],[-165,-975]]},{"n":"The Mall","c":"grand","p":[[0,-60],[0,-975]]},{"n":"Palace Place","c":"second","p":[[-268,70],[-268,-60],[268,-60],[268,70]]},{"n":"Birdcage Walk","c":"main","s":1,"p":[[268,-40],[420,-85],[640,-130],[640,-880],[690,-915]]},{"n":"Buckingham Palace Road","c":"main","s":1,"p":[[268,60],[330,200],[450,400],[560,560],[620,668]]},{"n":"Buckingham Gate","c":"second","s":1,"p":[[420,-85],[540,30],[860,30]]},{"n":"Whitehall","c":"main","p":[[145,-1060],[690,-1060]]},{"n":"Parliament Square","c":"main","p":[[690,-915],[955,-915],[955,-1075],[690,-1075],[690,-915]]},{"n":"Parliament Street & Westminster Bridge","c":"main","p":[[690,-1075],[690,-1192],[1900,-1192]]},{"n":"St Margaret Street & Millbank","c":"main","p":[[955,-1192],[955,40]]},{"n":"Victoria Street","c":"main","s":1,"p":[[760,-915],[760,-400],[790,-120],[900,40],[900,250]]},{"n":"Grosvenor Gardens","c":"second","p":[[900,250],[900,668]]},{"n":"Horseferry Road & Lambeth Bridge","c":"main","p":[[760,-530],[1660,-530]]},{"n":"Great Peter Street","c":"second","p":[[760,-380],[955,-380]]},{"n":"Marsham Street","c":"second","p":[[870,30],[870,-516]]},{"n":"Horse Guards Road","c":"second","p":[[24,-916],[640,-916]]},{"n":"Downing Street","c":"second","p":[[480,-930],[480,-1045]]},{"n":"Strand","c":"main","s":1,"p":[[145,-1165],[200,-1200],[230,-1300],[230,-1640]]},{"n":"Fleet Street","c":"main","p":[[230,-1640],[235,-1990]]},{"n":"Ludgate Hill","c":"main","p":[[235,-1990],[240,-2120]]},{"n":"St Paul's Churchyard","c":"second","p":[[40,-2120],[440,-2120],[440,-2350],[40,-2350],[40,-2120]]},{"n":"Cheapside & Poultry","c":"main","s":1,"p":[[40,-2350],[40,-2500],[70,-2570]]},{"n":"King William Street & London Bridge","c":"main","s":1,"p":[[70,-2570],[300,-2620],[700,-2620],[1460,-2620]]},{"n":"Borough High Street","c":"main","s":1,"p":[[1460,-2620],[1650,-2650],[1900,-2700]]},{"n":"Queen Victoria Street","c":"main","s":1,"p":[[240,-2620],[500,-2350],[900,-2060],[1110,-2010]]},{"n":"New Bridge Street & Blackfriars Bridge","c":"main","p":[[235,-1990],[235,-2000],[1900,-2000]]},{"n":"Farringdon Street","c":"main","p":[[-1125,-2005],[215,-2005]]},{"n":"High Holborn","c":"main","p":[[-830,-1170],[-830,-2005]]},{"n":"Victoria Embankment & Thames Street","c":"main","p":[[1110,-1192],[1110,-2710]]},{"n":"Lower Thames Street","c":"main","p":[[1110,-2710],[700,-2710]]},{"n":"Great Tower Street","c":"main","p":[[700,-2620],[700,-3010]]},{"n":"Tower Bridge Approach & Tower Bridge","c":"main","s":1,"p":[[110,-2900],[500,-2990],[760,-3010],[1900,-3010]]},{"n":"Cornhill & Whitechapel","c":"main","s":1,"p":[[70,-2570],[110,-2640],[110,-3320]]},{"n":"Threadneedle Street","c":"second","s":1,"p":[[70,-2570],[0,-2630],[0,-2730]]},{"n":"Bishopsgate","c":"main","p":[[-1150,-2730],[110,-2730]]},{"n":"Cannon Street","c":"main","s":1,"p":[[440,-2350],[380,-2420],[380,-2610]]},{"n":"London Wall","c":"main","p":[[-400,-2005],[-400,-2730]]},{"n":"Aldersgate Street","c":"main","p":[[-1125,-2150],[-60,-2150]]},{"n":"Newgate Street","c":"second","p":[[-60,-2005],[-60,-2350],[40,-2350]]},{"n":"Old Bailey","c":"second","p":[[-60,-2100],[230,-2100]]},{"n":"Moorgate","c":"second","p":[[-1125,-2430],[-200,-2430]]},{"n":"Wood Street","c":"second","p":[[-400,-2250],[40,-2250]]},{"n":"Old Broad Street","c":"second","p":[[-400,-2685],[0,-2685]]},{"n":"Bread Street","c":"second","p":[[40,-2440],[380,-2440]]},{"n":"Paul's Wharf lane","c":"lane","p":[[460,-2200],[1110,-2200]]},{"n":"Queenhithe lane","c":"lane","p":[[380,-2450],[1110,-2450]]},{"n":"Barbican","c":"second","p":[[-700,-2005],[-700,-2730]]},{"n":"Commercial Street","c":"main","p":[[-1150,-2950],[110,-2950]]},{"n":"Brick Lane","c":"second","p":[[-1150,-3150],[110,-3150]]},{"n":"Commercial Road","c":"main","s":1,"p":[[110,-2950],[250,-3000],[250,-3320]]},{"n":"Cable Street","c":"main","s":1,"p":[[500,-2990],[520,-3060],[520,-3320]]},{"n":"Leman Street","c":"second","p":[[110,-3080],[520,-3080]]},{"n":"East Smithfield","c":"second","p":[[740,-3010],[740,-3320]]},{"n":"Spitalfields lane","c":"lane","p":[[-600,-2730],[-600,-3320]]},{"n":"Wentworth Street","c":"lane","p":[[-300,-2950],[-300,-3320]]},{"n":"Fashion Street","c":"lane","p":[[-1150,-3250],[110,-3250]]},{"n":"Brook Street","c":"second","p":[[-1000,648],[-1000,-760]]},{"n":"Grosvenor Street","c":"second","p":[[-870,648],[-870,-760]]},{"n":"Mount Street","c":"second","p":[[-750,648],[-750,-760]]},{"n":"Curzon Street","c":"second","p":[[-630,648],[-630,-780]]},{"n":"Park Street","c":"second","p":[[-1125,540],[-460,540]]},{"n":"South Audley Street","c":"second","p":[[-1125,400],[-505,400]]},{"n":"Davies Street","c":"second","p":[[-1125,250],[-505,250]]},{"n":"New Bond Street","c":"second","p":[[-1125,40],[-505,40]]},{"n":"Albemarle Street","c":"second","p":[[-1125,-200],[-505,-200]]},{"n":"Swallow Street","c":"second","p":[[-1125,-470],[-505,-470]]},{"n":"Adams Row","c":"mews","p":[[-935,250],[-935,40]]},{"n":"Hays Mews","c":"mews","p":[[-690,540],[-690,250]]},{"n":"Bruton Mews","c":"mews","p":[[-810,-200],[-810,-470]]},{"n":"Wardour Street","c":"second","p":[[-1125,-890],[-600,-890]]},{"n":"Dean Street","c":"second","p":[[-1125,-1020],[-580,-1020]]},{"n":"Old Compton Street","c":"second","p":[[-760,-890],[-760,-1170]]},{"n":"Broadwick Street","c":"second","p":[[-940,-780],[-940,-1170]]},{"n":"Orange Street","c":"second","p":[[-285,-1000],[-285,-1170]]},{"n":"St James's Street","c":"second","p":[[-505,-470],[-250,-470]]},{"n":"Jermyn Street","c":"second","p":[[-440,-470],[-440,-1000]]},{"n":"Marlborough Road","c":"second","p":[[-250,-440],[-24,-440]]},{"n":"King Street (St James's)","c":"second","p":[[-440,-645],[-250,-645]]},{"n":"Charles II Street","c":"second","p":[[-440,-795],[-250,-795]]},{"n":"Long Acre","c":"second","p":[[-400,-1170],[-400,-1650]]},{"n":"St Martin's Lane","c":"second","p":[[-400,-1250],[210,-1250]]},{"n":"King Street","c":"second","p":[[-240,-1250],[-240,-1560]]},{"n":"Henrietta Street","c":"second","p":[[-40,-1250],[-40,-1560]]},{"n":"Southampton Street","c":"second","p":[[-40,-1400],[210,-1400]]},{"n":"Bow Street","c":"second","p":[[-400,-1560],[210,-1560]]},{"n":"Drury Lane","c":"second","p":[[-1125,-1650],[210,-1650]]},{"n":"Great Russell Street","c":"second","p":[[-950,-1170],[-950,-1650]]},{"n":"Southampton Row","c":"second","p":[[-1125,-1500],[-830,-1500]]},{"n":"Chancery Lane","c":"second","p":[[-830,-1820],[210,-1820]]},{"n":"Fetter Lane","c":"second","p":[[-830,-1930],[210,-1930]]},{"n":"Portugal Street","c":"second","p":[[-545,-1650],[-545,-1820]]},{"n":"Hatton Garden","c":"second","p":[[-1125,-1960],[-830,-1960]]},{"n":"Villiers Street","c":"second","p":[[250,-1480],[1110,-1480]]},{"n":"Savoy Street","c":"second","p":[[250,-1620],[1110,-1620]]},{"n":"Temple Avenue","c":"second","p":[[250,-1770],[1110,-1770]]},{"n":"Belgrave Square","c":"second","p":[[505,575],[655,575],[655,425],[505,425],[505,575]]},{"n":"Chapel Street","c":"second","p":[[505,575],[505,668]]},{"n":"Halkin Street","c":"second","p":[[330,668],[330,500],[505,500]]},{"n":"Upper Belgrave Street","c":"second","p":[[655,400],[685,400]]},{"n":"Eaton Square","c":"second","p":[[685,375],[795,375],[795,105],[685,105],[685,375]]},{"n":"Elizabeth Street","c":"second","p":[[795,240],[900,240]]},{"n":"Lambeth Palace Road","c":"main","p":[[1660,-530],[1660,-1192]]},{"n":"Albert Embankment","c":"main","p":[[1490,850],[1490,-530]]},{"n":"Lambeth Road","c":"second","p":[[1660,-300],[1900,-300]]},{"n":"Kennington Lane","c":"second","p":[[1490,0],[1900,0]]},{"n":"Vauxhall Walk","c":"second","p":[[1490,400],[1900,400]]},{"n":"Black Prince Road","c":"second","p":[[1700,850],[1700,-530]]},{"n":"Stamford Street & Southwark Street","c":"second","p":[[1700,-1192],[1700,-2640]]},{"n":"Bankside","c":"second","p":[[1490,-1192],[1490,-2620]]},{"n":"Upper Ground","c":"second","p":[[1490,-1600],[1900,-1600]]},{"n":"Tooley Street","c":"second","p":[[1490,-2620],[1490,-3010]]},{"n":"Southwark grid","c":"second","p":[[1700,-2660],[1700,-3320]]},{"n":"Long Lane","c":"second","p":[[1490,-2800],[1900,-2800]]},{"n":"Jamaica Road","c":"second","p":[[1490,-3200],[1900,-3200]]}],
+"paths":[{"n":"Rotten Row","w":16,"sand":1,"p":[[-1140,770],[-330,770]]},{"n":"Hyde Park walk","w":10,"p":[[-1140,720],[-330,720]]},{"n":"Hyde Park carriage walk","w":10,"p":[[-1140,820],[-330,820]]},{"n":"Green Park diagonal","w":10,"p":[[-300,560],[-470,-420]]},{"n":"Green Park walk","w":10,"p":[[-40,-90],[-300,520]]},{"n":"Queen's Walk","w":10,"p":[[-470,-430],[-40,-430]]},{"n":"St James's Park circuit","w":10,"p":[[40,-80],[200,-180],[200,-780],[420,-880],[560,-760],[560,-180],[420,-70],[40,-80]]},{"n":"Blue Bridge","w":8,"p":[[200,-470],[560,-470]]},{"n":"Temple walk","w":8,"p":[[580,-1880],[1080,-1880]]},{"n":"Embankment Gardens walk","w":8,"p":[[850,-1320],[850,-1590]]},{"n":"Victoria Tower Gardens walk","w":8,"p":[[1020,-570],[1020,-745]]}],
+"rail":{"n":"Hungerford Railway Bridge","p":[[820,-1350],[1900,-1350]],"w":20,"deck":14},
+"bus":{"n":"Omnibus loop","p":[[-200,668],[-300,668],[-430,560],[-505,420],[-505,-956],[-505,-1000],[-461,-1000],[-165,-1000],[-165,-1165],[145,-1165],[200,-1200],[230,-1300],[230,-1640],[235,-1990],[240,-2120],[40,-2120],[40,-2350],[40,-2500],[70,-2570],[300,-2620],[700,-2620],[700,-2710],[1110,-2710],[1110,-1192],[955,-1192],[955,-915],[760,-915],[760,-400],[790,-120],[900,40],[900,250],[900,668],[620,668],[-200,668]],
+"stops":[["Hyde Park Corner",-200,652],["Green Park",-489,0],["Piccadilly Circus",-489,-930],["Trafalgar Square",40,-1149],["Charing Cross",246,-1350],["Fleet Street",208,-1800],["St Paul's",29,-2200],["Bank",24,-2460],["Monument",900,-2604],["Tower Hill",684,-2780],["Temple",1094,-1900],["Westminster",900,-1176],["Westminster Abbey",744,-700],["Victoria",889,400],["Belgravia",400,652]]},
+"cabRanks":[["Palace Place",-150,-56,"x"],["Hyde Park Corner",-150,660,"x"],["Berkeley Square",-746,150,"z"],["Belgrave Square",580,429,"x"],["Trafalgar Square",40,-1157,"x"],["Charing Cross",238,-1350,"z"],["Covent Garden",-236,-1400,"z"],["Parliament Square",698,-1000,"z"],["Bank",48,-2460,"z"],["Tower Hill",708,-2850,"z"],["Victoria",904,350,"z"],["Fleet Street",241,-1850,"z"]],
+"spots":[["Spawn: terminus platforms",555,-1350],["Bandstand",180,-300],["Rowing",330,-650],["Croquet lawn",-380,-250],["Mudlarking foreshore",1168,-2000],["Fishing",1138,-1700],["Music hall",190,-1470],["Fairground (market days)",-140,-1320],["Fire station",-300,-2250],["Police court",-320,-1598],["Prison (Newgate)",-137,-2058],["Coal yard",400,-3250],["Motor works",-300,-2900],["Cab yard",-320,-1400],["Omnibus depot",-1000,-800],["Smithfield meat market",-610,-2125],["Spitalfields market",-440,-3020],["Fence (stolen goods)",-800,-3200],["Gunsmith",-900,-300],["Royal Mews",150,600]],
+"events":[{"n":"Changing of the Guard","p":[[680,-300],[640,-300],[640,-130],[420,-85],[268,-40],[150,60]]},{"n":"Jubilee procession","p":[[0,60],[0,-975],[145,-975],[145,-1165],[200,-1200],[230,-1300],[230,-1640],[235,-1990],[240,-2120]]},{"n":"State Opening","p":[[0,60],[0,-975],[145,-975],[145,-1060],[690,-1060],[690,-1075],[955,-1075],[955,-780]]},{"n":"Motor Run","p":[[0,-200],[0,-975],[145,-975],[145,-1060],[690,-1060],[690,-1192],[1450,-1192],[1900,-1192]]}]}]==]
+]]></ProtectedString></Properties></Item></roblox>
