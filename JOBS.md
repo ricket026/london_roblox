@@ -56,6 +56,9 @@ it in a UI) or to NPCs on busy corners (walk up, hold action). Pay 1d per copy +
 Royal decrees, court verdicts and passed bills are auto-added as a "Court & Parliament" column.
 
 ## 3. Second-wave jobs (outline)
+
+New with player shops (`SHOPS.md` §7): **shopkeeper**, **shop assistant** (a starter job),
+**carpenter** (makes furniture for the building kit) and **delivery runner**.
 | Job | Loop | Notes |
 |---|---|---|
 | Telegraph messenger | Timed deliveries between offices on a bicycle | Bonus for speed |

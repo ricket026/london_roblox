@@ -128,11 +128,17 @@ Each job is 1–3 minute repeatable tasks with a pay-out and XP for ranks. First
   sweep, firefighter, motor engineer (repairs), photographer (takes in-game portraits),
   physician (revives the downed), butler/maid in noble houses.
 
-### 6.4 Property
-- Townhouses (Belgravia/Mayfair) and lodgings (East End) rentable per real-time week with
-  in-game money. Townhouses include a **mews** for a carriage or motor car.
-- Owner can lock doors, give keys, hire household staff (other players), and pick from a small
-  set of furniture layouts. (No free-build in v1.)
+### 6.4 Property, building and shops (revised 2026-10-27: `PROPERTY.md`, `BUILDING.md`, `SHOPS.md`)
+- **Rent or buy** homes (lodging, terrace house, townhouse with a **mews**) and businesses (shop,
+  market stall, later workshop and warehouse) with in-game money. A property is a **portable
+  deed**: it appears on a free plot of its kind in whichever server you join, at your usual address
+  when it's free.
+- Players **build their house from a period kit** (brick and stucco fronts, sash windows, roofs)
+  and **decorate** it, inside the plot and height limits; the street front must stay a proper
+  house front. Unused plots show template houses, so the city is never empty.
+- Owners lock doors, give keys, hire household staff and shop assistants.
+- **Shopkeepers** stock wholesale goods from the docks and markets and goods made by other
+  players (bread, outfits, furniture), set prices, and sell to players and NPC customers.
 
 ### 6.5 Law & order
 - **Crimes:** pickpocketing, burglary, swindling, smuggling, assault, trespass in the palace,
@@ -299,7 +305,8 @@ Vehicles are a headline feature. Old and new share the road.
 
 ## 13. What this is NOT (v1)
 
-- Not a free-build sandbox.
+- Not a free-build sandbox: building is from a curated period kit on your own plot only
+  (BUILDING.md).
 - Not a shooter: guns exist for police, guards, crime and duels, but fighting isn't the main
   loop. Not a racing game either.
 - Not 1:1 historically accurate London.

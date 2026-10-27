@@ -24,6 +24,9 @@ All numbers below are starting values in `Config.Economy` and will be tuned in M
 
 ## 3. Prices
 
+Property rent and purchase prices (lodging £30, terrace £120, townhouse £400, shop £200 to buy)
+are in `PROPERTY.md` §2; shop pricing and wholesale (60% of base) in `SHOPS.md`.
+
 | Item | Price | Hours of labour (~£2.5/h) |
 |---|---|---|
 | Lodging (East End), per real week | £1 | 0.4 |

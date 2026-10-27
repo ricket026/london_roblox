@@ -40,6 +40,74 @@ keep the scripts you touch to the list (or say why), run `tools/check_luau.py`, 
 
 ---
 
+## Property, building and shops (ROADMAP Phases 2–4, next after Phase 1)
+
+Specs: `PROPERTY.md`, `BUILDING.md`, `SHOPS.md` (user decisions 2026-10-27: portable deeds,
+rent or buy, kit building + decor, wholesale + player-made goods). Do them in this order; the
+economy core (T09, T10, T15, T11) comes first and is listed under M2 below.
+
+### P01 · Items and inventory ⬜
+- **Specs** SHOPS §1 · **Depends** T09 · **Size** M
+- `Shared.Items` (definitions + categories), server `Inventory` (bag 20 stacks, storage), give
+  prompt (both confirm), consumable/holdable use. Profile v3 field `inventory`.
+- **Done when** a player buys a bun at a counter (T15), carries it, gives it to a friend, who eats it.
+
+### P02 · Profile v3: deeds and storage ⬜
+- **Specs** PROPERTY §6 · **Size** S · `properties`, `storage` (removals), `inventory` (P01) with a
+  v2 → v3 migration in `Profiles`; new store `PropertyBuild_v1` written under the profile's lock
+  token. Update `Shared.Types` and TECH §5.1.
+
+### P03 · Estate agents, rent and buy, plot assignment ⬜
+- **Specs** PROPERTY §2–4 · **Depends** P02, T15 · **Size** M
+- Server `Property` module: deed kinds from Config, rent (weekly from the bank, 3-day grace,
+  lapse keeps the build), buy and sell-back, per-server lot assignment (saved lot → same
+  district → same kind → hotel/stall), addresses from road names, 10-minute linger after leaving.
+- **Done when** two players rent terraces in one server and get different lots, and one of them
+  gets the same address back after rejoining an empty server.
+
+### P04 · The kit: piece data and builder ⬜
+- **Specs** BUILDING §1–2 · **Size** M · `Shared.Kit` (piece ids, sizes, grid footprint, colour
+  slots, groups) and a builder that makes a piece (greybox parts now) at a grid position on a lot.
+  Lot `Front` side computed from the road data (once, cached as an attribute).
+- **Done when** a test command lays out one of every piece on a lot, at the right scale next to
+  an R15 character.
+
+### P05 · Templates on every unused plot ⬜
+- **Specs** BUILDING §6 · **Depends** P04 · **Size** M · ≤ 6 parts per unused lot, varied by
+  `LotId`, district style (stock brick in the East End, stucco in Belgravia...). Full-detail only
+  near players. Check part counts and FPS with all ~4,000 lots.
+- **Done when** every street has houses and a phone keeps 30 FPS walking through Mayfair.
+
+### P06 · Build mode: place, rotate, move, delete, rules ⬜
+- **Specs** BUILDING §3–4 · **Depends** P03, P04 · **Size** L (split client UI / server rules)
+- Build camera, catalogue, ghost preview with rule reasons, budget meter, storey selector,
+  undo/redo, templates to start from, draft vs published (street-front rule). Server validates
+  every edit (bounds, height, budget, permissions, rate limit). Touch and gamepad from day one.
+
+### P07 · Save and load builds ⬜
+- **Specs** BUILDING §5 · **Depends** P06 · **Size** S · Relative-to-lot format, validate on load,
+  pieces that don't fit go to storage, size budget per property.
+
+### P08 · Decorating: furniture, paint, wallpaper, storage ⬜
+- **Specs** BUILDING §2, SHOPS §1 · **Depends** P06, P01 · **Size** M · Free starter set, bought
+  furniture from storage, paint/wallpaper per face, fireplaces and lamps that light.
+
+### P09 · "Report this building" ⬜ · **Specs** BUILDING §7 · 3 reports in a server → template for the session; logged.
+### P10 · Keys, locks, "At Home", visiting ⬜ · **Specs** PROPERTY §5 · Uses `Doors`; key permissions enter/decorate/build/sell.
+
+### S01 · Shop settings, till, opening, selling to players ⬜
+- **Specs** SHOPS §2, §4 · **Depends** P03, P06, P01 · **Size** M · Trade choice, filtered sign,
+  prices 0.8–3× base, stock on displays, open only while a seller is present, till auto-banks.
+### S02 · Wholesale suppliers and deliveries ⬜ · **Specs** SHOPS §3 · Supplier counters (T15) by in-game hours, 60% of base, delivery 2d.
+### S03 · NPC customers ⬜ · **Specs** SHOPS §4, LOW_POP §1 · First slice of the NPC framework (T24): walk in, buy by trade/price/footfall/appeal, hourly cap.
+### S04 · Market stalls ⬜ · **Specs** SHOPS §5, PROPERTY §2 · Daily rent, fixed stall, Market Day doubling.
+### S05 · Staff and the shop-assistant job ⬜ · **Specs** SHOPS §6 · Needs the job framework (T17) for ranks; wages per in-game day.
+### S06 · Selling player-made goods to shops ⬜ · **Specs** SHOPS §3 · "Made by" tag, shop buying prices, both confirm.
+### S07 · Makers: baker and carpenter jobs ⬜ · **Specs** SHOPS §7, JOBS §3 · Depends T17, P01.
+### S08 · Shoplifting ⬜ · **Specs** SHOPS §8 · With M5 law (T43).
+
+---
+
 ## M1: greybox city + identity (finish)
 
 ### T03 · Spawn at the terminus ⬜
@@ -124,9 +192,11 @@ keep the scripts you touch to the list (or say why), run `tools/check_luau.py`, 
 - **Done when** (ROADMAP M2) a player buys a bicycle that persists; a second player rides in a
   cab and an omnibus; hitting a pedestrian never hurts them.
 
-### T15 · Shops and purchases ⬜
-- **Depends** T09 · **Size** S · Generic shop counter (prompt → item list → buy) used by the
-  bicycle shop now and tailors/showrooms later. Owned vehicles go in `profile.vehicles`.
+### T15 · Counter menu (buying from NPC sellers) ⬜
+- **Depends** T09, P01 · **Size** S · ROADMAP Phase 2 · A generic counter: prompt → list of items
+  with prices (from Config / `Shared.Items`) → buy into the bag or storage. Reused by estate agents
+  (P03), wholesale suppliers (S02), kiosks, the bicycle shop and tailors. Player-run shops (S01)
+  use the same menu with the shop's own stock and prices.
 
 ### T16 · Daily stipend and streak ⬜
 - **Specs** ECONOMY §4, PLAYER_GATHERING §4 · **Size** S · 1s, rising to 7s over a 7-day streak.
@@ -222,7 +292,7 @@ Mark progress in the table in `activities/README.md`.
 
 ## M6: property, wardrobe, motor cars
 
-### T47 · Leases and houses ⬜ · **Specs** PROPERTY_WARDROBE §1–2 · Per-server house assignment, locks, keys, layouts. Leases are account-wide (money is).
+### T47 · (replaced) Leases and houses → see **Property, building and shops** (P01–P10, S01–S08) above.
 ### T48 · Wardrobe and shops ⬜ · **Specs** PROPERTY_WARDROBE §3 · Owned outfits, role uniforms, dress codes. Builds on T06. 🔒 catalog items list (§4) for real clothing.
 ### T49 · Motor cars, fuel, breakdowns, motor engineer ⬜ · **Specs** VEHICLES §2, §5 · Depends T13.
 

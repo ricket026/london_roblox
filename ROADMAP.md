@@ -6,6 +6,73 @@
 > **character save slots** (built ahead of M1 at the user's request) and the **activity
 > framework + 4 activities** (pulled forward from M3, the user's priority).
 
+## The plan, step by step (2026-10-27)
+
+The order to build things in. Each step is a task in `TASKS.md`; a phase is done when its
+"done when" line is true in a Play-test. **Property and shops come next** (user, 2026-10-27), so
+they move ahead of vehicles and jobs; the economy core goes first because both need it.
+
+**Phase 1 · Finish what's built (now)**
+1. Install steps 1b–5 in the user's place and fix what the Play-test finds (T01).
+2. Merge `m1-identity` into `main` when the user says (T02).
+3. Spawn at the terminus (T03), a quick win while installing.
+*Done when* the character creator, roles, clock and four activities run with no errors.
+
+**Phase 2 · Economy core** (everything with money or goods needs it)
+1. Economy ledger `Economy.change` (T09), then wallet HUD (T10).
+2. Items and inventory: `Shared.Items`, bag and storage (P01).
+3. Generic counter menu for buying from NPC sellers (T15), reused by estate agents, suppliers and
+   shops.
+4. Bank deposits/withdrawals and hand-over transfers (T11).
+*Done when* a player buys an item at a counter, carries it, gives it to another player, and every
+penny shows in the ledger.
+
+**Phase 3 · Homes and building** (PROPERTY.md, BUILDING.md)
+1. Profile v3 with deeds and storage (P02).
+2. The kit: piece data and a builder that makes pieces from it (P04).
+3. Templates on every unused plot, so the whole city gets houses (P05).
+4. Estate agents: rent or buy, plot assignment per server, addresses (P03).
+5. Build mode: place / rotate / move / delete, the rules and the budget (P06), then save and load
+   on any lot of the kind (P07).
+6. Decorating: furniture, paint, wallpaper, storage, furniture bought from dealers (P08).
+7. Keys, locks, "At Home", visiting (P10), then "report this building" (P09).
+*Done when* a player rents a terrace house, builds and furnishes it, leaves, joins another server
+and finds it on a plot in the same district, and a friend with a key can visit.
+
+**Phase 4 · Shops and trade** (SHOPS.md)
+1. Shop settings, the till, opening and selling to players (S01).
+2. Wholesale suppliers and deliveries (S02).
+3. Basic NPC customers that walk in and buy (S03, the first slice of the NPC framework T24).
+4. Market stalls as the cheap first shop (S04).
+5. Staff and the shop-assistant job (S05), selling player-made goods to shops (S06).
+*Done when* a player opens a Soho shop, stocks it from the docks, sells to a player and to NPCs,
+and earns about £2 an hour of being open.
+
+**Phase 5 · Jobs** (JOBS.md, SHOPS §7)
+Job framework (T17), then jobs that feed shops first: baker and carpenter (S07), then
+lamplighter, constable, newsboy, cabbie and omnibus (T18–T23, cabbie and omnibus after Phase 7),
+first-join flow and goals (T25).
+
+**Phase 6 · Getting players together** (PLAYER_GATHERING.md)
+Hub appointments (T30), "What's on" across servers (T31, needs the place published), parties
+(T32), daily tasks and letters (T33).
+
+**Phase 7 · Vehicles**: framework, bicycle, hansom, omnibus, licences, shops for them, the
+townhouse mews (T13–T15, T21, T19–T20).
+
+**Phase 8 · The Court** (T34–T40) · **Phase 9 · Law** (T41–T46, + shoplifting S08 and burglary)
+· **Phase 10 · Parliament and events** (T50–T53) · **Phase 11 · Art, UI, all platforms, launch**
+(T54–T57 and the landmark track below; the art pass swaps the kit's greybox pieces for Blender
+meshes).
+
+**Lanes for working in parallel** (so several agents don't edit the same scripts):
+- *Lane A, critical path:* Phases 2 → 3 → 4 → 5 in order.
+- *Lane B, activities:* `activities/` batch A from now on (each activity is its own module).
+- *Lane C, Studio/Blender agent:* the map (plot `Front` attributes, curiosities placement),
+  landmark track, Blender versions of the kit pieces.
+
+## Milestone definitions (what each delivers; order above)
+
 Era: 1897. Each milestone ends with a Play test (0 console errors), screenshots, a short report,
 and the user's go-ahead before the next one.
 
@@ -103,7 +170,8 @@ role-locked outfits and tailor shop. Motor cars (showroom, fuel, breakdowns, mot
 motor licence), private carriages.
 **Done when:** rent a townhouse, store a car in its mews, lock the door, wear a bought outfit;
 all persist.
-- [ ] T47–T49 (T06 3D outfits is the base for the wardrobe).
+- [ ] Property moved earlier (Phases 3–4 above: P01–P10, S01–S08). Wardrobe T48 (T06 3D outfits is
+      its base) and motor cars T49 remain here.
 
 ### M7 — Parliament + events
 Sittings, bills on real levers (incl. speed limit and cab fares), votes, Lords delay, royal

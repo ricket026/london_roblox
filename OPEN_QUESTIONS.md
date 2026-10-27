@@ -27,6 +27,11 @@ Each open question has a **default** I'll use if you don't answer.
 | Slots | **First slot free; sharing progress into a new slot costs £100** in-game | 2026-10-27 |
 | Creator | **Name + look presets** (skin tone, hair, outfit) on the player's own face and body | 2026-10-27 |
 | Workflow | The user installs scripts **by copy-paste**; keep the number of scripts per change small and always say which to paste (CLAUDE.md) | 2026-10-27 |
+| Property | **Portable deeds**: own a kind of property in a district; it appears on a free plot of that kind in each server, the usual address when free | 2026-10-27 |
+| Property | **Rent or buy** homes and shops | 2026-10-27 |
+| Building | **Kit building + decorating** on your own plot (curated period pieces, grid, plot and height limits); replaces "no free-build in v1" | 2026-10-27 |
+| Shops | Shopkeepers sell **wholesale stock** and **player-made goods** | 2026-10-27 |
+| Priority | **Property and shops next**, ahead of vehicles and most jobs (ROADMAP "step by step") | 2026-10-27 |
 
 ## Still open
 

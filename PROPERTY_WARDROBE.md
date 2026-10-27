@@ -1,5 +1,9 @@
 # Property & Wardrobe spec
 
+> **§1–2 are replaced by `PROPERTY.md`, `BUILDING.md` and `SHOPS.md`** (user decisions
+> 2026-10-27: portable deeds that can be rented or bought, kit building + decorating, player
+> shops). Kept below for history. §3–4 (wardrobe) still apply.
+
 ## 1. Leases, not fixed addresses
 Many servers share one game, so a fixed house can't belong to one player everywhere. Instead:
 - Players rent a **lease** of a tier (Lodging / Flat / Townhouse), saved in the profile.

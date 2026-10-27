@@ -53,4 +53,7 @@ If two files conflict, **PLAYER_GATHERING.md wins** (getting players together is
 | [LAW.md](LAW.md) | Health/downed, crimes, arrest flow, courts, sentences, anti-abuse | M5 |
 | [COURT_PARLIAMENT.md](COURT_PARLIAMENT.md) | Precedence, seat limits, address, throne room, honours, decrees, elections, bills & levers | M4, M7 |
 | [EVENTS.md](EVENTS.md) | Event framework and every event | M4, M7 |
-| [PROPERTY_WARDROBE.md](PROPERTY_WARDROBE.md) | Leases, houses, staff, outfits, dress codes, items to source | M6 |
+| [PROPERTY.md](PROPERTY.md) | Homes and shops: portable deeds, rent or buy, plots per server, keys | Phase 3 |
+| [BUILDING.md](BUILDING.md) | The period building kit, build mode, decorating, limits, templates for every plot | Phase 3 |
+| [SHOPS.md](SHOPS.md) | Items and inventory, shopkeeping, wholesale, player-made goods, NPC customers | Phases 2, 4 |
+| [PROPERTY_WARDROBE.md](PROPERTY_WARDROBE.md) | Outfits, dress codes, items to source (§1–2 property replaced by the three above) | M6 |
