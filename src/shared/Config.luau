@@ -109,6 +109,7 @@ Config.OUTFITS = {
 Config.NAME_MIN = 2 -- characters in a first or last name
 Config.NAME_MAX = 14 -- characters in a first or last name
 Config.NAME_CHANGE_COOLDOWN = 60 * 60 * 24 * 7 -- seconds between renames of a character (from its creation)
+Config.NAME_FIX_GRACE = 60 * 10 -- a brand-new character may be renamed once within this many seconds (typos)
 Config.NAME_RATE = { count = 4, per = 20 } -- calls that run the text filter (create, link, rename) per player
 -- Words a name may not contain (lowercase): titles and ranks are granted, never typed (TECH §8).
 Config.NAME_RESERVED = {

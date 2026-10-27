@@ -45,6 +45,16 @@ local function fullName(slot: Types.Slot): string
 	return slot.name.first .. " " .. slot.name.last
 end
 
+-- Seconds until a slot may be renamed. A character never renamed gets one free fix within
+-- Config.NAME_FIX_GRACE of its creation; after that, Config.NAME_CHANGE_COOLDOWN applies.
+local function renameIn(slot: Types.Slot): number
+	local now = os.time()
+	if slot.name.changedAt == slot.createdAt and now - slot.createdAt < Config.NAME_FIX_GRACE then
+		return 0
+	end
+	return math.max(0, Config.NAME_CHANGE_COOLDOWN - (now - slot.name.changedAt))
+end
+
 -- How many slots point at a progress id.
 local function linkCount(p: Types.Profile, char: string): number
 	local n = 0
@@ -102,7 +112,7 @@ function Characters.list(player: Player): { [string]: any }
 				summary = summary(p.progress[s.char]),
 				linked = linkCount(p, s.char) > 1,
 				shared = linkCount(p, s.char), -- slots sharing this progress (incl. this one)
-				renameIn = math.max(0, Config.NAME_CHANGE_COOLDOWN - (os.time() - s.name.changedAt)),
+				renameIn = renameIn(s),
 			}
 		end
 	end
@@ -253,11 +263,12 @@ local function play(player: Player, p: Types.Profile, key: string)
 end
 
 local function newSlot(p: Types.Profile, key: string, char: string, first: string, last: string, look: Types.Look)
+	local now = os.time()
 	p.slots[key] = {
 		char = char,
-		name = { first = first, last = last, changedAt = os.time() },
+		name = { first = first, last = last, changedAt = now }, -- == createdAt marks "never renamed"
 		look = look,
-		createdAt = os.time(),
+		createdAt = now,
 	}
 end
 
@@ -357,7 +368,7 @@ function Characters.rename(player: Player, key: string, first: any, last: any): 
 	if not p or not slot then
 		return "That slot is empty."
 	end
-	local left = Config.NAME_CHANGE_COOLDOWN - (os.time() - slot.name.changedAt)
+	local left = renameIn(slot)
 	if left > 0 then
 		return string.format("This character can be renamed again in %d days.", math.ceil(left / 86400))
 	end
@@ -406,6 +417,12 @@ end
 
 -- Lifecycle ----------------------------------------------------------------------------------
 function Characters.onProfileLoaded(player: Player)
+	local p = Profiles.get(player)
+	if p then
+		for _, s in p.slots do
+			s.look = Looks.repair(s.look) -- a preset may have been removed from Config since it was saved
+		end
+	end
 	task.spawn(avatarDescription, player) -- warm the cache while they read the menu
 	pushList(player)
 end

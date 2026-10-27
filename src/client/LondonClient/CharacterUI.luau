@@ -245,7 +245,8 @@ refreshPicks = function()
 			local chosen = (pick :: any)[d:GetAttribute("Field") :: string] == d:GetAttribute("Value")
 			local isSwatch = d:GetAttribute("Field") == "skin"
 			if isSwatch then
-				local stroke = d:FindFirstChildOfClass("UIStroke") or make("UIStroke", d, { Thickness = 3 })
+				-- Border mode: on a TextButton a stroke outlines the text by default, and swatches have none
+				local stroke = d:FindFirstChildOfClass("UIStroke") or make("UIStroke", d, { Thickness = 3, ApplyStrokeMode = Enum.ApplyStrokeMode.Border })
 				stroke.Color = PICKED
 				stroke.Enabled = chosen
 			else
@@ -469,9 +470,13 @@ function CharacterUI.init()
 		while not player:GetAttribute("ProfileLoaded") do
 			task.wait(0.2)
 		end
-		local ok, res = Net.request("Character", "List")
-		if ok then
-			list = res
+		for _ = 1, 10 do -- a slow first request mustn't leave an empty menu
+			local ok, res = Net.request("Character", "List")
+			if ok and type(res) == "table" and res.loaded then
+				list = res
+				break
+			end
+			task.wait(1)
 		end
 		menuCamera()
 		if not player.Character then

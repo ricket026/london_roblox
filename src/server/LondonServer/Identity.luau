@@ -156,8 +156,10 @@ end
 
 -- Lifecycle --------------------------------------------------------------------------
 -- Back to the default role (frees any limited seat). Called when the character changes, so
--- a seat earned as one character isn't carried into another.
+-- a seat earned as one character isn't carried into another. Clears the role cooldown so the
+-- new character can pick a role at once (switching character has its own cooldown).
 function Identity.resetRole(player: Player)
+	switchedAt[player] = nil
 	if Roles.roleOf(player) ~= Config.DEFAULT_ROLE or player:GetAttribute(Roles.ROLE_ATTR) == nil then
 		setRole(player, Config.DEFAULT_ROLE)
 	end

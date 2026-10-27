@@ -21,6 +21,9 @@ STATUS
               Review fixes: duck stand off the shoreline, glints raycast under Blackfriars
               Bridge, tide sign off the parapet, bigger site boards, persisted pastime pay cap.
               Not yet Play-tested.
+  2026-10-27  Second review: role cooldown cleared on character switch, saved looks repaired
+              against Config on load, one free rename within Config.NAME_FIX_GRACE of creation,
+              skin swatch outline (UIStroke Border mode), character menu retries its first List.
 
 MODULES
   ReplicatedStorage.Shared
