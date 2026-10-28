@@ -25,20 +25,24 @@ Never paste a `.rbxmx` file or anything starting with `<roblox` into a script.
 | 1b | Name-tag fix | ⬜ re-paste Identity |
 | 2 | Station (role) menu | ⬜ |
 | 3 | World clock | ⬜ |
-| 4 | Activities (ducks, test your strength, mudlarking, chess) | ⬜ |
-| 5 | Debug commands for testing | ⬜ |
-| 6 | Money and things: wallet, bag, shop and bank counters, hand-overs (Phase 2) | ⬜ |
+| 4 | Money, things and 3D outfits: wallet, bag, shop and bank counters, hand-overs (Phase 2, T06) | ⬜ |
+| 5 | Activities (ducks, test your strength, mudlarking, chess) | ⬜ |
+| 6 | Debug commands, day/night lighting, arriving at the terminus (T07, T03) | ⬜ |
 | 7 | Homes and building: estate agents, rent/buy, plots, template houses, build mode, keys (Phase 3) | ⬜ |
-| 8 | Shops: tills, stock, suppliers, market stalls, NPC customers (Phase 4) | ⬜ |
-| 9 | Jobs: postman, newsboy, baker, carpenter, shop assistant, job tracker (Phase 5) | ⬜ |
-| 10 | 3D outfits and hats (T06) | ⬜ (needs step 6) |
+| 8 | Shops, jobs and gas lamps: tills, suppliers, stalls, postman, newsboy, lamplighter, baker, carpenter, shop assistant (Phases 4–5, T04) | ⬜ |
+
+Do the steps **in order**: each needs the ones before it (a script that waits for a missing one
+just hangs; `tools/check_install.py` checks this list against the code). The links always show
+the latest code, so do a step's pastes in one go.
 
 **Players → CharacterAutoLoads must be unticked** (Properties window). Players spawn only after
 picking a character.
 
-## Step 1b: name over the head
+## Step 1b: name over the head (and the newest settings)
 Replace the code of ServerScriptService › LondonServer › **Identity** with
-[src/server/LondonServer/Identity.luau](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Identity.luau).
+[src/server/LondonServer/Identity.luau](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Identity.luau),
+and the code of ReplicatedStorage › Shared › **Config** with
+[src/shared/Config.luau](https://github.com/ricket026/london_roblox/blob/m1-identity/src/shared/Config.luau) (it only adds settings; every later step uses them).
 
 ## Step 2: station (role) menu
 - New **ModuleScript** `IdentityUI` inside StarterPlayer › StarterPlayerScripts › **LondonClient**:
@@ -61,63 +65,19 @@ Test: after picking a character, a **Station** button appears bottom-left.
 
 Test: the time ("6:45 pm · Dusk") shows at the top and the sky changes.
 
-## Step 4: activities
-Needs step 3. Shared modules (all **ModuleScripts** inside ReplicatedStorage › **Shared**):
-[Collection](https://github.com/ricket026/london_roblox/blob/m1-identity/src/shared/Collection.luau),
-[Chess](https://github.com/ricket026/london_roblox/blob/m1-identity/src/shared/Chess.luau),
-[Meter](https://github.com/ricket026/london_roblox/blob/m1-identity/src/shared/Meter.luau).
-
-Server: a **ModuleScript** `Activities` inside **LondonServer**, with the code of
-[Activities/init.luau](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Activities/init.luau),
-then four **ModuleScripts** inside `Activities`:
-[Chess](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Activities/Chess.luau),
-[Ducks](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Activities/Ducks.luau),
-[Mudlark](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Activities/Mudlark.luau),
-[Strength](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Activities/Strength.luau).
-
-Client: a **ModuleScript** `Activities` inside **LondonClient**, with the code of
-[Activities/init.luau](https://github.com/ricket026/london_roblox/blob/m1-identity/src/client/LondonClient/Activities/init.luau),
-then two **ModuleScripts** inside it:
-[Chess](https://github.com/ricket026/london_roblox/blob/m1-identity/src/client/LondonClient/Activities/Chess.luau),
-[Strength](https://github.com/ricket026/london_roblox/blob/m1-identity/src/client/LondonClient/Activities/Strength.luau).
-(The server and client `Chess`/`Strength` are different scripts; don't mix them up.)
-
-Startup scripts: with steps 1–4 in, replace the code of **LondonServer** (the Script) and
-**LondonClient** (the LocalScript) entirely with the GitHub versions:
-[server](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/init.server.luau),
-[client](https://github.com/ricket026/london_roblox/blob/m1-identity/src/client/LondonClient/init.client.luau).
-From then on they match GitHub, and later steps only say which lines changed.
-
-Test: seed stand at the St James's Park lake (west shore), strength machine in Covent Garden,
-three chess tables by the bandstand, tide sign by the river stairs below the Temple.
-
-## Step 5: debug commands (Studio only)
-Replace LondonServer › **Debug** with
-[src/server/LondonServer/Debug.luau](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Debug.luau).
-Commands (Command Bar, set to **Server**):
-`game.ServerStorage.LondonDebug:Invoke("play", <userId>)`, `("givePence", <userId>, 24000)`,
-`("clock", 14.5)`, `("setRole", <userId>, "Judge")`.
-
-## Step 6: money and things (wallet, bag, counters, bank, hand-overs)
-Needs steps 1–5. Do it in this order: the new scripts first, then the replacements, then the two
-start-up scripts (a replaced script waits for the new ones, so adding them first avoids a hang).
+## Step 4: money, things and 3D outfits
+New scripts first, then the replacements, then the start-up lines (a replaced script waits for
+the new ones, so adding them first avoids a hang).
 
 **New ModuleScripts**
-- inside ReplicatedStorage › **Shared**: `Items` ([Items.luau](https://github.com/ricket026/london_roblox/blob/m1-identity/src/shared/Items.luau))
-- inside ServerScriptService › **LondonServer**: `Economy` ([Economy.luau](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Economy.luau)),
-  `Inventory` ([Inventory.luau](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Inventory.luau)),
-  `World` ([World.luau](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/World.luau)),
-  `Counters` ([Counters.luau](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Counters.luau)),
-  `Exchange` ([Exchange.luau](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Exchange.luau))
-- inside StarterPlayer › StarterPlayerScripts › **LondonClient**: `EconomyUI` ([EconomyUI.luau](https://github.com/ricket026/london_roblox/blob/m1-identity/src/client/LondonClient/EconomyUI.luau))
+- inside ReplicatedStorage › **Shared**: [Items](https://github.com/ricket026/london_roblox/blob/m1-identity/src/shared/Items.luau), [OutfitParts](https://github.com/ricket026/london_roblox/blob/m1-identity/src/shared/OutfitParts.luau)
+- inside ServerScriptService › **LondonServer**: [Economy](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Economy.luau), [Inventory](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Inventory.luau),
+  [World](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/World.luau), [Counters](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Counters.luau), [Exchange](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Exchange.luau), [Wardrobe](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Wardrobe.luau)
+- inside StarterPlayer › StarterPlayerScripts › **LondonClient**: [EconomyUI](https://github.com/ricket026/london_roblox/blob/m1-identity/src/client/LondonClient/EconomyUI.luau)
 
-**Replace the code of** (same place, same type):
-Shared › [Config](https://github.com/ricket026/london_roblox/blob/m1-identity/src/shared/Config.luau), Shared › [Types](https://github.com/ricket026/london_roblox/blob/m1-identity/src/shared/Types.luau),
+**Replace the code of** (same place, same type): Shared › [Config](https://github.com/ricket026/london_roblox/blob/m1-identity/src/shared/Config.luau), Shared › [Types](https://github.com/ricket026/london_roblox/blob/m1-identity/src/shared/Types.luau),
 LondonServer › [Profiles](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Profiles.luau) (save format v3; old saves upgrade themselves),
-LondonServer › [Characters](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Characters.luau),
-LondonServer › [Debug](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Debug.luau),
-LondonServer › **Activities** (the ModuleScript itself; code from [Activities/init.luau](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Activities/init.luau)),
-LondonServer › Activities › [Ducks](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Activities/Ducks.luau).
+LondonServer › [Characters](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Characters.luau), LondonServer › [WorldClock](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/WorldClock.luau).
 
 **LondonServer** (the Script):
 - under `local Characters = require(script:WaitForChild("Characters"))` add
@@ -139,47 +99,67 @@ LondonServer › Activities › [Ducks](https://github.com/ricket026/london_robl
 
 **LondonClient** (the LocalScript): delete the block that starts `local State = { pence = 0, bank = 0 }`
 and ends with the `end)` after `script:SetAttribute("Pence", State.pence)` (the wallet moved into
-EconomyUI), and under the `Activities` line add
+EconomyUI), and under the last `require(...).init()` line add
 ```lua
 require(script:WaitForChild("EconomyUI")).init() -- wallet, bag, counters, hand-overs (Phase 2)
 ```
-Or replace both start-up scripts entirely with the GitHub versions
-([server](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/init.server.luau), [client](https://github.com/ricket026/london_roblox/blob/m1-identity/src/client/LondonClient/init.client.luau)).
 
 Test (Play):
-- the wallet shows top right after picking a character, with "Bank 0d" under it;
-- **B** (or the Bag button) opens the bag;
-- the refreshment kiosk in St James's Park, near the chess tables, sells tea: buy two, then in the
-  bag **Hold** one and **Use** one;
+- characters wear 3D outfits: frock coat with tails and a top hat, tweed with a flat cap, dresses
+  with full skirts and bonnets. Walk, jump, sit: nothing catches. Tell me what looks wrong;
+- the wallet shows top right after picking a character, with "Bank 0d" under it; **B** (or Bag)
+  opens the bag;
+- the refreshment kiosk in St James's Park sells tea: buy two, **Hold** one, **Use** one;
 - the post office in Trafalgar Square pays money in and out;
-- the furniture warehouse outside Smithfield Market sends furniture to "stored at home";
-- with two players (Test › Clients and Servers, 2 players), stand together, **Bag › Give**, and
-  accept on the other player.
-Counter positions are first placements checked against the map file; move any that sit badly
-(Config.COUNTERS: x, z, yaw).
-Debug: `game.ServerStorage.LondonDebug:Invoke("giveItem", <userId>, "tea", 3)`, and
-`print(game.ServerStorage.LondonDebug:Invoke("ledger", <userId>))` for this session's money lines,
-`print(game.ServerStorage.LondonDebug:Invoke("totals"))` for money in and out of the server by reason.
+- with two players (Test › Clients and Servers), stand together, **Bag › Give**, accept.
+
+## Step 5: activities
+Shared modules (all **ModuleScripts** inside ReplicatedStorage › **Shared**):
+[Collection](https://github.com/ricket026/london_roblox/blob/m1-identity/src/shared/Collection.luau), [Chess](https://github.com/ricket026/london_roblox/blob/m1-identity/src/shared/Chess.luau), [Meter](https://github.com/ricket026/london_roblox/blob/m1-identity/src/shared/Meter.luau).
+
+Server: a **ModuleScript** `Activities` inside **LondonServer**, with the code of
+[Activities/init.luau](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Activities/init.luau), then four **ModuleScripts** inside `Activities`:
+[Chess](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Activities/Chess.luau), [Ducks](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Activities/Ducks.luau), [Mudlark](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Activities/Mudlark.luau), [Strength](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Activities/Strength.luau).
+
+Client: a **ModuleScript** `Activities` inside **LondonClient**, with the code of
+[Activities/init.luau](https://github.com/ricket026/london_roblox/blob/m1-identity/src/client/LondonClient/Activities/init.luau), then two **ModuleScripts** inside it:
+[Chess](https://github.com/ricket026/london_roblox/blob/m1-identity/src/client/LondonClient/Activities/Chess.luau), [Strength](https://github.com/ricket026/london_roblox/blob/m1-identity/src/client/LondonClient/Activities/Strength.luau).
+(The server and client `Chess`/`Strength` are different scripts; don't mix them up.)
+
+**LondonServer**: add `local Activities = require(script:WaitForChild("Activities"))` under the
+WorldClock line, `Activities.init()` under `WorldClock.init()`, and
+`Activities.onPlayerRemoving(player)` in the `PlayerRemoving` function.
+**LondonClient**: add `require(script:WaitForChild("Activities")).init()` above the EconomyUI line.
+
+Test: seed stand at the St James's Park lake (west shore), strength machine in Covent Garden,
+three chess tables by the bandstand, tide sign by the river stairs below the Temple.
+
+## Step 6: debug commands, day and night, arriving at the terminus
+Replace LondonServer › [Debug](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Debug.luau). (Steps 4's WorldClock and Characters already have
+the lighting and the terminus spawn.)
+
+In **LondonServer**, make sure Debug starts in Studio: the block
+`if RunService:IsStudio() then require(script:WaitForChild("Debug")).init() end` sits after the
+other `init()` lines.
+
+Commands (Command Bar, set to **Server**), e.g. `game.ServerStorage.LondonDebug:Invoke("play", <userId>)`:
+`("givePence", <userId>, 24000)`, `("clock", 19)` (dusk), `("weather", "fog")` (a pea-souper),
+`("setRole", <userId>, "Judge")`, `("giveItem", <userId>, "tea", 3)`,
+`print(game.ServerStorage.LondonDebug:Invoke("ledger", <userId>))`, `print(game.ServerStorage.LondonDebug:Invoke("totals"))`.
+
+Test: new characters arrive by the terminus platforms; `("clock", 21)` makes it night (darker, a
+blue haze); `("weather", "fog")` closes the view right in.
 
 ## Step 7: homes and building (estate agents, plots, build mode)
-Needs step 6, and **ServerStorage › MapLayoutData** (already in your place; it gives the plots
-their street side and address). New scripts first, then replacements, then the start-up lines.
+Needs **ServerStorage › MapLayoutData** (already in your place; it gives the plots their street
+side and address).
 
 **New ModuleScripts**
-- inside ReplicatedStorage › **Shared**: `Palette` ([Palette.luau](https://github.com/ricket026/london_roblox/blob/m1-identity/src/shared/Palette.luau)),
-  `Kit` ([Kit.luau](https://github.com/ricket026/london_roblox/blob/m1-identity/src/shared/Kit.luau))
-- inside ServerScriptService › **LondonServer**: `Lots` ([Lots.luau](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Lots.luau)),
-  `Builds` ([Builds.luau](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Builds.luau)),
-  `Property` ([Property.luau](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Property.luau))
-- inside StarterPlayer › StarterPlayerScripts › **LondonClient**: `BuildUI` ([BuildUI.luau](https://github.com/ricket026/london_roblox/blob/m1-identity/src/client/LondonClient/BuildUI.luau)),
-  `PropertyUI` ([PropertyUI.luau](https://github.com/ricket026/london_roblox/blob/m1-identity/src/client/LondonClient/PropertyUI.luau))
+- inside ReplicatedStorage › **Shared**: [Palette](https://github.com/ricket026/london_roblox/blob/m1-identity/src/shared/Palette.luau), [Kit](https://github.com/ricket026/london_roblox/blob/m1-identity/src/shared/Kit.luau)
+- inside ServerScriptService › **LondonServer**: [Lots](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Lots.luau), [Builds](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Builds.luau), [Property](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Property.luau)
+- inside StarterPlayer › StarterPlayerScripts › **LondonClient**: [BuildUI](https://github.com/ricket026/london_roblox/blob/m1-identity/src/client/LondonClient/BuildUI.luau), [PropertyUI](https://github.com/ricket026/london_roblox/blob/m1-identity/src/client/LondonClient/PropertyUI.luau)
 
-**Replace the code of**: Shared › [Config](https://github.com/ricket026/london_roblox/blob/m1-identity/src/shared/Config.luau),
-LondonServer › [Doors](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Doors.luau),
-LondonServer › [Economy](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Economy.luau),
-LondonServer › [World](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/World.luau),
-LondonClient › [EconomyUI](https://github.com/ricket026/london_roblox/blob/m1-identity/src/client/LondonClient/EconomyUI.luau).
-(If you're doing steps 6 and 7 together, the step 6 links are already the latest.)
+**Replace the code of**: LondonServer › [Doors](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Doors.luau).
 
 **LondonServer** (the Script):
 - under `local Exchange = require(script:WaitForChild("Exchange"))` add
@@ -209,8 +189,6 @@ LondonClient › [EconomyUI](https://github.com/ricket026/london_roblox/blob/m1-
 require(script:WaitForChild("BuildUI")).init() -- build mode (Phase 3)
 require(script:WaitForChild("PropertyUI")).init() -- estate agents, your properties, keys (Phase 3)
 ```
-Or replace both start-up scripts entirely with the GitHub versions
-([server](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/init.server.luau), [client](https://github.com/ricket026/london_roblox/blob/m1-identity/src/client/LondonClient/init.client.luau)).
 
 Test (Play):
 - every empty plot gets a plain template house (it builds in over a few seconds). If Studio
@@ -223,99 +201,51 @@ Test (Play):
   then **Put**), **R** turns it, **Select** + **Delete**, **Paint**, **Undo**. Take out a front-wall
   window: the house becomes a draft (others see the plain house); put a wall back and **Publish**;
 - **Exit** saves. Leave and rejoin: the same address and house come back.
-Things to look at closely (they can't be checked outside Studio): doors swing the right way,
-roofs slope up to the ridge, chairs face forward, the build camera, and frame rate with templates.
+Look closely at what can't be checked outside Studio: doors swing the right way, roofs slope
+up to the ridge, chairs face forward, the build camera, and frame rate with templates.
 
-## Step 8: shops, suppliers and market stalls
-Needs step 7.
-
+## Step 8: shops, jobs and gas lamps
 **New ModuleScripts**
-- inside ServerScriptService › **LondonServer**: `Shops` ([Shops.luau](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Shops.luau))
-- inside StarterPlayer › StarterPlayerScripts › **LondonClient**: `ShopUI` ([ShopUI.luau](https://github.com/ricket026/london_roblox/blob/m1-identity/src/client/LondonClient/ShopUI.luau))
+- inside ReplicatedStorage › **Shared**: [Ranks](https://github.com/ricket026/london_roblox/blob/m1-identity/src/shared/Ranks.luau)
+- inside ServerScriptService › **LondonServer**: [Lamps](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Lamps.luau), [Jobs](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Jobs.luau), [Shops](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Shops.luau)
+- inside StarterPlayer › StarterPlayerScripts › **LondonClient**: [ShopUI](https://github.com/ricket026/london_roblox/blob/m1-identity/src/client/LondonClient/ShopUI.luau), [JobUI](https://github.com/ricket026/london_roblox/blob/m1-identity/src/client/LondonClient/JobUI.luau)
 
-**Replace the code of**: Shared › [Config](https://github.com/ricket026/london_roblox/blob/m1-identity/src/shared/Config.luau),
-LondonServer › [Counters](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Counters.luau),
-LondonServer › [Economy](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Economy.luau),
-LondonClient › [EconomyUI](https://github.com/ricket026/london_roblox/blob/m1-identity/src/client/LondonClient/EconomyUI.luau).
-(Doing steps 6–8 together? The earlier links are already the latest.)
+**Replace the code of**: Shared › [Stations](https://github.com/ricket026/london_roblox/blob/m1-identity/src/shared/Stations.luau) (new roles: Lamplighter's already there;
+Baker, Carpenter, Shop Assistant).
+
+From here the two start-up scripts can simply be **replaced entirely** with the GitHub versions
+([server](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/init.server.luau), [client](https://github.com/ricket026/london_roblox/blob/m1-identity/src/client/LondonClient/init.client.luau)). Or add the lines by hand:
 
 **LondonServer** (the Script):
+- under `local WorldClock = require(script:WaitForChild("WorldClock"))` add
+  `local Lamps = require(script:WaitForChild("Lamps"))`
 - under `local Property = require(script:WaitForChild("Property"))` add
-  `local Shops = require(script:WaitForChild("Shops"))`
-- under `Property.init()` add `Shops.init()`
+  ```lua
+  local Shops = require(script:WaitForChild("Shops"))
+  local Jobs = require(script:WaitForChild("Jobs"))
+  ```
+- under `Property.init()` add `Shops.init()` and `Jobs.init()`; under `WorldClock.init()` add `Lamps.init()`
 - above `Property.onPlayerRemoving(player)` add `Shops.onPlayerRemoving(player)`
 - in the `game:BindToClose(function()` block, add `Shops.closeAll()` as its first line.
 
 **LondonClient** (the LocalScript): under the `PropertyUI` line add
 ```lua
 require(script:WaitForChild("ShopUI")).init() -- shop tills, market stalls, suppliers (Phase 4)
-```
-Or replace both start-up scripts with the GitHub versions
-([server](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/init.server.luau), [client](https://github.com/ricket026/london_roblox/blob/m1-identity/src/client/LondonClient/init.client.luau)).
-
-Test (Play; two players for buying: Test › Clients and Servers):
-- **Buy** a shop at the Covent Garden estate agent (£200; give yourself money first);
-- in build mode add a **Counter with Till** and a **Display Case** (buy them at the Furniture
-  Warehouse outside Smithfield Market first: they go to storage);
-- buy stock at a supplier (Spitalfields Wholesale, 5 am–2 pm in-game; Docks Warehouse 7 am–7 pm):
-  carry it, or have it delivered to storage;
-- at your till: **Add all** from the bag, **Open**; the other player buys at the till; set a
-  price, a trade and a sign (it appears on the shopfront);
-- walk away: the shop closes and the till goes to your bank;
-- a market stall in Covent Garden piazza (south of the market hall) or Spitalfields: **Rent this
-  stall**, put stock out, open.
-
-## Step 9: jobs (postman, newsboy, baker, carpenter, shop assistant)
-Needs step 8.
-
-**New ModuleScripts**
-- inside ReplicatedStorage › **Shared**: `Ranks` ([Ranks.luau](https://github.com/ricket026/london_roblox/blob/m1-identity/src/shared/Ranks.luau))
-- inside ServerScriptService › **LondonServer**: `Jobs` ([Jobs.luau](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Jobs.luau))
-- inside StarterPlayer › StarterPlayerScripts › **LondonClient**: `JobUI` ([JobUI.luau](https://github.com/ricket026/london_roblox/blob/m1-identity/src/client/LondonClient/JobUI.luau))
-
-**Replace the code of**: Shared › [Config](https://github.com/ricket026/london_roblox/blob/m1-identity/src/shared/Config.luau),
-Shared › [Stations](https://github.com/ricket026/london_roblox/blob/m1-identity/src/shared/Stations.luau) (new roles Baker, Carpenter, Shop Assistant),
-Shared › [Types](https://github.com/ricket026/london_roblox/blob/m1-identity/src/shared/Types.luau),
-LondonServer › [Profiles](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Profiles.luau),
-LondonServer › [Shops](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Shops.luau),
-LondonClient › [ShopUI](https://github.com/ricket026/london_roblox/blob/m1-identity/src/client/LondonClient/ShopUI.luau).
-
-**LondonServer** (the Script):
-- under `local Shops = require(script:WaitForChild("Shops"))` add
-  `local Jobs = require(script:WaitForChild("Jobs"))`
-- under `Shops.init()` add `Jobs.init()`
-
-**LondonClient** (the LocalScript): under the `ShopUI` line add
-```lua
 require(script:WaitForChild("JobUI")).init() -- job tracker (Phase 5)
 ```
 
-Test (Play):
-- **Station › Postman**: a tracker appears top left with a marker over the nearest post office;
-  hold the prompt there, then at each door. The round pays 1s 6d (more at higher ranks);
-- **Station › Newsboy**: collect at the newsagent by Horse Guards, sell on the corners;
-- **Station › Baker**: buy flour at Spitalfields Wholesale (lots of 5), then bake at the
-  Bakehouse in Spitalfields market: loaves "made by" you, to sell to a shop or a stall;
-- **Station › Carpenter**: timber from the Docks Warehouse, make furniture at the Carpenter's
-  Workshop in Finsbury Circus (it goes to storage);
-- **Shop Assistant**: with a Till key to someone's shop, mind their till while it's open; the
-  owner sets your wage in the till menu.
-
-## Step 10: 3D outfits and hats
-Needs step 6 (the new Characters script uses Economy). Can go before or after steps 7–9.
-
-**New scripts**
-- ModuleScript `OutfitParts` inside ReplicatedStorage › **Shared**: [OutfitParts.luau](https://github.com/ricket026/london_roblox/blob/m1-identity/src/shared/OutfitParts.luau)
-- ModuleScript `Wardrobe` inside ServerScriptService › **LondonServer**: [Wardrobe.luau](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Wardrobe.luau)
-
-**Replace the code of**: Shared › [Config](https://github.com/ricket026/london_roblox/blob/m1-identity/src/shared/Config.luau) (outfit trim and hat
-colours), LondonServer › [Characters](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Characters.luau).
-
-No start-up script lines: Characters uses Wardrobe itself.
-
-Test (Play): make or pick characters in each of the six outfits. The frock coat has tails, a
-waistcoat and a top hat; the tweed suit and working clothes have flat caps; the dresses have
-full skirts, puffed sleeves and a bonnet, a feathered hat or a mob cap and apron. Walk, jump and
-sit on a bench: nothing should catch or push. Tell me what looks wrong (too big, clipping,
-floating) and I'll tune the sizes in OutfitParts.
-
+Test (Play; two players for buying: Test › Clients and Servers):
+- **gas lamps** line every street; `("clock", 18.5)` (dusk): they're dark until lit; **Station ›
+  Lamplighter** gives a round of lamps to light (hold at each pole). Lamps nobody lights come on
+  by themselves three in-game hours into dusk, and go out the same way after dawn;
+- **Station › Postman**: a tracker top left and a marker over the nearest post office; hold the
+  prompt there, then at each door. **Newsboy**: collect at the newsagent by Horse Guards, sell
+  on the corners;
+- **Buy** a shop at the Covent Garden estate agent; in build mode add a **Counter with Till** and a
+  **Display Case** (from the Furniture Warehouse outside Smithfield Market); buy stock at a supplier
+  (Spitalfields Wholesale 5 am–2 pm in-game, Docks Warehouse 7 am–7 pm); at your till **Add all**,
+  **Open**; the other player buys; set a price, a trade and a sign; walk away and the till banks;
+- a **market stall** south of Covent Garden market hall or in Spitalfields: rent it, stock it, open;
+- **Baker**: flour from Spitalfields Wholesale, bake at the Bakehouse there; **Carpenter**: timber
+  from the Docks Warehouse, make furniture at the workshop in Finsbury Circus; **Shop Assistant**:
+  with a Till key, mind someone's open shop; the owner sets your wage at the till.

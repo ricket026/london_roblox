@@ -72,7 +72,10 @@ MODULES
              in workspace.Activities from Config coordinates (Y by raycast). Remotes:
              Activity.StrengthSwing / ChessMove / ChessResign.
     WorldClock (M1) shared clock from server time (Config.DAY_MINUTES), drives Lighting.ClockTime,
-             Lighting attr "Phase", WorldClock.PhaseChanged for lamplighters (M3).
+             Lighting attr "Phase", WorldClock.PhaseChanged for lamplighters (M3). Tweens
+             Lighting + Atmosphere per phase (Config.LIGHTING); setWeather clear/rain/fog.
+    Lamps    gas lamps built along MapLayoutData's roads (Config.LAMP_*), tag "Lamp", attrs
+             Route/Lit; lamplighters (Jobs) or the city's fallback light and put them out.
     Economy (Phase 2) the money ledger: every change has a reason (REASONS: faucet / sink / move),
              change/pay/charge (wallet then bank, all or nothing), deposit/withdraw, transfer
              (new accounts: Config.NEW_ACCOUNT_DAILY_TRANSFER a day), recent lines + server totals,

@@ -4,9 +4,12 @@
 -- cross-server "What's on" feed (M3b) and clock-time events line up. Drives Lighting.ClockTime
 -- (replicates to clients) and sets Lighting attribute "Phase" (Dawn / Day / Dusk / Night).
 -- Other systems: WorldClock.hour(), WorldClock.phase(), WorldClock.PhaseChanged:Connect(fn(name)).
+-- Each phase tweens Lighting and the Atmosphere to Config.LIGHTING (art/style.md §6, TASKS T07);
+-- WorldClock.setWeather("clear" | "rain" | "fog") adds Config.WEATHER on top (events, pea-soupers).
 local Lighting = game:GetService("Lighting")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
 
 local Config = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Config"))
 
@@ -16,6 +19,53 @@ WorldClock.PhaseChanged = phaseEvent.Event
 
 local debugShift = 0 -- hours added in Studio by WorldClock.debugSetHour
 local currentPhase = ""
+local weather = "clear"
+
+local function rgb(t: { number }): Color3
+	return Color3.fromRGB(t[1], t[2], t[3])
+end
+
+local function atmosphere(): Atmosphere
+	local a = Lighting:FindFirstChildOfClass("Atmosphere")
+	if a then
+		return a
+	end
+	local made = Instance.new("Atmosphere")
+	made.Parent = Lighting
+	return made
+end
+
+-- Tweens the sky to the phase's look plus the weather.
+local function applyLook(instant: boolean?)
+	local look = Config.LIGHTING[currentPhase]
+	if not look then
+		return
+	end
+	local w = Config.WEATHER[weather] or Config.WEATHER.clear
+	local info = TweenInfo.new(if instant then 0 else Config.LIGHTING_TWEEN, Enum.EasingStyle.Sine)
+	TweenService:Create(Lighting, info, { Brightness = look.brightness * w.brightness, OutdoorAmbient = rgb(look.ambient) }):Play()
+	TweenService:Create(atmosphere(), info, {
+		Density = math.min(1, look.density + w.density),
+		Haze = look.haze,
+		Glare = look.glare,
+		Color = rgb(w.colour or look.colour),
+	}):Play()
+end
+
+-- "clear", "rain" or "fog" (Config.WEATHER); the sky changes at once (over LIGHTING_TWEEN).
+function WorldClock.setWeather(kind: string): boolean
+	if not Config.WEATHER[kind] then
+		return false
+	end
+	weather = kind
+	Lighting:SetAttribute("Weather", kind)
+	applyLook()
+	return true
+end
+
+function WorldClock.weather(): string
+	return weather
+end
 
 -- In-game hour, 0 <= h < 24.
 function WorldClock.hour(): number
@@ -43,8 +93,10 @@ local function update()
 	Lighting.ClockTime = h
 	local p = WorldClock.phaseAt(h)
 	if p ~= currentPhase then
+		local first = currentPhase == ""
 		currentPhase = p
 		Lighting:SetAttribute("Phase", p)
+		applyLook(first)
 		phaseEvent:Fire(p)
 	end
 end
@@ -62,6 +114,7 @@ end
 
 function WorldClock.init()
 	Lighting:SetAttribute("DayMinutes", Config.DAY_MINUTES)
+	Lighting:SetAttribute("Weather", weather)
 	update()
 	task.spawn(function()
 		while true do

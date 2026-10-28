@@ -19,7 +19,7 @@ they move ahead of vehicles and jobs; the economy core goes first because both n
 *Done when* the character creator, roles, clock and four activities run with no errors.
 
 **Phase 2 · Economy core** (everything with money or goods needs it) · *code written 2026-10-28,
-INSTALL step 6, awaiting a Play-test*
+INSTALL step 4, awaiting a Play-test*
 1. Economy ledger `Economy.change` (T09), then wallet HUD (T10).
 2. Items and inventory: `Shared.Items`, bag and storage (P01).
 3. Generic counter menu for buying from NPC sellers (T15), reused by estate agents, suppliers and
@@ -52,7 +52,7 @@ selling made goods wait for T24/T17/S07), INSTALL step 8, awaiting a Play-test*
 and earns about £2 an hour of being open.
 
 **Phase 5 · Jobs** (JOBS.md, SHOPS §7) · *framework, postman, newsboy, baker, carpenter and shop
-assistant written 2026-10-28, INSTALL step 9, awaiting a Play-test*
+assistant written 2026-10-28, INSTALL step 8, awaiting a Play-test*
 Job framework (T17), then jobs that feed shops first: baker and carpenter (S07), then
 lamplighter, constable, newsboy, cabbie and omnibus (T18–T23, cabbie and omnibus after Phase 7),
 first-join flow and goals (T25).

@@ -1,6 +1,6 @@
 --!strict
 -- LondonServer.Jobs: the job framework (JOBS.md §1) and the first two jobs, Postman and Newsboy.
--- Jobs here: Postman, Newsboy, and the makers Baker and Carpenter (steps that use up `need` from the
+-- Jobs here: Postman, Newsboy, Lamplighter (LondonServer.Lamps), and the makers Baker and Carpenter (steps that use up `need` from the
 -- bag and make `give`, tagged "made by" the player: SHOPS §3, §7).
 -- A job is a station role (Shared.Stations; chosen in the role menu, and Identity applies the
 -- switch cooldown): holding the role is being on duty. On duty the server hands out tasks, each a
@@ -30,6 +30,7 @@ local Counters = require(script.Parent:WaitForChild("Counters"))
 local Inventory = require(script.Parent:WaitForChild("Inventory"))
 local World = require(script.Parent:WaitForChild("World"))
 local Lots = require(script.Parent:WaitForChild("Lots"))
+local Lamps = require(script.Parent:WaitForChild("Lamps"))
 
 local Jobs = {}
 Jobs.rng = Random.new()
@@ -37,6 +38,8 @@ Jobs.rng = Random.new()
 export type Step = {
 	kind: string, pos: Vector3, radius: number, seconds: number, text: string, action: string, pay: number?,
 	need: { [string]: number }?, give: { [string]: number }?, -- items used up / made at this step
+	done: ((Player) -> ())?, -- server-side effect when the step is done (light a lamp...)
+	skip: (() -> boolean)?, -- true when the step no longer needs doing (someone else did it)
 }
 export type Task = { job: string, title: string, steps: { Step }, index: number, stepAt: number, pay: number, xp: number, ref: string }
 
@@ -45,6 +48,7 @@ local tasks: { [Player]: Task } = {}
 local duty: { [Player]: string } = {}
 local shift: { [Player]: number } = {}
 local lastSkip: { [Player]: number } = {}
+local idle: { [Player]: boolean } = {} -- told "no work" already (tell once, not every retry)
 
 function Jobs.register(jobId: string, start: (Player) -> Task?)
 	starters[jobId] = start
@@ -146,7 +150,10 @@ local function newTask(player: Player)
 	local t = start(player)
 	if not t then
 		tasks[player] = nil
-		Net.push(player, "Job", "Notice", { text = "No work here just now; trying again shortly." })
+		if not idle[player] then
+			idle[player] = true
+			Net.push(player, "Job", "Notice", { text = "No work just now; there will be some shortly." })
+		end
 		task.delay(Config.JOB_RETRY_SECONDS, function()
 			if duty[player] == job and not tasks[player] then
 				newTask(player)
@@ -155,6 +162,7 @@ local function newTask(player: Player)
 		pushTask(player)
 		return
 	end
+	idle[player] = nil
 	t.index, t.stepAt = 1, os.clock()
 	tasks[player] = t
 	pushTask(player)
@@ -182,10 +190,17 @@ local function advance(player: Player)
 		return
 	end
 	local s = t.steps[t.index]
+	if s.done then
+		s.done(player)
+	end
 	if s.pay then
 		Jobs.pay(player, t.job, s.pay, t.ref)
 	end
 	t.index += 1
+	-- steps someone else has done meanwhile are skipped (no pay)
+	while t.steps[t.index] and t.steps[t.index].skip and (t.steps[t.index].skip :: () -> boolean)() do
+		t.index += 1
+	end
 	t.stepAt = os.clock()
 	if t.index > #t.steps then
 		complete(player, t)
@@ -355,6 +370,51 @@ local function newsboy(player: Player): Task?
 	return { job = "Newsboy", title = "Bundle", steps = steps, index = 1, stepAt = 0, pay = def.bundleBonus, xp = def.xp, ref = def.depot }
 end
 
+-- Lamplighter: the nearest route with lamps to light (from dusk) or put out (from dawn) ----------
+local function lamplighter(player: Player): Task?
+	local def = Config.JOBS.Lamplighter
+	local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+	local here = if hrp and hrp:IsA("BasePart") then hrp.Position else Vector3.zero
+	local want = Lamps.wanted()
+	local best, bestD = nil, math.huge
+	for _, id in Lamps.routeIds() do
+		local n = Lamps.pending(id)
+		local first = Lamps.route(id)[1]
+		if n > 0 and first then
+			local d = (first.Position - here).Magnitude - n * 20 -- fuller routes are worth a walk
+			if d < bestD then
+				best, bestD = id, d
+			end
+		end
+	end
+	if not best then
+		return nil
+	end
+	local steps: { Step } = {}
+	local todo = {}
+	for _, lamp in Lamps.route(best) do
+		if lamp:GetAttribute("Lit") ~= want then
+			table.insert(todo, lamp)
+		end
+	end
+	for k, lamp in route(here, todo, function(l)
+		return l.Position
+	end) do
+		table.insert(steps, {
+			kind = "hold", pos = lamp.Position - Vector3.new(0, 7, 0), radius = 8, seconds = Config.LAMP_HOLD,
+			text = string.format("%s lamp %d of %d", if want then "Light" else "Put out", k, #todo),
+			action = if want then "Light" else "Put out", pay = def.lampPay,
+			done = function()
+				Lamps.setLit(lamp, want)
+			end,
+			skip = function()
+				return lamp:GetAttribute("Lit") == want or Lamps.wanted() ~= want
+			end,
+		})
+	end
+	return { job = "Lamplighter", title = if want then "Lighting round" else "Morning round", steps = steps, index = 1, stepAt = 0, pay = 0, xp = def.xp, ref = best }
+end
+
 -- Makers: one step at their workplace, using up `need` and making `give` -------------------------
 local function needText(need: { [string]: number }): string
 	local parts = {}
@@ -398,6 +458,7 @@ end
 function Jobs.init()
 	Jobs.register("Postman", postman)
 	Jobs.register("Newsboy", newsboy)
+	Jobs.register("Lamplighter", lamplighter)
 	Jobs.register("Baker", maker("Baker", "Bake"))
 	Jobs.register("Carpenter", maker("Carpenter", "Make"))
 	local V = Net.V
@@ -434,7 +495,7 @@ function Jobs.init()
 		watch(p)
 	end
 	Players.PlayerRemoving:Connect(function(p)
-		tasks[p], duty[p], shift[p], lastSkip[p] = nil, nil, nil, nil
+		tasks[p], duty[p], shift[p], lastSkip[p], idle[p] = nil, nil, nil, nil, nil
 	end)
 	-- "goto" steps finish themselves when you arrive
 	task.spawn(function()

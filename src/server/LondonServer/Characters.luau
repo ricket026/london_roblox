@@ -26,6 +26,7 @@ local Hobbies = require(Shared:WaitForChild("Hobbies"))
 local Types = require(Shared:WaitForChild("Types"))
 local Profiles = require(script.Parent:WaitForChild("Profiles"))
 local Wardrobe = require(script.Parent:WaitForChild("Wardrobe"))
+local World = require(script.Parent:WaitForChild("World"))
 local Economy = require(script.Parent:WaitForChild("Economy"))
 local Analytics = require(script.Parent:WaitForChild("Analytics"))
 local Identity = require(script.Parent:WaitForChild("Identity"))
@@ -213,6 +214,20 @@ function Characters.describe(player: Player, look: Types.Look): HumanoidDescript
 end
 
 -- Spawning ----------------------------------------------------------------------------------
+-- Where characters arrive (T03): around the terminus platforms marker (Map.JobSites), spread over
+-- Config.SPAWN_RADIUS, standing on the ground found by raycast, facing into the station.
+local spawnRng = Random.new()
+function Characters.spawnPoint(): CFrame
+	local map = workspace:FindFirstChild("Map")
+	local sites = map and map:FindFirstChild("JobSites")
+	local marker = sites and sites:FindFirstChild(Config.SPAWN_MARKER)
+	local centre = if marker and marker:IsA("BasePart") then marker.Position else Vector3.new(Config.SPAWN_POINT.x, 0, Config.SPAWN_POINT.z)
+	local a = spawnRng:NextNumber() * math.pi * 2
+	local r = math.sqrt(spawnRng:NextNumber()) * Config.SPAWN_RADIUS
+	local g = World.ground(centre.X + math.cos(a) * r, centre.Z + math.sin(a) * r)
+	return CFrame.new(g + Vector3.new(0, 3, 0)) * CFrame.Angles(0, a, 0)
+end
+
 function Characters.spawn(player: Player)
 	local slot = Profiles.activeSlot(player)
 	if not slot or player.Parent ~= Players then
@@ -227,6 +242,7 @@ function Characters.spawn(player: Player)
 	local character = player.Character
 	if character then
 		Wardrobe.dress(character, slot.look.outfit) -- the 3D outfit (T06)
+		character:PivotTo(Characters.spawnPoint()) -- the terminus platforms (T03)
 	end
 end
 

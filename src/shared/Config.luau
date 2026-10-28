@@ -147,6 +147,36 @@ Config.CLOCK_PHASES = { -- in-game hour each phase starts (lamplighters: JOBS §
 	{ name = "Dusk", hour = 18 },
 	{ name = "Night", hour = 20 },
 }
+-- Lighting per phase (art/style.md §6; TASKS T07): tweened by WorldClock when the phase changes.
+-- Atmosphere = the hazy, sooty London sky. Colours are RGB 0-255.
+Config.LIGHTING_TWEEN = 12 -- seconds a change of phase takes
+Config.LIGHTING = {
+	Dawn = { brightness = 1, ambient = { 100, 104, 112 }, density = 0.4, haze = 1.8, colour = { 170, 170, 175 }, glare = 0.1 },
+	Day = { brightness = 2, ambient = { 128, 124, 118 }, density = 0.32, haze = 1.6, colour = { 199, 190, 175 }, glare = 0 },
+	Dusk = { brightness = 1.2, ambient = { 110, 96, 90 }, density = 0.38, haze = 2, colour = { 190, 150, 120 }, glare = 0.4 },
+	Night = { brightness = 0.5, ambient = { 52, 56, 72 }, density = 0.45, haze = 2.2, colour = { 70, 74, 90 }, glare = 0 },
+}
+-- Weather for events (WorldClock.setWeather): added to the phase's atmosphere.
+Config.WEATHER = {
+	clear = { density = 0, brightness = 1 },
+	rain = { density = 0.05, brightness = 0.8 }, -- 20% darker
+	fog = { density = 0.4, brightness = 0.85, colour = { 170, 160, 110 } }, -- a pea-souper: ~60 studs
+}
+
+-- Gas lamps (TASKS T04, JOBS §2 Lamplighter) -------------------------------------------------
+Config.LAMP_SPACING = 120 -- studs between lamps along a road (alternating sides): ~730 lamps
+Config.LAMP_KERB = 1.5 -- studs from the kerb line onto the pavement
+Config.LAMP_ROUTE = 12 -- lamps per lamplighter route
+Config.LAMP_MIN_GAP = 30 -- studs: a lamp this close to another (junctions) isn't built
+Config.LAMP_LIGHT_RANGE = 18 -- studs a lit lamp lights (style.md: warm pools, few lights)
+Config.LAMP_LIGHT_COLOUR = { 255, 196, 120 }
+Config.LAMP_NPC_DELAY = 180 -- seconds into dusk / dawn before the city's own lamplighters do the rest
+Config.LAMP_HOLD = 1.5 -- seconds a lamplighter holds the pole to light or put out a lamp
+
+-- Spawning (TASKS T03): new and returning characters arrive on the terminus platforms
+Config.SPAWN_MARKER = "Spawn: terminus platforms" -- a part in Workspace.Map.JobSites
+Config.SPAWN_POINT = { x = 555, z = -1350 } -- used when the marker isn't there
+Config.SPAWN_RADIUS = 18 -- studs around the spawn point characters are spread over
 
 -- Activities (LondonServer.Activities, systems/ACTIVITIES.md) ----------------
 -- Sites are greybox map coordinates (map_layout_v2.json); Y comes from a raycast to the ground.
@@ -381,6 +411,8 @@ Config.JOBS = {
 	-- the carpenter makes one of `makes` each time (it goes to storage, like all furniture)
 	Carpenter = { pay = 6, xp = 18, cap = 600, hold = 8, workplace = "workshop_finsbury", need = { timber = 4 },
 		makes = { "table_dining", "sideboard", "bookcase", "desk", "wardrobe", "clock_long" } },
+	-- light a route of lamps from dusk, put it out from dawn (LondonServer.Lamps)
+	Lamplighter = { lampPay = 2, xp = 12, cap = 720 },
 	-- shop assistants are paid wages by the shop's owner (Shops), XP per sale they serve
 	ShopAssistant = { xpPerSale = 3, cap = 0 },
 }

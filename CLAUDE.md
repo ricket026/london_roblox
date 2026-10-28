@@ -19,7 +19,10 @@ contract, the pipeline, the asset list), decisions in `OPEN_QUESTIONS.md`. Modul
   - **End every change with install instructions**: for each script, its Studio location, type
     (Script / LocalScript / ModuleScript), new or replace, and the GitHub link. For the boot
     scripts (`LondonServer`, `LondonClient`) give the exact lines to add.
-  - **Update `INSTALL.md`** (status table + a new step) in the same commit.
+  - **Update `INSTALL.md`** (status table + a new step) in the same commit. Links show the
+    latest code, so a change to an already-listed script can make an earlier step need a later
+    one: run `tools/check_install.py` and move or merge steps until it passes. Only the last
+    step may say "replace the start-up scripts with the GitHub versions".
   - Never ask them to paste generated or `.rbxmx` text into a script. Don't build installers
     or generators for them (they asked for plain copy-paste).
 - Agents with Studio access (Studio MCP, TECH.md §1): any script you change in Studio must be
@@ -40,6 +43,7 @@ python3 tools/check_luau.py      # block/bracket balance, Module.field reference
 python3 tools/luau_test.py       # runs tests/*.luau against the real src/ modules (needs `pip install lupa`)
 python3 tools/chess_perft.py     # chess rules (Python port of Shared.Chess) vs standard counts
 python3 tools/check_sites.py     # Config map positions vs london.rbxl + map_layout (pip install lz4 zstandard)
+python3 tools/check_install.py   # INSTALL.md steps in a valid order for the latest code (no step needs a later one)
 ```
 All must pass before you commit. `luau_test.py` converts src/ to plain Lua (`tools/luau2lua.py`,
 same line numbers) and runs it with `tools/luau_prelude.lua` standing in for Roblox: instances,
@@ -95,7 +99,8 @@ same for UI modules. `ReplicatedStorage.Shared` holds modules both sides use.
 | Server: Economy, Inventory, Counters, Exchange, World | money ledger + bank, bag/storage + held item, NPC counters, hand-overs, map helpers |
 | Server: Lots, Builds, Property | plots (street side, address, claims, templates), player builds (edits, render, save), deeds (rent/buy, keys, doors) |
 | Server: Shops | property shops and market stalls: till, stock, prices, wages, NPC customers (suppliers are a Counters kind) |
-| Server: Jobs (+ Shared.Ranks) | job framework (duty by role, server-checked steps, pay caps, ranks) and Postman, Newsboy, Baker, Carpenter |
+| Server: Jobs (+ Shared.Ranks) | job framework (duty by role, server-checked steps, pay caps, ranks) and Postman, Newsboy, Lamplighter, Baker, Carpenter |
+| Server: Lamps | gas lamps along every road (from MapLayoutData), lit by lamplighters or the city's fallback |
 | Server: Admin, AdminLog, Analytics, Doors, Debug | M0 (Debug = Studio-only test bindable) |
 | Client: CharacterUI, IdentityUI, ClockHUD, Activities (+ Chess, Strength), EconomyUI, BuildUI, PropertyUI, ShopUI, JobUI | menus and HUD stubs |
 

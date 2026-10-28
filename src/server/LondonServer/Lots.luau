@@ -9,7 +9,7 @@
 --   Lots.claim(name, userId, deedId) -> bool   Lots.release(name)   Lots.claimOf(name) -> claim?
 --   Lots.choose(kind, preferred?, near?) -> name?       (PROPERTY §4 order)
 --   Lots.toLot(name, worldPos) -> x, y, z (studs)       Lots.inside(name, worldPos, margin?) -> bool
---   Lots.showTemplate(name) / Lots.hideTemplate(name)
+--   Lots.showTemplate(name) / Lots.hideTemplate(name)    Lots.roads() -> road segments
 local HttpService = game:GetService("HttpService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerStorage = game:GetService("ServerStorage")
@@ -36,9 +36,10 @@ local kindByType: { [string]: string } = {}
 local templateFolder: Folder? = nil
 
 -- Roads from the map layout (centre lines + class widths), in a coarse grid for nearest lookups.
-type Seg = { ax: number, az: number, bx: number, bz: number, half: number, name: string }
+export type Seg = { ax: number, az: number, bx: number, bz: number, half: number, pave: number, name: string, road: number }
 local CELL = 128
 local grid: { [number]: { Seg } } = {}
+local allSegs: { Seg } = {}
 local haveRoads = false
 
 local function cellKey(cx: number, cz: number): number
@@ -59,12 +60,14 @@ local function loadRoads()
 		warn("[Lots] couldn't read MapLayoutData: " .. tostring(data))
 		return
 	end
-	for _, r in data.roads do
+	for ri, r in data.roads do
 		local cls = data.classes[r.c]
 		local half = if cls then cls.w / 2 else 6
+		local pave = if cls then cls.p else 0
 		for s = 1, #r.p - 1 do
 			local a, b = r.p[s], r.p[s + 1]
-			local seg: Seg = { ax = a[1], az = a[2], bx = b[1], bz = b[2], half = half, name = r.n }
+			local seg: Seg = { ax = a[1], az = a[2], bx = b[1], bz = b[2], half = half, pave = pave, name = r.n, road = ri }
+			table.insert(allSegs, seg)
 			local pad = half + 60
 			for cx = math.floor((math.min(a[1], b[1]) - pad) / CELL), math.floor((math.max(a[1], b[1]) + pad) / CELL) do
 				for cz = math.floor((math.min(a[2], b[2]) - pad) / CELL), math.floor((math.max(a[2], b[2]) + pad) / CELL) do
@@ -184,6 +187,11 @@ local function numberStreets()
 			l.part:SetAttribute("LotAddress", string.format("No. %d, %s", k, street))
 		end
 	end
+end
+
+-- Every road centre-line segment from the map layout, in road order (for street furniture).
+function Lots.roads(): { Seg }
+	return allSegs
 end
 
 function Lots.get(name: string): Lot?

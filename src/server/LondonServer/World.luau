@@ -1,6 +1,7 @@
 --!strict
 -- LondonServer.World: small helpers for building things in the city from map coordinates.
---   World.ground(x, z, fromY?) -> Vector3   ground point by raycast, ignoring markers and built props
+--   World.ground(x, z, fromY?) -> Vector3, Material?   ground point by raycast (and what it hit),
+--                                            ignoring markers and built props
 --   World.part(props) -> BasePart            anchored part with properties (ClassName = "Seat" etc.)
 --   World.folder(name) -> Folder              a top-level folder in workspace (created once)
 --   World.near(player, pos, range) -> bool   is the player's character within range?
@@ -12,12 +13,12 @@ local World = {}
 
 -- Folders a ground ray must pass through: map markers and everything our systems build.
 World.SKIP_MAP = { "JobSites", "Labels", "CabRanks", "BusStops", "Routes", "Bounds", "Spawns", "Landmarks_Greybox" }
-World.SKIP_ROOT = { "Activities", "Counters", "Properties", "Shops", "LotTemplates" }
+World.SKIP_ROOT = { "Activities", "Counters", "Properties", "Shops", "LotTemplates", "Lamps" }
 
 local rayParams = RaycastParams.new()
 rayParams.FilterType = Enum.RaycastFilterType.Exclude
 
-function World.ground(x: number, z: number, fromY: number?): Vector3
+function World.ground(x: number, z: number, fromY: number?): (Vector3, Enum.Material?)
 	local skip: { Instance } = {}
 	local map = workspace:FindFirstChild("Map")
 	if map then
@@ -42,7 +43,10 @@ function World.ground(x: number, z: number, fromY: number?): Vector3
 	rayParams.FilterDescendantsInstances = skip
 	local top = fromY or 300
 	local hit = workspace:Raycast(Vector3.new(x, top, z), Vector3.new(0, -top - 300, 0), rayParams)
-	return if hit then hit.Position else Vector3.new(x, math.min(top, 0), z)
+	if hit then
+		return hit.Position, hit.Material
+	end
+	return Vector3.new(x, math.min(top, 0), z), nil
 end
 
 function World.part(props: { [string]: any }): BasePart

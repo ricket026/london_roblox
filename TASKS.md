@@ -22,9 +22,10 @@ keep the scripts you touch to the list (or say why), run `tools/check_luau.py`, 
 | ✅ | Station roles with seat limits + playtime gates, overhead tags | Not Play-tested |
 | ✅ | World clock (24-min day, phases) + clock HUD | Not Play-tested |
 | ✅ | Activity framework + ducks, test your strength, mudlarking, chess | Not Play-tested; chess rules pass perft |
-| ✅ | Phase 2 economy core: ledger, wallet HUD, bag, NPC counters, bank, hand-overs (T09, T10, T11, T15, P01) | Not Play-tested; `tests/test_economy*.luau`; INSTALL step 6 |
-| ✅ | 3D part outfits and hats for all six outfits (T06) | Not Play-tested; `tests/test_wardrobe.luau`; INSTALL step 10 |
-| ✅ | Phase 5 start: job framework (T17) + Postman, Newsboy (selling), Baker, Carpenter (S07), shop assistant wages (S05), job tracker | Not Play-tested; `tests/test_jobs.luau`, wages in `test_shops.luau`; INSTALL step 9 |
+| ✅ | Phase 2 economy core: ledger, wallet HUD, bag, NPC counters, bank, hand-overs (T09, T10, T11, T15, P01) | Not Play-tested; `tests/test_economy*.luau`; INSTALL step 4 |
+| ✅ | Streets: gas lamps (T04), lamplighter (T18), lighting by phase + weather (T07), terminus spawn (T03) | Not Play-tested; `tests/test_lamps.luau`; INSTALL steps 4, 6, 8 |
+| ✅ | 3D part outfits and hats for all six outfits (T06) | Not Play-tested; `tests/test_wardrobe.luau`; INSTALL step 4 |
+| ✅ | Phase 5 start: job framework (T17) + Postman, Newsboy (selling), Baker, Carpenter (S07), shop assistant wages (S05), job tracker | Not Play-tested; `tests/test_jobs.luau`, wages in `test_shops.luau`; INSTALL step 8 |
 | ✅ | Phase 4 shops: tills, stock, prices, trade, sign, staff by key, wholesale suppliers + delivery, NPC customers (at the till), market stalls (S01–S04; S05, S06 partly) | Not Play-tested; `tests/test_shops.luau`, `test_shop_ui.luau`; INSTALL step 8 |
 | ✅ | Phase 3 homes and building: kit, plots, templates, estate agents, rent/buy/sell, build mode, save/load, keys, locks, reports (P02–P07, P09; P08, P10 partly) | Not Play-tested; `tests/test_kit.luau`, `test_property.luau`, `test_build_ui.luau`; INSTALL step 7 |
 
@@ -129,7 +130,7 @@ economy core (T09, T10, T15, T11) comes first and is listed under M2 below.
 
 ## M1: greybox city + identity (finish)
 
-### T03 · Spawn at the terminus ⬜
+### T03 · Spawn at the terminus ✅ (2026-10-28: `Characters.spawnPoint`, around the JobSites marker; not Play-tested)
 - **Specs** LOW_POP §3 step 1, PLAYER_GATHERING §1 (terminus is a hub) · **Size** S
 - New characters and returning players spawn on the platforms (`Map.JobSites["Spawn: terminus
   platforms"]`, ~(555, ?, −1350)): add `SpawnLocation`s from code or pick a spot and set the
@@ -137,7 +138,7 @@ economy core (T09, T10, T15, T11) comes first and is listed under M2 below.
 - **Files** `Characters.luau`, `Config` (spawn points). **Done when** a new character appears on a
   platform, not at the old baseplate `SpawnLocation`.
 
-### T04 · Gas lamps on every street ⬜
+### T04 · Gas lamps on every street ✅ (2026-10-28: `LondonServer.Lamps`, ~700 lamps / ~1,400 parts; not Play-tested)
 - **Specs** JOBS §4 (tagged `Lamp`, `Route` attribute), §2 Lamplighter · **Size** M
 - Generate lamps along `Map.Roads` (the road graph in the place / `map_layout_v2.json` roads) at
   ~40-stud spacing on pavements, each with a `PointLight` (off), tag `Lamp`, attribute `Route`
@@ -154,7 +155,7 @@ economy core (T09, T10, T15, T11) comes first and is listed under M2 below.
   applaud, cheer (animation IDs in Config, 🔒 user publishes animations; fall back to none).
 - **Done when** two clients see each other's phrases without typing; works on touch/gamepad.
 
-### T06 · 3D part outfits and hats ✅ (2026-10-28, not Play-tested; INSTALL step 10)
+### T06 · 3D part outfits and hats ✅ (2026-10-28, not Play-tested; INSTALL step 4)
 - **Specs** PROPERTY_WARDROBE §3; designed with the user 2026-10-27 · **Size** M
 - Build each `Config.OUTFITS` entry from welded, massless, non-colliding parts sized from the
   character's limbs (frock coat tails + waistcoat + cravat + top hat; bell skirt + bodice +
@@ -166,7 +167,7 @@ economy core (T09, T10, T15, T11) comes first and is listed under M2 below.
   `Characters.spawn`. Hats come with the outfit (Q23 default). Play-test: proportions, clipping
   when sitting, the skirts with long strides; tune sizes in OutfitParts.
 
-### T07 · Day/night lighting, fog and weather ⬜
+### T07 · Day/night lighting, fog and weather 🟡 (phase lighting + `WorldClock.setWeather` clear/rain/fog done; rain particles and window glow to do)
 - **Specs** DESIGN §6.10, EVENTS (pea-souper) · **Size** S
 - Extend `WorldClock`: Atmosphere density/colour and Lighting brightness per phase (tween),
   thicker fog at night, light rain. Keep values in Config. Expose `WorldClock.setFog(level)` for
@@ -242,7 +243,7 @@ economy core (T09, T10, T15, T11) comes first and is listed under M2 below.
   and hold prompt. Anti-AFK is by design (pay only for server-checked steps) plus the hourly cap.
   Not yet: depots/uniforms/tools on going on duty, rank perks, training.
 
-### T18 · Lamplighter ⬜ · **Depends** T04, T17 · Dusk/dawn routes, repairs, NPC fallback 10 min after dusk.
+### T18 · Lamplighter ✅ (rounds from dusk and dawn, 2d a lamp, city fallback after Config.LAMP_NPC_DELAY; repairs wait for vandalism/events) · **Depends** T04, T17 · Dusk/dawn routes, repairs, NPC fallback 10 min after dusk.
 ### T19 · Cabbie ⬜ · **Depends** T14, T17, T21 · Meter fares (VEHICLES §8), hailing, NPC fares at ranks.
 ### T20 · Omnibus driver + conductor ⬜ · **Depends** T14, T17 · Fixed route (`Map.BusStops`), stop timing.
 ### T21 · Licences and the driving test ⬜ · **Specs** VEHICLES §6 · Public Carriage Office course, revocation.

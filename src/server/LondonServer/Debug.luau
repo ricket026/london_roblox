@@ -2,7 +2,7 @@
 -- LondonServer.Debug: Studio-only test bindable, ServerStorage.LondonDebug (never created live).
 -- From the Server datamodel: game.ServerStorage.LondonDebug:Invoke("givePence", userId, 120)
 -- Commands: profile, givePence, setStaff, rejoin, lockTest, raw, setRaw, admin, net, analytics,
--- setRole, clock, play, giveItem, ledger, totals.
+-- setRole, clock, play, giveItem, ledger, totals, weather.
 local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -45,6 +45,10 @@ local cmds: { [string]: (...any) -> any } = {
 	-- ledger(userId): this session's money lines, newest first
 	ledger = function(userId)
 		return HttpService:JSONEncode(Economy.recent(plr(userId)))
+	end,
+	-- weather(kind): "clear", "rain" or "fog" (a pea-souper)
+	weather = function(kind)
+		return WorldClock.setWeather(kind)
 	end,
 	-- totals(): money in (+) and out (-) of this server by reason since it started
 	totals = function()
