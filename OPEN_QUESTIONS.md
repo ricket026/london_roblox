@@ -45,7 +45,7 @@ Each open question has a **default** I'll use if you don't answer.
 | Q20 | **How many royal family members per server?** | 8 |
 | Q21 | **Money packs:** OK to let Robux money buy expensive vehicles, or should some things be earn-only? | Packs buy anything except licences and ranks; top vehicles also need a job rank |
 | Q22 | **Price of a fresh (unlinked) character in slots 2–3?** Only the £100 link price was set | Free (`Config.SLOT_NEW_PRICE = 0`) |
-| Q23 | **How should outfits be made?** 3D outfits built from parts (TASKS T06, discussed), catalog clothing IDs, or Blender meshes later. And are hats a separate choice? | 3D part outfits now (swappable for Blender meshes later); hats come with the outfit |
+| Q23 | **How should outfits be made?** 3D outfits built from parts (TASKS T06, discussed), catalog clothing IDs, or Blender meshes later. And are hats a separate choice? | **Built (2026-10-28) as the default:** 3D part outfits (swappable for Blender meshes later); hats come with the outfit. Say if you want a separate Hat choice |
 | Q24 | **Staff tools vs Q11 "no staff":** the M0 `Admin` module has moderator/admin levels and group ranks | Cut down to owner-only tools + automatic moderation |
 | Q25 | **Rent while you're away:** rent is weekly in real time (PROPERTY §3); a player who comes back after a month owes 4 weeks at once (or the tenancy has lapsed, build kept) | As built: rent keeps falling due; consider pausing it after 2 weeks away |
 | Q26 | **"At Home":** spec says visitors knock and the owner admits them | As built (v1): At Home simply unlocks the doors; knocking comes with the visiting task (P10) |

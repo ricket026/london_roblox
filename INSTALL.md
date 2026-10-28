@@ -31,6 +31,7 @@ Never paste a `.rbxmx` file or anything starting with `<roblox` into a script.
 | 7 | Homes and building: estate agents, rent/buy, plots, template houses, build mode, keys (Phase 3) | ⬜ |
 | 8 | Shops: tills, stock, suppliers, market stalls, NPC customers (Phase 4) | ⬜ |
 | 9 | Jobs: postman, newsboy, baker, carpenter, shop assistant, job tracker (Phase 5) | ⬜ |
+| 10 | 3D outfits and hats (T06) | ⬜ (needs step 6) |
 
 **Players → CharacterAutoLoads must be unticked** (Properties window). Players spawn only after
 picking a character.
@@ -299,4 +300,22 @@ Test (Play):
   Workshop in Finsbury Circus (it goes to storage);
 - **Shop Assistant**: with a Till key to someone's shop, mind their till while it's open; the
   owner sets your wage in the till menu.
+
+## Step 10: 3D outfits and hats
+Needs step 6 (the new Characters script uses Economy). Can go before or after steps 7–9.
+
+**New scripts**
+- ModuleScript `OutfitParts` inside ReplicatedStorage › **Shared**: [OutfitParts.luau](https://github.com/ricket026/london_roblox/blob/m1-identity/src/shared/OutfitParts.luau)
+- ModuleScript `Wardrobe` inside ServerScriptService › **LondonServer**: [Wardrobe.luau](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Wardrobe.luau)
+
+**Replace the code of**: Shared › [Config](https://github.com/ricket026/london_roblox/blob/m1-identity/src/shared/Config.luau) (outfit trim and hat
+colours), LondonServer › [Characters](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Characters.luau).
+
+No start-up script lines: Characters uses Wardrobe itself.
+
+Test (Play): make or pick characters in each of the six outfits. The frock coat has tails, a
+waistcoat and a top hat; the tweed suit and working clothes have flat caps; the dresses have
+full skirts, puffed sleeves and a bonnet, a feathered hat or a mob cap and apron. Walk, jump and
+sit on a bench: nothing should catch or push. Tell me what looks wrong (too big, clipping,
+floating) and I'll tune the sizes in OutfitParts.
 

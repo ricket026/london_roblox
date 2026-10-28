@@ -23,6 +23,7 @@ keep the scripts you touch to the list (or say why), run `tools/check_luau.py`, 
 | ✅ | World clock (24-min day, phases) + clock HUD | Not Play-tested |
 | ✅ | Activity framework + ducks, test your strength, mudlarking, chess | Not Play-tested; chess rules pass perft |
 | ✅ | Phase 2 economy core: ledger, wallet HUD, bag, NPC counters, bank, hand-overs (T09, T10, T11, T15, P01) | Not Play-tested; `tests/test_economy*.luau`; INSTALL step 6 |
+| ✅ | 3D part outfits and hats for all six outfits (T06) | Not Play-tested; `tests/test_wardrobe.luau`; INSTALL step 10 |
 | ✅ | Phase 5 start: job framework (T17) + Postman, Newsboy (selling), Baker, Carpenter (S07), shop assistant wages (S05), job tracker | Not Play-tested; `tests/test_jobs.luau`, wages in `test_shops.luau`; INSTALL step 9 |
 | ✅ | Phase 4 shops: tills, stock, prices, trade, sign, staff by key, wholesale suppliers + delivery, NPC customers (at the till), market stalls (S01–S04; S05, S06 partly) | Not Play-tested; `tests/test_shops.luau`, `test_shop_ui.luau`; INSTALL step 8 |
 | ✅ | Phase 3 homes and building: kit, plots, templates, estate agents, rent/buy/sell, build mode, save/load, keys, locks, reports (P02–P07, P09; P08, P10 partly) | Not Play-tested; `tests/test_kit.luau`, `test_property.luau`, `test_build_ui.luau`; INSTALL step 7 |
@@ -153,7 +154,7 @@ economy core (T09, T10, T15, T11) comes first and is listed under M2 below.
   applaud, cheer (animation IDs in Config, 🔒 user publishes animations; fall back to none).
 - **Done when** two clients see each other's phrases without typing; works on touch/gamepad.
 
-### T06 · 3D part outfits and hats ⬜
+### T06 · 3D part outfits and hats ✅ (2026-10-28, not Play-tested; INSTALL step 10)
 - **Specs** PROPERTY_WARDROBE §3; designed with the user 2026-10-27 · **Size** M
 - Build each `Config.OUTFITS` entry from welded, massless, non-colliding parts sized from the
   character's limbs (frock coat tails + waistcoat + cravat + top hat; bell skirt + bodice +
@@ -161,6 +162,9 @@ economy core (T09, T10, T15, T11) comes first and is listed under M2 below.
   spawn); `Characters.spawn` calls it. Same attach system can take Blender MeshParts later.
 - 🔒 OPEN_QUESTIONS Q23: hats as a separate creator choice (adds a "Hat" row) or part of the outfit?
 - **Done when** all six outfits look distinct on R15 and survive walking/jumping/sitting.
+- **Built:** `Shared.OutfitParts` (pieces relative to limb sizes) + server `Wardrobe`, called by
+  `Characters.spawn`. Hats come with the outfit (Q23 default). Play-test: proportions, clipping
+  when sitting, the skirts with long strides; tune sizes in OutfitParts.
 
 ### T07 · Day/night lighting, fog and weather ⬜
 - **Specs** DESIGN §6.10, EVENTS (pea-souper) · **Size** S

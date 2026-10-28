@@ -101,6 +101,8 @@ MODULES
              banks itself (shop_sale / npc_sale), NPC customers at the till (rng = Shops.rng).
              Remotes Shop.Menu/Buy/Open/Restock/Unstock/Price/Settings/BankTill/RentStall/
              LeaveStall; pushes Shop.Notice. Counters kind "supplier" = wholesale (Counter.Wholesale).
+    Wardrobe (T06) welds an outfit's 3D pieces onto a character after Characters.spawn
+             (folder "Outfit"; massless, no collisions or queries).
     Jobs     (Phase 5) the job framework: duty = holding a job's station role; tasks of steps
              ("goto" auto, "hold" via Job.Hold; need/give for makers) checked by the server;
              pay with the rank bonus (Shared.Ranks) inside Config.JOBS[job].cap per real hour
@@ -119,6 +121,7 @@ MODULES
     Chess    full chess rules (server authority, client move hints).
     Meter    timing meter curve shared by client and server.
     Ranks    (Phase 5) job rank maths (XP for rank n, rank for XP, pay multiplier).
+    OutfitParts (T06) the 3D pieces of each outfit, sized and placed relative to limbs.
     Items    (Phase 2) every item: name, category, base price, stack size, use text, holdable,
              furniture kit id, player-made.
     Palette  (Phase 3) art/style.md colours by id; builds save the index (append only).

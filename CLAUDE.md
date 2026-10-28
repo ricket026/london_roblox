@@ -86,6 +86,7 @@ same for UI modules. `ReplicatedStorage.Shared` holds modules both sides use.
 | Shared: Stations, Names, Looks, Hobbies, Collection, Chess, Meter | role table, name rules, look presets, hobby levels, collection items, chess rules, timing meter |
 | Shared: Items | every item: price, stack, use, holdable, furniture, player-made |
 | Shared: Kit, Palette | building kit pieces + rules + greybox geometry (art/kit.md is the contract), named colours |
+| Shared: OutfitParts + Server: Wardrobe | 3D part outfits and hats welded on at spawn (T06) |
 | Server: Profiles + Store | profile schema v3, session lock, autosave, mock store in Studio |
 | Server: Characters | save slots, creator, linked slots, spawning from a HumanoidDescription, respawn |
 | Server: Identity | per-server roles with seats, overhead name tags |

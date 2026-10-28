@@ -96,13 +96,16 @@ Config.HAIR_STYLES = { -- "own" keeps the player's Roblox hair; others list hair
 	{ id = "own", name = "My own hair", assets = {} },
 	{ id = "none", name = "No hair (wear a hat)", assets = {} },
 }
+-- coat / lower = body colours under the 3D outfit; trim = waistcoats, hat bands, brims; hat = the
+-- hat. The 3D pieces of each outfit are in Shared.OutfitParts (T06); shirt/pants/layered stay 0/{}
+-- until the user supplies catalog ids (never guess them).
 Config.OUTFITS = {
-	{ id = "frock", name = "Frock coat", coat = Color3.fromRGB(28, 28, 32), lower = Color3.fromRGB(70, 70, 76), shirt = 0, pants = 0, layered = {} },
-	{ id = "tweed", name = "Tweed suit", coat = Color3.fromRGB(110, 92, 66), lower = Color3.fromRGB(96, 80, 58), shirt = 0, pants = 0, layered = {} },
-	{ id = "work", name = "Working clothes", coat = Color3.fromRGB(78, 62, 48), lower = Color3.fromRGB(52, 48, 44), shirt = 0, pants = 0, layered = {} },
-	{ id = "daydress", name = "Day dress", coat = Color3.fromRGB(70, 40, 60), lower = Color3.fromRGB(70, 40, 60), shirt = 0, pants = 0, layered = {} },
-	{ id = "walking", name = "Walking costume", coat = Color3.fromRGB(34, 52, 70), lower = Color3.fromRGB(46, 60, 74), shirt = 0, pants = 0, layered = {} },
-	{ id = "plain", name = "Plain dress & apron", coat = Color3.fromRGB(96, 92, 86), lower = Color3.fromRGB(120, 112, 100), shirt = 0, pants = 0, layered = {} },
+	{ id = "frock", name = "Frock coat", coat = Color3.fromRGB(28, 28, 32), lower = Color3.fromRGB(70, 70, 76), trim = Color3.fromRGB(110, 30, 36), hat = Color3.fromRGB(22, 22, 24), shirt = 0, pants = 0, layered = {} },
+	{ id = "tweed", name = "Tweed suit", coat = Color3.fromRGB(110, 92, 66), lower = Color3.fromRGB(96, 80, 58), trim = Color3.fromRGB(150, 120, 70), hat = Color3.fromRGB(96, 80, 58), shirt = 0, pants = 0, layered = {} },
+	{ id = "work", name = "Working clothes", coat = Color3.fromRGB(78, 62, 48), lower = Color3.fromRGB(52, 48, 44), trim = Color3.fromRGB(78, 62, 48), hat = Color3.fromRGB(60, 56, 50), shirt = 0, pants = 0, layered = {} },
+	{ id = "daydress", name = "Day dress", coat = Color3.fromRGB(70, 40, 60), lower = Color3.fromRGB(70, 40, 60), trim = Color3.fromRGB(230, 220, 200), hat = Color3.fromRGB(70, 40, 60), shirt = 0, pants = 0, layered = {} },
+	{ id = "walking", name = "Walking costume", coat = Color3.fromRGB(34, 52, 70), lower = Color3.fromRGB(46, 60, 74), trim = Color3.fromRGB(180, 150, 160), hat = Color3.fromRGB(34, 52, 70), shirt = 0, pants = 0, layered = {} },
+	{ id = "plain", name = "Plain dress & apron", coat = Color3.fromRGB(96, 92, 86), lower = Color3.fromRGB(120, 112, 100), trim = Color3.fromRGB(236, 232, 222), hat = Color3.fromRGB(236, 232, 222), shirt = 0, pants = 0, layered = {} },
 }
 
 -- RP names (LondonServer.Characters, DESIGN §6.1) -----------------------------

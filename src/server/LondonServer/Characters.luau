@@ -25,6 +25,7 @@ local Looks = require(Shared:WaitForChild("Looks"))
 local Hobbies = require(Shared:WaitForChild("Hobbies"))
 local Types = require(Shared:WaitForChild("Types"))
 local Profiles = require(script.Parent:WaitForChild("Profiles"))
+local Wardrobe = require(script.Parent:WaitForChild("Wardrobe"))
 local Economy = require(script.Parent:WaitForChild("Economy"))
 local Analytics = require(script.Parent:WaitForChild("Analytics"))
 local Identity = require(script.Parent:WaitForChild("Identity"))
@@ -222,6 +223,10 @@ function Characters.spawn(player: Player)
 	if not ok then
 		warn(string.format("[Characters] spawn with look failed for %s: %s", player.Name, tostring(err)))
 		pcall(player.LoadCharacter, player) -- never leave a player without a body
+	end
+	local character = player.Character
+	if character then
+		Wardrobe.dress(character, slot.look.outfit) -- the 3D outfit (T06)
 	end
 end
 
