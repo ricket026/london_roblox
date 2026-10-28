@@ -254,7 +254,69 @@ Config.COUNTERS = {
 	{ id = "estate_holborn", kind = "estate", name = "Estate Agent, Holborn", x = -675, z = -1682, yaw = 0 }, -- Lincoln's Inn Fields
 	{ id = "estate_covent", kind = "estate", name = "Estate Agent, Covent Garden", x = -80, z = -1480, yaw = 90 },
 	{ id = "estate_eastend", kind = "estate", name = "Estate Agent, Spitalfields", x = -480, z = -2975, yaw = 180 },
+	-- wholesale suppliers (SHOPS §3): Config.WHOLESALE_SHARE of base, in lots; open hours are
+	-- in-game hours (from, to)
+	{ id = "supplier_covent", kind = "supplier", name = "Covent Garden Market", x = -70, z = -1400, yaw = 90, hours = { 4, 10 },
+		stock = { "violets", "rose", "apple", "orange" } },
+	{ id = "supplier_smithfield", kind = "supplier", name = "Smithfield Market", x = -605, z = -2132, yaw = 0, hours = { 4, 12 },
+		stock = { "pie", "sandwich" } },
+	{ id = "supplier_spitalfields", kind = "supplier", name = "Spitalfields Wholesale", x = -420, z = -3040, yaw = 0, hours = { 5, 14 },
+		stock = { "apple", "orange", "bun", "flour" } },
+	{ id = "supplier_docks", kind = "supplier", name = "Docks Warehouse", x = 600, z = -2900, yaw = 90, hours = { 7, 19 },
+		stock = { "tea", "coffee", "lemonade", "cloth", "spinning_top", "hoop_stick", "kite", "timber" } },
+	{ id = "supplier_clerkenwell", kind = "supplier", name = "Clerkenwell Workshops", x = -580, z = -2478, yaw = 0, hours = { 8, 18 },
+		stock = { "watering_can", "seed_packet", "fishing_rod_fine", "letter_paper", "calling_card", "newspaper", "smelling_salts", "motor_spirit" } },
+	-- market stalls (SHOPS §5): rented per in-game day, run like a small shop
+	{ id = "stall_cg_1", kind = "stall", name = "Market Stall", x = -200, z = -1470, yaw = 0 },
+	{ id = "stall_cg_2", kind = "stall", name = "Market Stall", x = -185, z = -1470, yaw = 0 },
+	{ id = "stall_cg_3", kind = "stall", name = "Market Stall", x = -170, z = -1470, yaw = 0 },
+	{ id = "stall_cg_4", kind = "stall", name = "Market Stall", x = -155, z = -1470, yaw = 0 },
+	{ id = "stall_sp_1", kind = "stall", name = "Market Stall", x = -490, z = -3010, yaw = 0 },
+	{ id = "stall_sp_2", kind = "stall", name = "Market Stall", x = -475, z = -3010, yaw = 0 },
+	{ id = "stall_sp_3", kind = "stall", name = "Market Stall", x = -460, z = -3010, yaw = 0 },
+	{ id = "stall_sp_4", kind = "stall", name = "Market Stall", x = -400, z = -3010, yaw = 0 },
 }
+
+-- Shops (SHOPS.md) ------------------------------------------------------------------------------
+-- Trades a shop may follow: which item categories (Shared.Items) it may stock and NPCs buy.
+Config.SHOP_TRADES = {
+	grocer = { name = "Grocer", cats = { "food", "ingredients" } },
+	baker = { name = "Baker", cats = { "food" } },
+	confectioner = { name = "Confectioner", cats = { "food" } },
+	florist = { name = "Florist", cats = { "flowers" } },
+	stationer = { name = "Stationer & Bookseller", cats = { "stationery" } },
+	toyshop = { name = "Toy Shop", cats = { "toys" } },
+	ironmonger = { name = "Ironmonger", cats = { "tools" } },
+	chemist = { name = "Chemist", cats = { "chemist" } },
+	furniture = { name = "Furniture Dealer", cats = { "furniture" } },
+}
+Config.SHOP_TRADE_ORDER = { "grocer", "baker", "confectioner", "florist", "stationer", "toyshop", "ironmonger", "chemist", "furniture" }
+Config.STALL_CATS = { "food", "flowers", "stationery", "toys", "tools", "chemist" } -- what a market stall may sell
+Config.SHOP_PRICE_MIN = 0.8 -- lowest price as a share of the item's base price
+Config.SHOP_PRICE_MAX = 3 -- highest price as a share of the item's base price
+Config.SHOP_TILL_RANGE = 20 -- studs from the till that count as minding the shop
+Config.SHOP_TILL_BANK_AT = 1200 -- pence in the till that bank themselves (£5)
+Config.SHOP_TRADE_CHANGE = 7 * 24 * 3600 -- seconds between changes of a shop's trade
+Config.SHOP_SIGN_MAX = 40 -- characters on a shop sign
+Config.SHOP_STOCK_STACKS = 40 -- different stacks a shop can hold
+Config.SHOP_RATE = { count = 10, per = 4 } -- shop calls per player
+Config.SHOP_CHECK_SECONDS = 5 -- how often open shops check someone is minding the till
+-- NPC customers (SHOPS §4, first slice: no walking NPCs yet, sales happen at the till)
+-- Tuned so a shop at base prices with some appeal nets about £1.5-2 a real hour after wholesale
+-- costs (SHOPS §4, ECONOMY §2); M9 retunes with real numbers.
+Config.SHOP_NPC_SECONDS = 15 -- how often each open shop may get an NPC customer
+Config.SHOP_NPC_CHANCE = 0.5 -- chance of a customer each time, before appeal, price and footfall
+Config.SHOP_NPC_SECOND_ITEM = 0.4 -- chance a customer buys two of the item instead of one
+Config.SHOP_NPC_HOURLY_CAP = 960 -- pence NPCs spend per shop per real hour (£4 of takings)
+Config.SHOP_NPC_QUIET_PLAYERS = 8 -- servers with fewer players than this get more NPC trade
+Config.SHOP_NPC_QUIET_BONUS = 1.5 -- ... this much more
+Config.SHOP_NPC_FOOTFALL_RANGE = 150 -- studs: players this close to a shop add footfall
+-- Wholesale (SHOPS §3)
+Config.WHOLESALE_SHARE = 0.6 -- supplier price as a share of base
+Config.WHOLESALE_LOTS = { 5, 10, 20 } -- lot sizes suppliers sell
+Config.DELIVERY_PRICE = 2 -- pence per lot delivered to your storage
+Config.DELIVERY_SECONDS = 60 -- real seconds a delivery takes (one in-game hour of a 24-minute day)
+Config.STALL_RENT = 6 -- pence per in-game day for a market stall
 
 -- Property (PROPERTY.md) ----------------------------------------------------------------------
 -- Kinds a player can rent or buy. lotType = the plots' LotType attribute (MapGreybox districts);

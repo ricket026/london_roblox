@@ -3,6 +3,7 @@
 -- here with a reason, so the game knows where money comes from (faucets) and goes (sinks).
 --   Economy.change(player, delta, reason, ref?)   wallet +/-; refuses to go below 0 (fines: to -DEBT_MAX)
 --   Economy.pay(player, pence, reason, ref?)      into the wallet
+--   Economy.payBank(player, pence, reason, ref?)  straight into the bank (a shop's till)
 --   Economy.charge(player, pence, reason, ref?, bankFirst?)   wallet then bank (or bank then
 --                                                 wallet: rent); all or nothing
 --   Economy.deposit / Economy.withdraw(player, pence)   wallet <-> bank
@@ -93,6 +94,21 @@ end
 function Economy.pay(player: Player, pence: number, reason: string, ref: string?): (boolean, string?)
 	assert(pence >= 0, "Economy.pay: negative amount")
 	return Economy.change(player, pence, reason, ref)
+end
+
+function Economy.payBank(player: Player, pence: number, reason: string, ref: string?): (boolean, string?)
+	local p = Profiles.get(player)
+	if not p then
+		return false, "Your profile isn't loaded yet."
+	end
+	assert(valid(reason, pence) and pence >= 0, "Economy.payBank: bad reason or amount")
+	if p.bank + pence > Config.PENCE_MAX then
+		return false, "The bank can't hold that much."
+	end
+	p.bank += pence
+	record(player, pence, reason, ref)
+	Profiles.pushWallet(player)
+	return true
 end
 
 -- From the wallet, then the bank (bankFirst: the other way round, for standing payments like

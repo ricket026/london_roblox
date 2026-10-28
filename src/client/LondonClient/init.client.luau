@@ -16,6 +16,7 @@ require(script:WaitForChild("Activities")).init()
 require(script:WaitForChild("EconomyUI")).init() -- wallet, bag, counters, hand-overs (Phase 2)
 require(script:WaitForChild("BuildUI")).init() -- build mode (Phase 3)
 require(script:WaitForChild("PropertyUI")).init() -- estate agents, your properties, keys (Phase 3)
+require(script:WaitForChild("ShopUI")).init() -- shop tills, market stalls, suppliers (Phase 4)
 
 Net.listen("Admin", "Notice", function(msg)
 	if type(msg.text) ~= "string" then

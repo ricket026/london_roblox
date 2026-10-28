@@ -29,6 +29,7 @@ Never paste a `.rbxmx` file or anything starting with `<roblox` into a script.
 | 5 | Debug commands for testing | ⬜ |
 | 6 | Money and things: wallet, bag, shop and bank counters, hand-overs (Phase 2) | ⬜ |
 | 7 | Homes and building: estate agents, rent/buy, plots, template houses, build mode, keys (Phase 3) | ⬜ |
+| 8 | Shops: tills, stock, suppliers, market stalls, NPC customers (Phase 4) | ⬜ |
 
 **Players → CharacterAutoLoads must be unticked** (Properties window). Players spawn only after
 picking a character.
@@ -222,4 +223,43 @@ Test (Play):
 - **Exit** saves. Leave and rejoin: the same address and house come back.
 Things to look at closely (they can't be checked outside Studio): doors swing the right way,
 roofs slope up to the ridge, chairs face forward, the build camera, and frame rate with templates.
+
+## Step 8: shops, suppliers and market stalls
+Needs step 7.
+
+**New ModuleScripts**
+- inside ServerScriptService › **LondonServer**: `Shops` ([Shops.luau](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Shops.luau))
+- inside StarterPlayer › StarterPlayerScripts › **LondonClient**: `ShopUI` ([ShopUI.luau](https://github.com/ricket026/london_roblox/blob/m1-identity/src/client/LondonClient/ShopUI.luau))
+
+**Replace the code of**: Shared › [Config](https://github.com/ricket026/london_roblox/blob/m1-identity/src/shared/Config.luau),
+LondonServer › [Counters](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Counters.luau),
+LondonServer › [Economy](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Economy.luau),
+LondonClient › [EconomyUI](https://github.com/ricket026/london_roblox/blob/m1-identity/src/client/LondonClient/EconomyUI.luau).
+(Doing steps 6–8 together? The earlier links are already the latest.)
+
+**LondonServer** (the Script):
+- under `local Property = require(script:WaitForChild("Property"))` add
+  `local Shops = require(script:WaitForChild("Shops"))`
+- under `Property.init()` add `Shops.init()`
+- above `Property.onPlayerRemoving(player)` add `Shops.onPlayerRemoving(player)`
+- in the `game:BindToClose(function()` block, add `Shops.closeAll()` as its first line.
+
+**LondonClient** (the LocalScript): under the `PropertyUI` line add
+```lua
+require(script:WaitForChild("ShopUI")).init() -- shop tills, market stalls, suppliers (Phase 4)
+```
+Or replace both start-up scripts with the GitHub versions
+([server](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/init.server.luau), [client](https://github.com/ricket026/london_roblox/blob/m1-identity/src/client/LondonClient/init.client.luau)).
+
+Test (Play; two players for buying: Test › Clients and Servers):
+- **Buy** a shop at the Covent Garden estate agent (£200; give yourself money first);
+- in build mode add a **Counter with Till** and a **Display Case** (buy them at the Furniture
+  Warehouse outside Smithfield Market first: they go to storage);
+- buy stock at a supplier (Spitalfields Wholesale, 5 am–2 pm in-game; Docks Warehouse 7 am–7 pm):
+  carry it, or have it delivered to storage;
+- at your till: **Add all** from the bag, **Open**; the other player buys at the till; set a
+  price, a trade and a sign (it appears on the shopfront);
+- walk away: the shop closes and the till goes to your bank;
+- a market stall in Covent Garden piazza (south of the market hall) or Spitalfields: **Rent this
+  stall**, put stock out, open.
 

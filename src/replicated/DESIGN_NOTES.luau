@@ -95,6 +95,12 @@ MODULES
              store (key u_<userId>_<deedId>, only while the owner's profile is open; never over a
              build that failed to load). Remotes Build.Enter/Exit/Place/Remove/Move/Paint/
              Publish/Starter; pushes State, Changed, Notice, Closed.
+    Shops    (Phase 4) property shops (deed.shop: trade, sign, prices, stock, till) and market
+             stalls (counter kind "stall", per server): till prompt on counter_till pieces,
+             open only while the owner is here and a seller is within SHOP_TILL_RANGE, till
+             banks itself (shop_sale / npc_sale), NPC customers at the till (rng = Shops.rng).
+             Remotes Shop.Menu/Buy/Open/Restock/Unstock/Price/Settings/BankTill/RentStall/
+             LeaveStall; pushes Shop.Notice. Counters kind "supplier" = wholesale (Counter.Wholesale).
     Property (Phase 3) deeds in profile.properties: estate agents (counter kind "estate"),
              rent (bank first, grace, lapse keeps the build), buy/sell back, placing on plots,
              10-min linger, keys (enter/decorate/build/sell), lock, At Home, name plate,
@@ -120,6 +126,7 @@ MODULES
     IdentityUI (stub) "Station" role menu bottom-left.
     ClockHUD   (stub) "6:45 pm · Dusk" at the top.
     Activities (stub) reward toasts + Strength meter + Chess board for seated players.
+    ShopUI     (stub) counter kinds "playershop", "stall", "supplier" in EconomyUI's panel.
     BuildUI    (stub) build mode: orbit camera, catalogue, ghost + reasons, undo/redo; draws
              drafts locally (hides the template here only).
     PropertyUI (stub) "Property" button: your properties, keys, name plate, Build; estate

@@ -8,6 +8,7 @@
 --     other systems add kinds with EconomyUI.onCounter(kind, fn(body, msg, order) -> nil).
 --   Offers to you: Exchange.Offered -> Accept / Decline (Exchange.Answer); Exchange.Closed.
 --   EconomyUI.toast(text) shows a short message at the bottom of the screen.
+--   EconomyUI.openCounter(msg) re-shows the counter panel (other modules refresh their menus).
 --   EconomyUI.ui: the plain widgets (text, button, line, row, panel, clear, counter, focus) for the
 --   other stub UIs (PropertyUI, BuildUI), so they share one look until the UI pass.
 local ContextActionService = game:GetService("ContextActionService")
@@ -534,6 +535,11 @@ local function openCounter(msg: { [string]: any })
 	renderCounter(msg)
 	counterPanel.Visible = true
 	focus(counterPanel:FindFirstChild("Close") :: GuiObject?)
+end
+
+-- Re-shows the counter panel with a fresh payload (other UIs, after an action).
+function EconomyUI.openCounter(msg: { [string]: any })
+	openCounter(msg)
 end
 
 -- Offers to me ------------------------------------------------------------------------------

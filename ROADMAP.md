@@ -41,7 +41,8 @@ knocking/visiting still to do), INSTALL step 7, awaiting a Play-test*
 *Done when* a player rents a terrace house, builds and furnishes it, leaves, joins another server
 and finds it on a plot in the same district, and a friend with a key can visit.
 
-**Phase 4 · Shops and trade** (SHOPS.md)
+**Phase 4 · Shops and trade** (SHOPS.md) · *code written 2026-10-28 (walking NPCs, wages and
+selling made goods wait for T24/T17/S07), INSTALL step 8, awaiting a Play-test*
 1. Shop settings, the till, opening and selling to players (S01).
 2. Wholesale suppliers and deliveries (S02).
 3. Basic NPC customers that walk in and buy (S03, the first slice of the NPC framework T24).
