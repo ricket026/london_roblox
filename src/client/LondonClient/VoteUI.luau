@@ -2,7 +2,7 @@
 -- LondonClient.VoteUI (stub): votes of no confidence and vote-kicks (DESIGN §10). Plain on purpose.
 --   A "Votes" button (top right, under Property): every player here, with "Kick" and, for those
 --   holding an office, "No confidence"; then a reason from the list, then Start.
---   While a vote runs, a box on the right for everyone: who, why, time left, the tally, Yes / No
+--   While a vote runs, a box low in the middle for everyone: who, why, time left, the tally, Yes / No
 --   (the one voted on sees it without the buttons).
 -- Server: LondonServer.Votes (Vote.Get / Start / Cast; pushes Open, Tally, Closed).
 local Players = game:GetService("Players")
@@ -165,17 +165,18 @@ function VoteUI.init()
 
 	box = Instance.new("Frame")
 	box.Name = "VoteBox"
-	box.AnchorPoint = Vector2.new(1, 0.5)
-	box.Position = UDim2.new(1, -12, 0.5, 20)
-	box.Size = UDim2.fromOffset(270, 124)
+	-- low in the middle: clear of the top-right buttons, above the room line and the toast
+	box.AnchorPoint = Vector2.new(0.5, 1)
+	box.Position = UDim2.new(0.5, 0, 1, -118)
+	box.Size = UDim2.fromOffset(300, 108)
 	box.BackgroundColor3 = C.PAPER
 	box.BackgroundTransparency = 0.1
 	box.BorderSizePixel = 0
 	box.Visible = false
 	box.Parent = gui
-	boxText = ui.text(box, "TextLabel", { Name = "Text", TextSize = 15, TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, Position = UDim2.fromOffset(8, 4), Size = UDim2.new(1, -16, 0, 78) })
-	yesB = ui.button(box, "Yes", { Name = "Yes", AnchorPoint = Vector2.new(1, 1), Position = UDim2.new(0.5, -4, 1, -6), Size = UDim2.fromOffset(110, 32) })
-	noB = ui.button(box, "No", { Name = "No", AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0.5, 4, 1, -6), Size = UDim2.fromOffset(110, 32) })
+	boxText = ui.text(box, "TextLabel", { Name = "Text", TextSize = 15, TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, Position = UDim2.fromOffset(8, 4), Size = UDim2.new(1, -16, 0, 62) })
+	yesB = ui.button(box, "Yes", { Name = "Yes", AnchorPoint = Vector2.new(1, 1), Position = UDim2.new(0.5, -4, 1, -6), Size = UDim2.fromOffset(110, 30) })
+	noB = ui.button(box, "No", { Name = "No", AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0.5, 4, 1, -6), Size = UDim2.fromOffset(110, 30) })
 	yesB.Activated:Connect(function()
 		cast(true)
 	end)

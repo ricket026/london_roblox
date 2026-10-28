@@ -214,7 +214,7 @@ function ThroneRoomUI.init()
 	status = ui.text(gui, "TextLabel", {
 		Name = "RoomStatus",
 		AnchorPoint = Vector2.new(0.5, 1),
-		Position = UDim2.new(0.5, 0, 1, -60),
+		Position = UDim2.new(0.5, 0, 1, -92), -- above the toast line
 		Size = UDim2.fromOffset(380, 24),
 		TextSize = 17,
 		TextStrokeTransparency = 0.5,

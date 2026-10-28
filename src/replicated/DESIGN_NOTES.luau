@@ -185,7 +185,7 @@ MODULES
     ThroneRoomUI (stub) state line at the bottom inside the room; "Room" panel top left for
              those who preside; the audience reason box; the mark marker when called.
     VoteUI     (stub) "Votes" top right: players with Kick / No confidence, reasons, Start; the
-             vote box on the right with the tally and Yes / No.
+             vote box low in the middle with the tally and Yes / No.
     DailyUI    (stub) appointment countdown under the clock; "Today" tasks + streak panel.
     JobUI      (stub) job tracker top left: step, distance, shift pay, Skip; marker + hold prompt.
     BuildUI    (stub) build mode: orbit camera, catalogue, ghost + reasons, undo/redo; draws
@@ -196,6 +196,19 @@ MODULES
              EconomyUI.onCounter(kind, fn) for more), offer popup, toasts. The only module that
              listens to Profile.Wallet (Net.listen keeps one listener per action).
   ReplicatedFirst.LoadingScreen       stub title card until "ProfileLoaded".
+
+HUD MAP (offsets in px; check a new piece against this on a 360 px tall landscape phone)
+  Top centre   ClockHUD 6 · DailyUI appointment 32, Today 56 · ThroneUI proclamation 86-130 ·
+               CourtUI decree banner 86-254 (for a few seconds) · EconomyUI hand-over offer 36
+  Top left     JobUI tracker 44-136 (on duty) or ThroneUI reign panel 44-108 (monarch) ·
+               CourtUI Court 140-168 · ThroneRoomUI Room 172-200
+  Top right    wallet 6, bank 30, Bag 52-86, Property 92-126, Report this house 132-162 (near a
+               house), Votes 168-198
+  Middle       centred panels (ui.panel, 85% high, max 420×520); throne / Court offers (0.5, 0.5)
+  Bottom       VoteUI vote box 134-242 from the top on 360 px (bottom −118) · ThroneRoomUI room
+               line bottom −92 · EconomyUI toast bottom −60 · left: Station 12-232, Characters
+               240-380, Say 388-478 (bottom −12, 40 high) · BuildUI owns the screen in build mode
+  Mobile: Roblox's thumbstick sits bottom left and the jump button bottom right.
 
 STAFF
   Config.STAFF_USER_IDS (owner 3967616473 = level 3). Studio test players: -1 owner, -2 mod.

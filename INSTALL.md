@@ -364,7 +364,7 @@ some: during Play, switch the command bar to **Server** and run
   boards that face the wrong way with `yaw` in `Config.DECREE_BOARDS`. The bell is silent until
   a sound id goes in `Config.DECREE_BELL_SOUND`.
 - **Votes** (top right): Kick or No confidence (for office holders) › a reason › Start. Everyone
-  gets the vote box on the right with Yes / No. It needs real numbers to pass (no confidence: 6
+  gets the vote box low in the middle with Yes / No. It needs real numbers to pass (no confidence: 6
   votes cast, 60% yes; kick: 8 yes and 60% of the server), so in Studio check that it opens,
   counts and fails; the passing cases are covered by `tests/test_votes.luau`.
 - **The throne room** uses `ThroneRoom.Gameplay.RoomZone` from the place. As King, **Room** (top
