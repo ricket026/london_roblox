@@ -4,6 +4,8 @@
 -- for Config.SPEECH_SECONDS (everyone sees it) and sends the line to players within
 -- Config.SPEECH_RANGE for their chat window.
 -- Remote (Phrase domain, event): Say { id }. Push: Phrase.Said { from, text } to those nearby.
+--   Speech.allow(player) -> boolean: a hook other modules set (the throne room in session lets
+--   only the Monarch and whoever has the floor speak); nil = everyone may.
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -14,6 +16,7 @@ local Phrases = require(Shared:WaitForChild("Phrases"))
 local World = require(script.Parent:WaitForChild("World"))
 
 local Speech = {}
+Speech.allow = nil :: ((Player) -> boolean)?
 
 local stamps: { [Player]: number } = {}
 
@@ -26,6 +29,10 @@ function Speech.say(player: Player, id: string): boolean
 	local phrase = Phrases.get(id)
 	local head = player.Character and player.Character:FindFirstChild("Head")
 	if not phrase or not head or not head:IsA("BasePart") or player:GetAttribute("CharSlot") == nil then
+		return false
+	end
+	local allow = Speech.allow
+	if allow and not allow(player) then
 		return false
 	end
 	local old = head:FindFirstChild("Speech")

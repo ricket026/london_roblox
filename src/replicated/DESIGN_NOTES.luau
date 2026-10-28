@@ -105,6 +105,11 @@ MODULES
              passes → default role, Identity.bar, Court.undoGrantsBy) or a kick (Config.KICK_*;
              kicked + per-server rejoin bar). Starter's yes, reasons from lists, early close,
              lapses if the target leaves. Remotes Vote.Get/Start/Cast; pushes Open/Tally/Closed.
+    ThroneRoom (M4, T36) PalaceInteriors.ThroneRoom.Gameplay.RoomZone; attr Protocol Open /
+             Closed (sweep shows out non-Household non-guests to Config.THRONE_ROOM_EXIT) /
+             Session (RBXGeneral ShouldDeliverCallback + Speech.allow: Monarch and the floor
+             only; warnings then shown out). Floor (Config.FLOOR_SECONDS), audience book prompt
+             (Config.THRONE_ROOM_LEDGER) and queue (Call / Up / Decline). Remotes Room.*.
     Lamps    gas lamps built along MapLayoutData's roads (Config.LAMP_*), tag "Lamp", attrs
              Route/Lit; lamplighters (Jobs) or the city's fallback light and put them out.
     Economy (Phase 2) the money ledger: every change has a reason (REASONS: faucet / sink / move),
@@ -177,6 +182,8 @@ MODULES
              address, Renounce; for granters a player list, titles with a place, offices, the
              royal family, revoke with a reason, a confirm step; offer popup Accept/Decline;
              the Monarch's decree form; the decree banner for everyone.
+    ThroneRoomUI (stub) state line at the bottom inside the room; "Room" panel top left for
+             those who preside; the audience reason box; the mark marker when called.
     VoteUI     (stub) "Votes" top right: players with Kick / No confidence, reasons, Start; the
              vote box on the right with the tally and Yes / No.
     DailyUI    (stub) appointment countdown under the clock; "Today" tasks + streak panel.

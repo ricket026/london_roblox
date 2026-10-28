@@ -529,4 +529,18 @@ Config.KICK_YES_MIN = 8
 Config.KICK_BAR_SECONDS = 1800
 Config.KICK_REASONS = { "Griefing", "Random killing", "Harassment", "Exploiting" }
 
+-- The throne room: protocol and audiences (COURT_PARLIAMENT §4; TASKS T36) ---------------------
+-- Map studs from london.rbxl: the room is PalaceInteriors.ThroneRoom (Gameplay.RoomZone covers
+-- x 94-190, z 460-492, floor y 18.6); its west door opens into the South Saloon.
+Config.THRONE_ROOM_ZONE = "RoomZone" -- the part under ThroneRoom.Gameplay that covers the room
+Config.THRONE_ROOM_EXIT = { x = 80, y = 21.6, z = 476.5 } -- where those not admitted are sent (South Saloon, by the door)
+Config.THRONE_ROOM_LEDGER = { x = 88, y = 18.6, z = 466 } -- the audience book, by the door in the South Saloon
+Config.THRONE_ROOM_MARK = { x = 168, y = 18.6, z = 476.5 } -- the petitioner's mark before the thrones
+Config.THRONE_ROOM_CHECK = 1 -- seconds between checks of who is in the room
+Config.FLOOR_SECONDS = 180 -- the floor is given for this long; Extend adds as much again
+Config.CONTEMPT_WARNINGS = 2 -- warnings for speaking out of turn in session; the next is shown out
+Config.AUDIENCE_REASON_MAX = 80 -- characters
+Config.AUDIENCE_QUEUE_MAX = 10 -- petitioners waiting at once
+Config.AUDIENCE_RATE = { count = 8, per = 10 } -- throne room calls per player
+
 return Config

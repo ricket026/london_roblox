@@ -23,6 +23,7 @@ require(script:WaitForChild("SpeechUI")).init() -- quick phrases and gestures (T
 require(script:WaitForChild("ThroneUI")).init() -- the throne: offers, proclamations, abdicate (T34)
 require(script:WaitForChild("CourtUI")).init() -- titles, offices, forms of address (T35, T08)
 require(script:WaitForChild("VoteUI")).init() -- no confidence and vote-kick (T38)
+require(script:WaitForChild("ThroneRoomUI")).init() -- throne room protocol and audiences (T36)
 
 Net.listen("Admin", "Notice", function(msg)
 	if type(msg.text) ~= "string" then

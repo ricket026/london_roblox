@@ -32,7 +32,7 @@ Never paste a `.rbxmx` file or anything starting with `<roblox` into a script.
 | 8 | Shops, jobs and gas lamps: tills, suppliers, stalls, postman, newsboy, lamplighter, baker, carpenter, shop assistant (Phases 4–5, T04) | ⬜ |
 | 9 | Appointments at the hubs every 10 minutes, today's tasks panel (T30, T33) | ⬜ |
 | 10 | Quick phrases and gestures: speak without typing (T05) | ⬜ |
-| 11 | The Court: the throne (claim, succession, abdication), titles, Household offices, forms of address, decrees and bank holidays, no-confidence votes and vote-kick (T34, T35, T08, T37, T38) | ⬜ |
+| 11 | The Court: the throne (claim, succession, abdication), titles, Household offices, forms of address, decrees and bank holidays, no-confidence votes and vote-kick, throne room protocol and audiences (T34–T38, T08) | ⬜ |
 
 Do the steps **in order**: each needs the ones before it (a script that waits for a missing one
 just hangs; `tools/check_install.py` checks this list against the code). The links always show
@@ -294,15 +294,17 @@ both players, and the line in the other player's chat. **Wave**, **Cheer** and *
 Roblox's own emotes. Bow, curtsy, salute, doff hat and applaud need animations: publish them and
 put their ids in `Config.EMOTE_ANIMATIONS`.
 
-## Step 11: the Court (the throne, titles, offices, decrees) and votes
+## Step 11: the Court (the throne, titles, offices, decrees, the throne room) and votes
 **New scripts**
 - ModuleScript `Throne` inside ServerScriptService › **LondonServer**: [Throne](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Throne.luau)
 - ModuleScript `Court` inside ServerScriptService › **LondonServer**: [Court](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Court.luau)
 - ModuleScript `Decrees` inside ServerScriptService › **LondonServer**: [Decrees](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Decrees.luau)
 - ModuleScript `Votes` inside ServerScriptService › **LondonServer**: [Votes](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Votes.luau)
+- ModuleScript `ThroneRoom` inside ServerScriptService › **LondonServer**: [ThroneRoom](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/ThroneRoom.luau)
 - ModuleScript `ThroneUI` inside StarterPlayer › StarterPlayerScripts › **LondonClient**: [ThroneUI](https://github.com/ricket026/london_roblox/blob/m1-identity/src/client/LondonClient/ThroneUI.luau)
 - ModuleScript `CourtUI` inside StarterPlayer › StarterPlayerScripts › **LondonClient**: [CourtUI](https://github.com/ricket026/london_roblox/blob/m1-identity/src/client/LondonClient/CourtUI.luau)
 - ModuleScript `VoteUI` inside StarterPlayer › StarterPlayerScripts › **LondonClient**: [VoteUI](https://github.com/ricket026/london_roblox/blob/m1-identity/src/client/LondonClient/VoteUI.luau)
+- ModuleScript `ThroneRoomUI` inside StarterPlayer › StarterPlayerScripts › **LondonClient**: [ThroneRoomUI](https://github.com/ricket026/london_roblox/blob/m1-identity/src/client/LondonClient/ThroneRoomUI.luau)
 
 **Replace** (open the script, select all, paste the GitHub version)
 - `Config` in ReplicatedStorage › Shared: [Config](https://github.com/ricket026/london_roblox/blob/m1-identity/src/shared/Config.luau) (throne and Court settings at the end)
@@ -310,6 +312,7 @@ put their ids in `Config.EMOTE_ANIMATIONS`.
 - `Identity` in ServerScriptService › LondonServer: [Identity](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Identity.luau)
 - `Jobs` in ServerScriptService › LondonServer: [Jobs](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Jobs.luau) (bank-holiday pay)
 - `SpeechUI` in StarterPlayerScripts › LondonClient: [SpeechUI](https://github.com/ricket026/london_roblox/blob/m1-identity/src/client/LondonClient/SpeechUI.luau) (the Say button no longer covers Characters)
+- `Speech` in ServerScriptService › LondonServer: [Speech](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Speech.luau) (quiet in the throne room when the court sits)
 
 (If you pasted those earlier steps from today's code they're already up to date; pasting again does no harm.)
 
@@ -320,6 +323,7 @@ Start-up lines:
   local Court = require(script:WaitForChild("Court"))
   local Decrees = require(script:WaitForChild("Decrees"))
   local Votes = require(script:WaitForChild("Votes"))
+  local ThroneRoom = require(script:WaitForChild("ThroneRoom"))
   ```
   and under `Speech.init()` add
   ```lua
@@ -327,12 +331,14 @@ Start-up lines:
   Court.init()
   Decrees.init()
   Votes.init()
+  ThroneRoom.init()
   ```
 - **LondonClient**: under the `SpeechUI` line add
   ```lua
   require(script:WaitForChild("ThroneUI")).init() -- the throne: offers, proclamations, abdicate (T34)
   require(script:WaitForChild("CourtUI")).init() -- titles, offices, forms of address (T35, T08)
   require(script:WaitForChild("VoteUI")).init() -- no confidence and vote-kick (T38)
+  require(script:WaitForChild("ThroneRoomUI")).init() -- throne room protocol and audiences (T36)
   ```
 
 It uses the two seats already in the place: `Workspace.PalaceInteriors.ThroneRoom.Gameplay.ThroneSeat1`
@@ -361,6 +367,14 @@ some: during Play, switch the command bar to **Server** and run
   gets the vote box on the right with Yes / No. It needs real numbers to pass (no confidence: 6
   votes cast, 60% yes; kick: 8 yes and 60% of the server), so in Studio check that it opens,
   counts and fails; the passing cases are covered by `tests/test_votes.luau`.
+- **The throne room** uses `ThroneRoom.Gameplay.RoomZone` from the place. As King, **Room** (top
+  left, under Court): Open / Closed / Session. Closed: a second player who isn't Household or
+  invited is moved out to the South Saloon door within a second. Session: their chat and quick
+  phrases aren't heard in the room until you give them the **Floor**; after 2 warnings they're
+  shown out. The **audience book** stands in the South Saloon by the throne room door: hold its
+  prompt, give a reason, and the King sees it in Room › Call / Up / No. Check the book, the exit
+  point and the gold mark land on the floor (`Config.THRONE_ROOM_*`), and that chat is really
+  held back (TextChatService must be the chat version).
 
 ## After the last step: the start-up scripts
 Once every step above is in, the two start-up scripts can simply be **replaced entirely** with

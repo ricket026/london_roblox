@@ -324,7 +324,17 @@ Mark progress in the table in `activities/README.md`.
   `progress.honours`); `Court.undoGrantsBy(granter)` ready for no-confidence (T38). Choices: Q29.
 - **Still to do** the Royal Warrant (needs a Shops hook: "By Appointment" sign, +5% NPC sales),
   pardons (M5 law), Gazette entries (T33 newspaper), grants from the audience UI (T36).
-### T36 · Throne room protocol and audience queue ⬜ · **Specs** COURT §4 · Court chat channel, floor control.
+### T36 · Throne room protocol and audience queue ✅ (code + tests; needs a Play-test) · **Specs** COURT §4 · Court chat channel, floor control.
+- **Built** `LondonServer.ThroneRoom` + `LondonClient.ThroneRoomUI`, `Speech.allow` hook,
+  `Config.THRONE_ROOM_*`, `FLOOR_SECONDS`, `CONTEMPT_WARNINGS`, `AUDIENCE_*`,
+  `tests/test_throne_room.luau`. Open / Closed (shows out all but the Household and guests) /
+  Session (RBXGeneral `ShouldDeliverCallback` + quick phrases: only the Monarch and the floor are
+  heard inside, outsiders aren't heard in; 2 warnings then shown out), the floor (3 min, Extend,
+  Take back), the audience book in the South Saloon, the queue (Call announces, makes a guest,
+  shows the mark and gives the floor; Up; Decline). Choices in Q31.
+- **Not yet** the bow/curtsy prompt (needs `Config.EMOTE_ANIMATIONS`), granting straight from the
+  audience (use the Court menu), presentations at court ("The Season", an event: T39), contempt
+  as a crime (LAW §2, M5).
 ### T37 · Decrees ✅ (code + tests; needs a Play-test) · **Specs** COURT §6 · Banner + bell, decree boards, Gazette column, lever decrees.
 - **Built** `LondonServer.Decrees` (+ the decree form and banner in `CourtUI`), `Config.DECREE_*`,
   four boards (`Config.DECREE_BOARDS`, checked by `tools/check_sites.py`), the **bank holiday**
