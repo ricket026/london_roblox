@@ -107,8 +107,9 @@ same for UI modules. `ReplicatedStorage.Shared` holds modules both sides use.
 | Server: Throne, Court, Decrees (+ Shared.Titles) | the thrones (claim, succession, abdication, reign count); titles, Household offices, royal invitations, forms of address, precedence; royal decrees, decree boards, levers (bank holiday) |
 | Server: Votes | no-confidence votes (seated roles; bar via `Identity.bar`) and vote-kicks (rejoin bar) |
 | Server: ThroneRoom | throne room Open / Closed / Session (RoomZone), the floor, chat gating, audience book and queue |
+| Server: Events | event framework: `Config.EVENTS` data + `Events.hook`; host / schedule / random / decree; rewards |
 | Server: Admin, AdminLog, Analytics, Doors, Debug | M0 (Debug = Studio-only test bindable) |
-| Client: CharacterUI, IdentityUI, ClockHUD, Activities (+ Chess, Strength), EconomyUI, BuildUI, PropertyUI, ShopUI, JobUI, DailyUI, SpeechUI, ThroneUI, CourtUI, VoteUI, ThroneRoomUI | menus and HUD stubs |
+| Client: CharacterUI, IdentityUI, ClockHUD, Activities (+ Chess, Strength), EconomyUI, BuildUI, PropertyUI, ShopUI, JobUI, DailyUI, SpeechUI, ThroneUI, CourtUI, VoteUI, ThroneRoomUI, EventUI | menus and HUD stubs |
 
 Data (`Shared.Types`): one profile per account. **Account-wide**: money, collection, Robux
 purchases, outfits/vehicles/rental, moderation record. **Per character slot**: name and look.
@@ -122,6 +123,8 @@ Extension points:
 - A role given by a game rule (the throne, appointed offices): `Identity.grant(player, roleId)`;
   the caller checks eligibility and seats. Seat holders in join order: `Identity.holdersOf(roleId)`.
 - A decree that pulls a lever: `Decrees.lever(id, { name, check(player) -> why?, apply(player) })`.
+- New event: a `Config.EVENTS` entry (place, steps, parts, rewards, trigger); code goes in
+  `Events.hook(id, { check, start, step, finish })`. `decree = true` makes it a decree lever.
 - A server-wide proclamation (the gold banner): `Throne.proclaim(text)`. Names as addressed:
   `Titles.address{ first, last, role, roleName, title, place, form }`.
 - New NPC counter: `Counters.add{ id, kind, name, x, z, yaw }` (server) and, for a new kind,
@@ -133,7 +136,7 @@ Extension points:
 - New building piece: add a row to art/kit.md and the same entry to `Shared.Kit` (test_kit fails
   until both match); new colours go at the END of `Shared.Palette` (saved by index).
 - Net domains in use: `Profile`, `Admin`, `Identity`, `Character`, `Activity`, `Economy`,
-  `Inventory`, `Counter`, `Exchange`, `Property`, `Build`, `Shop`, `Job`, `Daily`, `Appointment`, `Phrase`, `Throne`, `Court`, `Decree`, `Vote`, `Room`. `Net.listen` keeps one listener per action.
+  `Inventory`, `Counter`, `Exchange`, `Property`, `Build`, `Shop`, `Job`, `Daily`, `Appointment`, `Phrase`, `Throne`, `Court`, `Decree`, `Vote`, `Room`, `Event`. `Net.listen` keeps one listener per action.
 
 ## Working with the user
 

@@ -543,4 +543,55 @@ Config.AUDIENCE_REASON_MAX = 80 -- characters
 Config.AUDIENCE_QUEUE_MAX = 10 -- petitioners waiting at once
 Config.AUDIENCE_RATE = { count = 8, per = 10 } -- throne room calls per player
 
+-- Events (EVENTS.md §1, §3, §4; TASKS T39) ------------------------------------------------------
+Config.EVENT_MAJOR_GAP = 600 -- seconds between the end of one major event and the next
+Config.EVENT_SPECTATE_SECONDS = 20 -- seconds near a running event that make you a spectator
+Config.EVENT_RANDOM_CHECK = 60 -- seconds between rolls for random events
+Config.EVENT_RATE = { count = 8, per = 10 } -- event calls per player
+-- One entry per event. trigger: "host" (started by one of `hosts`, or the owner), "schedule"
+-- (every `every` seconds of server time, offset `offset`), "random" (on average once per `mean`
+-- seconds while at least `minPlayers` are here) and/or decree = true (a Crown decree lever).
+-- Steps run in order for their seconds (a host may advance them). Rewards: `pay` pence and `xp`
+-- (to their job, if they hold one) for those signed up to a role and there at the end;
+-- `spectator` pence and the `memento` for anyone near it for EVENT_SPECTATE_SECONDS.
+-- `cooldown`: seconds before the same event can run again in this server.
+Config.EVENTS = {
+	balcony = {
+		name = "A balcony appearance", major = true, trigger = "host", hosts = { "King", "Queen" },
+		place = "the Palace", x = 0, z = 20, radius = 60, gather = 90, cooldown = 1800,
+		steps = {
+			{ text = "The crowd gathers below the balcony", seconds = 30 },
+			{ text = "The balcony doors open", seconds = 15 },
+			{ text = "The royal family appears: wave and cheer!", seconds = 60 },
+		},
+		pay = 0, xp = 0, spectator = 3, memento = "memento_balcony",
+	},
+	coronation = {
+		name = "The Coronation", major = true, trigger = "host", hosts = { "King", "Queen" }, decree = true,
+		place = "Westminster Abbey", x = 880, z = -960, radius = 70, gather = 180, cooldown = 3600,
+		roles = {
+			{ id = "Archbishop", name = "Archbishop", max = 1 },
+			{ id = "Choir", name = "Choir", max = 6 },
+			{ id = "Guard", name = "Guard of honour", max = 8 },
+		},
+		steps = {
+			{ text = "The procession arrives at the Abbey", seconds = 60 },
+			{ text = "The anointing", seconds = 30 },
+			{ text = "The crowning", seconds = 30 },
+			{ text = "God save the Crown!", seconds = 30 },
+		},
+		pay = 60, xp = 20, spectator = 3, memento = "memento_coronation",
+	},
+	peasouper = {
+		name = "A pea-souper", major = false, trigger = "random", mean = 72 * 60, minPlayers = 1,
+		place = "the whole city", cooldown = 2400, gather = 0,
+		steps = {
+			{ text = "A yellow fog creeps up from the river", seconds = 120 },
+			{ text = "A pea-souper: you can barely see your hand", seconds = 480 },
+			{ text = "The fog lifts", seconds = 60 },
+		},
+		pay = 0, xp = 0, spectator = 0,
+	},
+}
+
 return Config

@@ -28,7 +28,7 @@ local Economy = {}
 Economy.REASONS = {
 	job_pay = "faucet", salary = "faucet", pastime = "faucet", fare = "move", prize = "faucet",
 	stipend = "faucet", shop_sale = "move", npc_sale = "faucet", wage_staff = "move",
-	property_sell = "faucet", product = "faucet", admin = "faucet",
+	property_sell = "faucet", product = "faucet", admin = "faucet", event = "faucet",
 	rent = "sink", tax = "sink", fine = "sink", purchase = "sink", wholesale = "sink",
 	delivery = "sink", property_buy = "sink", stall_rent = "sink", character = "sink",
 	licence = "sink", hospital = "sink", upkeep = "sink",

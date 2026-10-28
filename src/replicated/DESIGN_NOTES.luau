@@ -110,6 +110,10 @@ MODULES
              Session (RBXGeneral ShouldDeliverCallback + Speech.allow: Monarch and the floor
              only; warnings then shown out). Floor (Config.FLOOR_SECONDS), audience book prompt
              (Config.THRONE_ROOM_LEDGER) and queue (Call / Up / Decline). Remotes Room.*.
+    Events   (M4, T39) Config.EVENTS data + Events.hook; announce (flag in workspace.Events,
+             proclamation) → gather → steps → finish; host / schedule / random / decree
+             triggers; one major at a time + EVENT_MAJOR_GAP; sign-up parts; pay ("event"),
+             job XP, mementos, spectators (EVENT_SPECTATE_SECONDS). Remotes Event.*.
     Lamps    gas lamps built along MapLayoutData's roads (Config.LAMP_*), tag "Lamp", attrs
              Route/Lit; lamplighters (Jobs) or the city's fallback light and put them out.
     Economy (Phase 2) the money ledger: every change has a reason (REASONS: faucet / sink / move),
@@ -184,6 +188,8 @@ MODULES
              the Monarch's decree form; the decree banner for everyone.
     ThroneRoomUI (stub) state line at the bottom inside the room; "Room" panel top left for
              those who preside; the audience reason box; the mark marker when called.
+    EventUI    (stub) gold line under the banner (name, step, time, distance); "Events" top
+             right: what's on (Join / Leave; host: Next step / End) and what you may start.
     VoteUI     (stub) "Votes" top right: players with Kick / No confidence, reasons, Start; the
              vote box low in the middle with the tally and Yes / No.
     DailyUI    (stub) appointment countdown under the clock; "Today" tasks + streak panel.
@@ -199,11 +205,12 @@ MODULES
 
 HUD MAP (offsets in px; check a new piece against this on a 360 px tall landscape phone)
   Top centre   ClockHUD 6 · DailyUI appointment 32, Today 56 · ThroneUI proclamation 86-130 ·
+               EventUI event line 132-154 ·
                CourtUI decree banner 86-254 (for a few seconds) · EconomyUI hand-over offer 36
   Top left     JobUI tracker 44-136 (on duty) or ThroneUI reign panel 44-108 (monarch) ·
                CourtUI Court 140-168 · ThroneRoomUI Room 172-200
   Top right    wallet 6, bank 30, Bag 52-86, Property 92-126, Report this house 132-162 (near a
-               house), Votes 168-198
+               house), Votes 168-198, Events 204-234
   Middle       centred panels (ui.panel, 85% high, max 420×520); throne / Court offers (0.5, 0.5)
   Bottom       VoteUI vote box 134-242 from the top on 360 px (bottom −118) · ThroneRoomUI room
                line bottom −92 · EconomyUI toast bottom −60 · left: Station 12-232, Characters

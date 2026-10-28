@@ -37,6 +37,8 @@ Collection.ITEMS = {
 	{ id = "memento_programme", name = "Concert Programme", page = "Mementos", value = 0 },
 	{ id = "memento_guard", name = "Palace Postcard", page = "Mementos", value = 0 },
 	{ id = "memento_auction", name = "Auction Lot Card", page = "Mementos", value = 0 },
+	{ id = "memento_balcony", name = "Paper Union Flag", page = "Mementos", value = 0 },
+	{ id = "memento_coronation", name = "Coronation Medal", page = "Mementos", value = 0 },
 } :: { Item }
 
 Collection.BY_ID = {} :: { [string]: Item }

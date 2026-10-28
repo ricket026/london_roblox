@@ -2,7 +2,7 @@
 """Checks the map positions in src/shared/Config.luau against the place file and the map layout.
 
 For every site (NPC counters in Config.COUNTERS, newsboy corners, and the activity sites
-DUCKS_SITE, STRENGTH_SITE, MUDLARK_SIGN, CHESS_TABLES, decree boards) it reports the park / square it is in and any problems:
+DUCKS_SITE, STRENGTH_SITE, MUDLARK_SIGN, CHESS_TABLES, decree boards, event places) it reports the park / square it is in and any problems:
   ERROR  on a building lot (Workspace.Map.Plots), on a road's carriageway, or inside a landmark
   note   a pavement, or a part within a few studs (kerbs, walls: often intended)
 Exit status 1 if any site has an ERROR. Needs: pip install lz4 zstandard
@@ -178,6 +178,8 @@ def read_sites():
     if m:
         for t in re.finditer(r'name = "([^"]+)", x = (-?[\d.]+), z = (-?[\d.]+)', m.group(1)):
             sites.append(("corner " + t.group(1), float(t.group(2)), float(t.group(3))))
+    for t in re.finditer(r'place = "([^"]+)", x = (-?[\d.]+), z = (-?[\d.]+), radius', src):
+        sites.append(("event at " + t.group(1), float(t.group(2)), float(t.group(3))))
     m = re.search(r"Config\.DECREE_BOARDS = \{(.*?)\n\}", src, re.S)
     if m:
         for t in re.finditer(r'name = "([^"]+)", x = (-?[\d.]+), z = (-?[\d.]+)', m.group(1)):

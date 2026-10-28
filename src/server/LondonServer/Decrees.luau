@@ -198,7 +198,10 @@ function Decrees.init()
 		schema = {
 			title = V.str(Config.DECREE_TITLE_MAX),
 			text = V.str(Config.DECREE_TEXT_MAX),
-			lever = V.optional(V.enum(Decrees.ORDER)),
+			-- checked against Decrees.LEVERS when the call comes, so levers added later count
+			lever = V.optional(function(x: any): (boolean, any)
+				return type(x) == "string" and Decrees.LEVERS[x] ~= nil, x
+			end),
 		},
 		rate = Config.DECREE_RATE,
 		call = true,

@@ -33,6 +33,7 @@ Never paste a `.rbxmx` file or anything starting with `<roblox` into a script.
 | 9 | Appointments at the hubs every 10 minutes, today's tasks panel (T30, T33) | ⬜ |
 | 10 | Quick phrases and gestures: speak without typing (T05) | ⬜ |
 | 11 | The Court: the throne (claim, succession, abdication), titles, Household offices, forms of address, decrees and bank holidays, no-confidence votes and vote-kick, throne room protocol and audiences (T34–T38, T08) | ⬜ |
+| 12 | Events: balcony appearance, the Coronation, the pea-souper fog; the event framework (T39) | ⬜ |
 
 Do the steps **in order**: each needs the ones before it (a script that waits for a missing one
 just hangs; `tools/check_install.py` checks this list against the code). The links always show
@@ -375,6 +376,33 @@ some: during Play, switch the command bar to **Server** and run
   prompt, give a reason, and the King sees it in Room › Call / Up / No. Check the book, the exit
   point and the gold mark land on the floor (`Config.THRONE_ROOM_*`), and that chat is really
   held back (TextChatService must be the chat version).
+
+## Step 12: events (balcony appearance, the Coronation, fog)
+**New scripts**
+- ModuleScript `Events` inside ServerScriptService › **LondonServer**: [Events](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Events.luau)
+- ModuleScript `EventUI` inside StarterPlayer › StarterPlayerScripts › **LondonClient**: [EventUI](https://github.com/ricket026/london_roblox/blob/m1-identity/src/client/LondonClient/EventUI.luau)
+
+**Replace**
+- `Config` in ReplicatedStorage › Shared: [Config](https://github.com/ricket026/london_roblox/blob/m1-identity/src/shared/Config.luau) (`Config.EVENTS` at the end)
+- `Collection` in ReplicatedStorage › Shared: [Collection](https://github.com/ricket026/london_roblox/blob/m1-identity/src/shared/Collection.luau) (two new mementos)
+- `Economy` in ServerScriptService › LondonServer: [Economy](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Economy.luau) (event pay)
+- `Decrees` in ServerScriptService › LondonServer: [Decrees](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Decrees.luau) (events as decree levers)
+
+Start-up lines:
+- **LondonServer**: under `local ThroneRoom = require(script:WaitForChild("ThroneRoom"))` add
+  `local Events = require(script:WaitForChild("Events"))`, and under `ThroneRoom.init()` add `Events.init()`.
+- **LondonClient**: under the `ThroneRoomUI` line add
+  ```lua
+  require(script:WaitForChild("EventUI")).init() -- events: what's on, sign-up, hosting (T39)
+  ```
+
+Test (Play): as King, **Events** (top right, under Votes) › A balcony appearance › Start. A
+proclamation, a flag in front of the Palace, and a gold line under the banner counting down
+("begins in 1:30"), then the steps. Stand near the flag through the steps: when it ends you get
+3d and a Paper Union Flag in the collection book. The Coronation (at Westminster Abbey) has parts
+to Join (Archbishop, Choir, Guard of honour); the host can press **Next step** to hurry it; at the
+end the King is crowned. The pea-souper comes by itself about once every 72 minutes (fog for ten
+minutes). New events are a `Config.EVENTS` entry (and, if they need code, an `Events.hook`).
 
 ## After the last step: the start-up scripts
 Once every step above is in, the two start-up scripts can simply be **replaced entirely** with

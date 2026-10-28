@@ -352,7 +352,18 @@ Mark progress in the table in `activities/README.md`.
   fixed lists; AdminLog `vote.*`. Choices in Q30.
 - **Not yet** AFK removal from a seat (COURT §2 "AFK for 10 min"), the 5-minute claim cooldown
   between seats, vote buttons in the quick-phrase wheel (DESIGN §9).
-### T39 · Event framework ⬜ · **Specs** EVENTS §1, §3, §4 · Announce → gather → steps → finish, NPC fill, scheduling.
+### T39 · Event framework ✅ (code + tests; needs a Play-test) · **Specs** EVENTS §1, §3, §4 · Announce → gather → steps → finish, NPC fill, scheduling.
+- **Built** `LondonServer.Events` + `LondonClient.EventUI`, `Config.EVENTS` (data) and
+  `Events.hook(id, { check, start, step, finish })` (code), `tests/test_events.luau`. Triggers host /
+  schedule / random / decree (a `Decrees` lever per decree event); one major event at a time,
+  `EVENT_MAJOR_GAP`, per-event cooldowns; sign-up parts; rewards (`event` pay reason, job XP,
+  mementos, `Daily.record(player, "event")`). First events: **balcony appearance** (host: the
+  Monarch), **the Coronation** (host or decree; crowns the host, honour `crowned:<role>`, once a
+  reign), **pea-souper** (random, minor: `WorldClock` fog).
+- **Not yet** NPC fill for empty parts (needs walking NPCs, T24/S03), road closures
+  (`closesZones`), the Court Circular board and HUD clock tooltip (§4), the Gazette entry.
+  Next events to add as data: Royal Ball (ballroom RoomZone), Market Day (Parliament lever),
+  Motor Run, Fire!, Tower Bridge lift.
 ### T40 · Changing of the Guard + balcony appearance ⬜ · **Depends** T39, T24 · Route in `Map.Routes`.
 
 ---
