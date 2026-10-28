@@ -96,6 +96,11 @@ MODULES
              honour "honour:<id>", undoGrantsBy for no-confidence (T38), the form of address
              (profile.settings.address). Remotes Court.Get/GrantTitle/Appoint/InviteRoyal/
              Answer/Revoke/Renounce/SetForm; pushes Offer, Closed, Changed, Notice.
+    Decrees  (M4, T37) the Monarch's decrees: filtered title/text, one per Config.DECREE_COOLDOWN
+             a server, banner (Decree.Issued) + bell id, boards in workspace.DecreeBoards
+             (newest 3), Decrees.recent for the Gazette; levers by Decrees.lever (bank_holiday sets
+             workspace attr BankHolidayUntil; Jobs.pay ×Config.BANK_HOLIDAY_PAY). Remotes
+             Decree.Get/Issue.
     Lamps    gas lamps built along MapLayoutData's roads (Config.LAMP_*), tag "Lamp", attrs
              Route/Lit; lamplighters (Jobs) or the city's fallback light and put them out.
     Economy (Phase 2) the money ledger: every change has a reason (REASONS: faucet / sink / move),
@@ -166,7 +171,8 @@ MODULES
              a countdown; "You reign as King" + Abdicate (two taps) top left.
     CourtUI    (stub) "Court" button top left (royals, titled, Household): style + form of
              address, Renounce; for granters a player list, titles with a place, offices, the
-             royal family, revoke with a reason, a confirm step; offer popup Accept/Decline.
+             royal family, revoke with a reason, a confirm step; offer popup Accept/Decline;
+             the Monarch's decree form; the decree banner for everyone.
     DailyUI    (stub) appointment countdown under the clock; "Today" tasks + streak panel.
     JobUI      (stub) job tracker top left: step, distance, shift pay, Skip; marker + hold prompt.
     BuildUI    (stub) build mode: orbit camera, catalogue, ghost + reasons, undo/redo; draws

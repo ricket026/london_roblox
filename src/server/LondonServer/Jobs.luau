@@ -8,6 +8,8 @@
 -- and XP come only from server-checked steps; pay rises Config.JOB_RANK_PAY a rank (Shared.Ranks)
 -- and each job has an hourly cap (Config.JOBS[job].cap, kept in profile.limits). XP and ranks live
 -- in Profiles.progress(player).jobs, so linked character slots share them.
+-- On a bank holiday (workspace attribute BankHolidayUntil, set by a royal decree) pay and the
+-- hourly cap are both ×Config.BANK_HOLIDAY_PAY.
 --   Jobs.register(jobId, start(player) -> Task?)   more jobs (cabbie, lamplighter...) plug in here
 --   Jobs.pay(player, jobId, pence, ref) -> paid     Jobs.addXp(player, jobId, xp)
 --   Jobs.current(player) -> Task?                    Jobs.rankOf(player, jobId) -> rank
@@ -90,7 +92,11 @@ function Jobs.pay(player: Player, jobId: string, pence: number, ref: string): nu
 		p.limits.jobPaid = {}
 	end
 	local paid = p.limits.jobPaid[jobId] or 0
-	local amount = math.min(math.floor(pence * Ranks.payMultiplier(Jobs.rankOf(player, jobId)) + 0.5), def.cap - paid)
+	-- a bank holiday (a royal decree, LondonServer.Decrees) raises pay and the cap alike
+	local ends = workspace:GetAttribute("BankHolidayUntil")
+	local holiday = if type(ends) == "number" and workspace:GetServerTimeNow() < ends then Config.BANK_HOLIDAY_PAY else 1
+	local cap = math.floor(def.cap * holiday)
+	local amount = math.min(math.floor(pence * Ranks.payMultiplier(Jobs.rankOf(player, jobId)) * holiday + 0.5), cap - paid)
 	if amount <= 0 then
 		return 0
 	end

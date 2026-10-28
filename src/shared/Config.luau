@@ -491,4 +491,24 @@ Config.COURT_UNDO_WINDOW = 600 -- seconds: grants made this recently are undone 
 Config.COURT_REASON_MAX = 80 -- characters in a revocation reason
 Config.COURT_RATE = { count = 8, per = 10 } -- Court calls per player
 
+-- Royal decrees (COURT_PARLIAMENT §6; TASKS T37) -----------------------------------------------
+Config.DECREE_TITLE_MAX = 60 -- characters
+Config.DECREE_TEXT_MAX = 400 -- characters
+Config.DECREE_COOLDOWN = 600 -- seconds between decrees in one server
+Config.DECREE_KEEP = 8 -- decrees remembered this session (boards show the newest 3)
+Config.DECREE_SHOW_SECONDS = 14 -- how long the decree banner stays on screen
+Config.DECREE_BELL_SOUND = 0 -- Sound asset id for the bell (0 = silent until the user gives one)
+Config.DECREE_RATE = { count = 4, per = 10 } -- decree calls per player
+-- Decree boards (map studs; yaw in degrees turns the board's face, which looks along -Z at 0).
+Config.DECREE_BOARDS = {
+	{ name = "the Palace gates", x = 12, z = -30, yaw = 0 },
+	{ name = "Charing Cross", x = 271, z = -1320, yaw = 0 },
+	{ name = "Covent Garden", x = -150, z = -1500, yaw = 0 },
+	{ name = "Spitalfields", x = -460, z = -3030, yaw = 0 },
+}
+-- The "bank holiday" lever: job pay (and its hourly cap) times this for one in-game day, once
+-- per real (UTC) day per server.
+Config.BANK_HOLIDAY_PAY = 1.5
+Config.BANK_HOLIDAY_SECONDS = Config.DAY_MINUTES * 60 -- one in-game day
+
 return Config

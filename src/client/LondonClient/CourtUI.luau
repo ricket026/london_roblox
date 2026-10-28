@@ -4,13 +4,17 @@
 --   your style and form of address (Their / His / Her), Renounce title; and, for those who may
 --   grant, every player here: titles (with a place), offices, the royal family, revocations
 --   (with a reason). Every grant asks to confirm first.
+--   For the King or Queen: Issue a decree (title, words, and a lever such as a bank holiday).
 --   An offered office or royal invitation: Accept / Decline in the middle of the screen.
+--   A royal decree for everyone: a banner at the top (Close), with the bell if Config has one.
 -- Server: LondonServer.Court (Court.Get / GrantTitle / Appoint / InviteRoyal / Answer / Revoke /
---   Renounce / SetForm; pushes Offer, Closed, Changed, Notice).
+--   Renounce / SetForm; pushes Offer, Closed, Changed, Notice), LondonServer.Decrees (Decree.Get /
+--   Issue; pushes Issued, Notice).
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared:WaitForChild("Config"))
 local Net = require(Shared:WaitForChild("Net"))
 local Roles = require(Shared:WaitForChild("Roles"))
 local Titles = require(Shared:WaitForChild("Titles"))
@@ -35,12 +39,16 @@ local offerText: TextLabel
 local view: { [string]: any } = {}
 local chosen: number? = nil -- userId of the player the grant section is about
 local placeIndex = 1
-local pending: { action: string, args: { [string]: any }, text: string }? = nil
+local pending: { domain: string, action: string, args: { [string]: any }, text: string }? = nil
+local decrees: { [string]: any } = {} -- Decree.Get, for the King or Queen
+local draft = { title = "", text = "", lever = "" } -- the decree being written ("" = no lever)
+local decreeFrame: Frame
+local decreeShown = 0
 local offer: { id: number, endsAt: number, text: string }? = nil
 local renounceUntil = 0
 
-local function request(action: string, args: { [string]: any }?): boolean
-	local ok, res = Net.request("Court", action, args)
+local function request(action: string, args: { [string]: any }?, domain: string?): boolean
+	local ok, res = Net.request(domain or "Court", action, args)
 	if not ok then
 		EconomyUI.toast(tostring(res), true)
 	end
@@ -65,13 +73,80 @@ local function fetch()
 	local ok, res = Net.request("Court", "Get")
 	if ok then
 		view = res
+		if view.monarch then
+			local good, d = Net.request("Decree", "Get")
+			decrees = if good then d else {}
+		end
 		render()
 	end
 end
 
-local function ask(action: string, args: { [string]: any }, text: string)
-	pending = { action = action, args = args, text = text }
+local function ask(action: string, args: { [string]: any }, text: string, domain: string?)
+	pending = { domain = domain or "Court", action = action, args = args, text = text }
 	render()
+end
+
+local function box(o: () -> number, name: string, value: string, placeholder: string, height: number, onChange: (string) -> ()): TextBox
+	local r = Instance.new("Frame")
+	r.LayoutOrder = o()
+	r.BackgroundTransparency = 1
+	r.Size = UDim2.new(1, 0, 0, height + 4)
+	r.Parent = body
+	local b = ui.text(r, "TextBox", {
+		Name = name,
+		Text = value,
+		PlaceholderText = placeholder,
+		PlaceholderColor3 = C.MUTED,
+		ClearTextOnFocus = false,
+		MultiLine = height > 40,
+		TextWrapped = true,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextYAlignment = Enum.TextYAlignment.Top,
+		BackgroundTransparency = 0,
+		BackgroundColor3 = Color3.fromRGB(34, 30, 26),
+		TextSize = 16,
+		Size = UDim2.new(1, 0, 0, height),
+		Position = UDim2.fromOffset(0, 2),
+	})
+	b:GetPropertyChangedSignal("Text"):Connect(function()
+		onChange(b.Text)
+	end)
+	return b
+end
+
+-- The King or Queen writes a decree.
+local function decreeSection(o: () -> number)
+	ui.line(body, o(), "Issue a decree" .. (if (decrees.cooldown or 0) > 0 then string.format(" (next in %d s)", decrees.cooldown) else ""), C.GOLD, 18)
+	box(o, "DecreeTitle", draft.title, string.format("Title (up to %d letters)", Config.DECREE_TITLE_MAX), 30, function(t)
+		draft.title = t
+	end)
+	box(o, "DecreeText", draft.text, string.format("The decree (up to %d letters)", Config.DECREE_TEXT_MAX), 84, function(t)
+		draft.text = t
+	end)
+	local choices = { { id = "", name = "No lever (proclamation only)" } }
+	for _, l in decrees.levers or {} do
+		table.insert(choices, l)
+	end
+	for _, c in choices do
+		local mark = if draft.lever == c.id then "• " else ""
+		local _, b = ui.row(body, o(), mark .. c.name .. (if c.why then " · " .. c.why else ""), { { if draft.lever == c.id then "Chosen" else "Choose" } }, 84)
+		b[1].Activated:Connect(function()
+			draft.lever = c.id
+			render()
+		end)
+	end
+	local _, issue = ui.row(body, o(), "", { { "Issue" } }, 96)
+	issue[1].Activated:Connect(function()
+		if draft.title == "" or draft.text == "" then
+			EconomyUI.toast("A decree needs a title and some words.", true)
+			return
+		end
+		local args: { [string]: any } = { title = draft.title, text = draft.text }
+		if draft.lever ~= "" then
+			args.lever = draft.lever
+		end
+		ask("Issue", args, string.format("Issue the decree \"%s\" to the whole city?", draft.title), "Decree")
+	end)
 end
 
 local function grantSection(o: () -> number)
@@ -168,8 +243,11 @@ render = function()
 		local _, b = ui.row(body, o(), "", { { "Confirm" }, { "Cancel" } }, 96)
 		b[1].Activated:Connect(function()
 			pending = nil
-			if request(p.action, p.args) then
+			if request(p.action, p.args, p.domain) then
 				EconomyUI.toast(if p.action == "Appoint" or p.action == "InviteRoyal" then "Offered. Waiting for an answer." else "Done.")
+				if p.domain == "Decree" then
+					draft = { title = "", text = "", lever = "" }
+				end
 			end
 			fetch()
 		end)
@@ -204,6 +282,9 @@ render = function()
 				fetch()
 			end
 		end)
+	end
+	if view.monarch and not chosen then
+		decreeSection(o)
 	end
 	local grants = view.monarch or #(view.appoint or {}) > 0
 	if not grants then
@@ -259,6 +340,31 @@ function CourtUI.state(): ({ [string]: any }, { id: number, endsAt: number, text
 	return view, offer
 end
 
+-- The decree banner everyone sees.
+function CourtUI.showDecree(msg: { [string]: any })
+	decreeShown += 1
+	local shown = decreeShown
+	local head = decreeFrame:FindFirstChild("Head") :: TextLabel
+	local words = decreeFrame:FindFirstChild("Words") :: TextLabel
+	head.Text = "ROYAL DECREE · " .. string.upper(tostring(msg.title))
+	words.Text = string.format("%s\n— %s", tostring(msg.text), tostring(msg.by))
+	decreeFrame.Visible = true
+	if type(msg.bell) == "number" and msg.bell ~= 0 then
+		local bell = Instance.new("Sound")
+		bell.SoundId = "rbxassetid://" .. msg.bell
+		bell.Parent = decreeFrame
+		bell:Play()
+		bell.Ended:Connect(function()
+			bell:Destroy()
+		end)
+	end
+	task.delay(Config.DECREE_SHOW_SECONDS, function()
+		if decreeShown == shown then
+			decreeFrame.Visible = false
+		end
+	end)
+end
+
 function CourtUI.open()
 	panel.Visible = true
 	chosen, pending = nil, nil
@@ -294,6 +400,31 @@ function CourtUI.init()
 	end)
 	no.Activated:Connect(function()
 		answer(false)
+	end)
+
+	decreeFrame = Instance.new("Frame")
+	decreeFrame.Name = "Decree"
+	decreeFrame.AnchorPoint = Vector2.new(0.5, 0)
+	decreeFrame.Position = UDim2.new(0.5, 0, 0, 86)
+	decreeFrame.Size = UDim2.new(0.9, 0, 0, 168)
+	decreeFrame.BackgroundColor3 = C.PAPER
+	decreeFrame.BorderSizePixel = 0
+	decreeFrame.Visible = false
+	decreeFrame.Parent = gui
+	local limit = Instance.new("UISizeConstraint")
+	limit.MaxSize = Vector2.new(460, 168)
+	limit.Parent = decreeFrame
+	ui.text(decreeFrame, "TextLabel", { Name = "Head", Font = Enum.Font.GaramondBold, TextColor3 = C.GOLD, TextSize = 19, TextTruncate = Enum.TextTruncate.AtEnd, Position = UDim2.fromOffset(10, 4), Size = UDim2.new(1, -96, 0, 26) })
+	ui.text(decreeFrame, "TextLabel", { Name = "Words", TextSize = 16, TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, Position = UDim2.fromOffset(10, 32), Size = UDim2.new(1, -20, 1, -38) })
+	local closeDecree = ui.button(decreeFrame, "Close", { Name = "Close", AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -6, 0, 4), Size = UDim2.fromOffset(78, 26), TextSize = 15 })
+	closeDecree.Activated:Connect(function()
+		decreeFrame.Visible = false
+	end)
+	Net.listen("Decree", "Issued", CourtUI.showDecree)
+	Net.listen("Decree", "Notice", function(msg)
+		if type(msg.text) == "string" then
+			EconomyUI.toast(msg.text)
+		end
 	end)
 
 	Net.listen("Court", "Offer", function(msg)

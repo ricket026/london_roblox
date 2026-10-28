@@ -325,7 +325,15 @@ Mark progress in the table in `activities/README.md`.
 - **Still to do** the Royal Warrant (needs a Shops hook: "By Appointment" sign, +5% NPC sales),
   pardons (M5 law), Gazette entries (T33 newspaper), grants from the audience UI (T36).
 ### T36 · Throne room protocol and audience queue ⬜ · **Specs** COURT §4 · Court chat channel, floor control.
-### T37 · Decrees ⬜ · **Specs** COURT §6 · Banner + bell, decree boards, Gazette column, lever decrees.
+### T37 · Decrees ✅ (code + tests; needs a Play-test) · **Specs** COURT §6 · Banner + bell, decree boards, Gazette column, lever decrees.
+- **Built** `LondonServer.Decrees` (+ the decree form and banner in `CourtUI`), `Config.DECREE_*`,
+  four boards (`Config.DECREE_BOARDS`, checked by `tools/check_sites.py`), the **bank holiday**
+  lever (`Config.BANK_HOLIDAY_PAY` on job pay and its cap for a game day, once a real day; Jobs
+  reads the workspace attribute `BankHolidayUntil`), `tests/test_decrees.luau`.
+- **Still to do** the bell sound id (`Config.DECREE_BELL_SOUND`, ask the user), board facing in
+  Studio (`yaw`), the Gazette front page (`Decrees.recent()`), the other levers as their systems
+  arrive: `Decrees.lever(id, { name, check, apply })` for pardons (M5), summon/dissolve
+  Parliament (M7), a ball or procession (T39).
 ### T38 · No-confidence votes and vote-kick ⬜ · **Specs** DESIGN §10, COURT §2 · Thresholds per spec, logged.
 ### T39 · Event framework ⬜ · **Specs** EVENTS §1, §3, §4 · Announce → gather → steps → finish, NPC fill, scheduling.
 ### T40 · Changing of the Guard + balcony appearance ⬜ · **Depends** T39, T24 · Route in `Map.Routes`.

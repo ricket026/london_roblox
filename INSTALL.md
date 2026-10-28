@@ -32,7 +32,7 @@ Never paste a `.rbxmx` file or anything starting with `<roblox` into a script.
 | 8 | Shops, jobs and gas lamps: tills, suppliers, stalls, postman, newsboy, lamplighter, baker, carpenter, shop assistant (Phases 4–5, T04) | ⬜ |
 | 9 | Appointments at the hubs every 10 minutes, today's tasks panel (T30, T33) | ⬜ |
 | 10 | Quick phrases and gestures: speak without typing (T05) | ⬜ |
-| 11 | The Court: the throne (claim, succession, abdication), titles, Household offices, forms of address (T34, T35, T08) | ⬜ |
+| 11 | The Court: the throne (claim, succession, abdication), titles, Household offices, forms of address, decrees and bank holidays (T34, T35, T08, T37) | ⬜ |
 
 Do the steps **in order**: each needs the ones before it (a script that waits for a missing one
 just hangs; `tools/check_install.py` checks this list against the code). The links always show
@@ -294,10 +294,11 @@ both players, and the line in the other player's chat. **Wave**, **Cheer** and *
 Roblox's own emotes. Bow, curtsy, salute, doff hat and applaud need animations: publish them and
 put their ids in `Config.EMOTE_ANIMATIONS`.
 
-## Step 11: the Court (the throne, titles, offices)
+## Step 11: the Court (the throne, titles, offices, decrees)
 **New scripts**
 - ModuleScript `Throne` inside ServerScriptService › **LondonServer**: [Throne](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Throne.luau)
 - ModuleScript `Court` inside ServerScriptService › **LondonServer**: [Court](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Court.luau)
+- ModuleScript `Decrees` inside ServerScriptService › **LondonServer**: [Decrees](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Decrees.luau)
 - ModuleScript `ThroneUI` inside StarterPlayer › StarterPlayerScripts › **LondonClient**: [ThroneUI](https://github.com/ricket026/london_roblox/blob/m1-identity/src/client/LondonClient/ThroneUI.luau)
 - ModuleScript `CourtUI` inside StarterPlayer › StarterPlayerScripts › **LondonClient**: [CourtUI](https://github.com/ricket026/london_roblox/blob/m1-identity/src/client/LondonClient/CourtUI.luau)
 
@@ -305,17 +306,22 @@ put their ids in `Config.EMOTE_ANIMATIONS`.
 - `Config` in ReplicatedStorage › Shared: [Config](https://github.com/ricket026/london_roblox/blob/m1-identity/src/shared/Config.luau) (throne and Court settings at the end)
 - `Stations` in ReplicatedStorage › Shared: [Stations](https://github.com/ricket026/london_roblox/blob/m1-identity/src/shared/Stations.luau) (the Household offices)
 - `Identity` in ServerScriptService › LondonServer: [Identity](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Identity.luau)
+- `Jobs` in ServerScriptService › LondonServer: [Jobs](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Jobs.luau) (bank-holiday pay)
+
+(If you pasted those earlier steps from today's code they're already up to date; pasting again does no harm.)
 
 Start-up lines:
 - **LondonServer**: under `local Speech = require(script:WaitForChild("Speech"))` add
   ```lua
   local Throne = require(script:WaitForChild("Throne"))
   local Court = require(script:WaitForChild("Court"))
+  local Decrees = require(script:WaitForChild("Decrees"))
   ```
   and under `Speech.init()` add
   ```lua
   Throne.init()
   Court.init()
+  Decrees.init()
   ```
 - **LondonClient**: under the `SpeechUI` line add
   ```lua
@@ -340,6 +346,11 @@ some: during Play, switch the command bar to **Server** and run
   title › Confirm: their tag shows "The Rt Hon. the Earl of Kew". **Offer** them an office: they
   get Accept / Decline. Grants are one a minute. In **Court**, "Address me as" Their / His / Her
   changes how your own tag reads.
+- As King, in **Court** › Issue a decree: a title, the words, optionally **Declare a bank
+  holiday** › Issue › Confirm. Everyone gets the decree banner; the four decree boards (Palace
+  gates, Charing Cross, Covent Garden, Spitalfields: `workspace.DecreeBoards`) show it. Turn
+  boards that face the wrong way with `yaw` in `Config.DECREE_BOARDS`. The bell is silent until
+  a sound id goes in `Config.DECREE_BELL_SOUND`.
 
 ## After the last step: the start-up scripts
 Once every step above is in, the two start-up scripts can simply be **replaced entirely** with

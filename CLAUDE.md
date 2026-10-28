@@ -104,7 +104,7 @@ same for UI modules. `ReplicatedStorage.Shared` holds modules both sides use.
 | Server: Lamps | gas lamps along every road (from MapLayoutData), lit by lamplighters or the city's fallback |
 | Server: Daily, Appointments | stipend streak + daily tasks (`Daily.record(player, event)`), hub appointments every 10 min |
 | Shared: Phrases + Server: Speech | quick phrases as speech bubbles (chat-light RP) |
-| Server: Throne, Court (+ Shared.Titles) | the thrones (claim, succession, abdication, reign count); titles, Household offices, royal invitations, forms of address, precedence |
+| Server: Throne, Court, Decrees (+ Shared.Titles) | the thrones (claim, succession, abdication, reign count); titles, Household offices, royal invitations, forms of address, precedence; royal decrees, decree boards, levers (bank holiday) |
 | Server: Admin, AdminLog, Analytics, Doors, Debug | M0 (Debug = Studio-only test bindable) |
 | Client: CharacterUI, IdentityUI, ClockHUD, Activities (+ Chess, Strength), EconomyUI, BuildUI, PropertyUI, ShopUI, JobUI, DailyUI, SpeechUI, ThroneUI, CourtUI | menus and HUD stubs |
 
@@ -119,6 +119,7 @@ Extension points:
 - Something that must settle before a character switch: `Characters.onBeforeChange(fn)`.
 - A role given by a game rule (the throne, appointed offices): `Identity.grant(player, roleId)`;
   the caller checks eligibility and seats. Seat holders in join order: `Identity.holdersOf(roleId)`.
+- A decree that pulls a lever: `Decrees.lever(id, { name, check(player) -> why?, apply(player) })`.
 - A server-wide proclamation (the gold banner): `Throne.proclaim(text)`. Names as addressed:
   `Titles.address{ first, last, role, roleName, title, place, form }`.
 - New NPC counter: `Counters.add{ id, kind, name, x, z, yaw }` (server) and, for a new kind,
@@ -130,7 +131,7 @@ Extension points:
 - New building piece: add a row to art/kit.md and the same entry to `Shared.Kit` (test_kit fails
   until both match); new colours go at the END of `Shared.Palette` (saved by index).
 - Net domains in use: `Profile`, `Admin`, `Identity`, `Character`, `Activity`, `Economy`,
-  `Inventory`, `Counter`, `Exchange`, `Property`, `Build`, `Shop`, `Job`, `Daily`, `Appointment`, `Phrase`, `Throne`, `Court`. `Net.listen` keeps one listener per action.
+  `Inventory`, `Counter`, `Exchange`, `Property`, `Build`, `Shop`, `Job`, `Daily`, `Appointment`, `Phrase`, `Throne`, `Court`, `Decree`. `Net.listen` keeps one listener per action.
 
 ## Working with the user
 
