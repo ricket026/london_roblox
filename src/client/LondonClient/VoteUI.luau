@@ -1,6 +1,6 @@
 --!strict
 -- LondonClient.VoteUI (stub): votes of no confidence and vote-kicks (DESIGN §10). Plain on purpose.
---   A "Votes" button (top right, under Property): every player here, with "Kick" and, for those
+--   "Votes" in the More menu (top right): every player here, with "Kick" and, for those
 --   holding an office, "No confidence"; then a reason from the list, then Start.
 --   While a vote runs, a box low in the middle for everyone: who, why, time left, the tally, Yes / No
 --   (the one voted on sees it without the buttons).
@@ -153,7 +153,7 @@ end
 
 function VoteUI.init()
 	local gui = EconomyUI.gui()
-	button = ui.button(gui, "Votes", { Name = "VotesButton", AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -12, 0, 168), Size = UDim2.fromOffset(84, 30), TextSize = 16, Visible = false })
+	button = EconomyUI.menuButton("VotesButton", "Votes", 30)
 	panel, body = ui.panel("VotePanel", "Votes")
 	button.Activated:Connect(function()
 		if panel.Visible then

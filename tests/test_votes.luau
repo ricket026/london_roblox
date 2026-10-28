@@ -57,7 +57,7 @@ test("ten players; the King grants a title", function()
 	__advance(0)
 	ok(Throne.claim(P[1], "King"))
 	ok(Court.grantTitle(P[1], P[2], "Earl", "Kew"))
-	ok(P[5].PlayerGui.Economy.VotesButton.Visible)
+	ok(P[5].PlayerGui.Economy.More.VotesButton.Visible)
 end)
 
 test("no confidence: only against an office; one vote at a time; 60% of at least 6 votes removes the King", function()

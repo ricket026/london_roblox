@@ -557,6 +557,15 @@ Config.HOBBY_TITLES = {
 	Games = { { 3, "Club Player" }, { 6, "Chess Master" }, { 10, "Grandmaster of the Bandstand" } },
 }
 
+-- Letters (PLAYER_GATHERING §4, TECH §8; TASKS T33) --------------------------------------------
+Config.LETTER_STORE = "Letters_v1" -- DataStore: "m_<userId>" = that player's letterbox (a list)
+Config.LETTER_MAX = 300 -- characters in a letter
+Config.LETTER_STAMP = 1 -- pence for a stamp (the Penny Black)
+Config.LETTER_DAILY = 5 -- letters one account may send a (UTC) day
+Config.LETTER_BOX = 20 -- letters a letterbox holds; a full one takes no more
+Config.LETTER_KEEP_DAYS = 30 -- letters older than this are thrown away
+Config.LETTER_RATE = { count = 6, per = 10 } -- letter calls per player
+
 -- First join and goals (LOW_POP_AND_ONBOARDING §3-4; TASKS T25) ---------------------------------
 Config.ARRIVAL_SECONDS = 5 -- the arrival camera over the terminus (skippable)
 Config.ARRIVAL_CAMERA = { x = 300, y = 90, z = -1180 } -- where it starts, looking at SPAWN_POINT

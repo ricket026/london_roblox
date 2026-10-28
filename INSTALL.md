@@ -36,6 +36,7 @@ Never paste a `.rbxmx` file or anything starting with `<roblox` into a script.
 | 12 | Events: balcony appearance, the Coronation, the pea-souper fog; the event framework (T39) | ⬜ |
 | 13 | First join: arrival camera, rules card, first job; the "Next steps" goals (T25) | ⬜ |
 | 14 | The collection book and pastime titles (T27, T28) | ⬜ |
+| 15 | Letters to friends (T33) | ⬜ |
 
 Do the steps **in order**: each needs the ones before it (a script that waits for a missing one
 just hangs; `tools/check_install.py` checks this list against the code). The links always show
@@ -316,6 +317,7 @@ put their ids in `Config.EMOTE_ANIMATIONS`.
 - `Jobs` in ServerScriptService › LondonServer: [Jobs](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Jobs.luau) (bank-holiday pay)
 - `SpeechUI` in StarterPlayerScripts › LondonClient: [SpeechUI](https://github.com/ricket026/london_roblox/blob/m1-identity/src/client/LondonClient/SpeechUI.luau) (the Say button no longer covers Characters)
 - `Speech` in ServerScriptService › LondonServer: [Speech](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Speech.luau) (quiet in the throne room when the court sits)
+- `EconomyUI` in StarterPlayerScripts › LondonClient: [EconomyUI](https://github.com/ricket026/london_roblox/blob/m1-identity/src/client/LondonClient/EconomyUI.luau) (the **More** menu the new buttons go in)
 
 (If you pasted those earlier steps from today's code they're already up to date; pasting again does no harm.)
 
@@ -451,6 +453,30 @@ Test (Play): **Book** (top right, under Events): page by page (◀ ▶), what yo
 often, "? ? ?" for the rest. Feed the ducks or go mudlarking and open it again. Finishing a page
 tells you and everyone in the server. The **Pastimes** tab shows each hobby's level; titles
 unlock at levels 3, 6 and 10 (`Config.HOBBY_TITLES`): **Wear** one and it shows under your name.
+
+## Step 15: letters to friends
+**New scripts**
+- ModuleScript `Letters` inside ServerScriptService › **LondonServer**: [Letters](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Letters.luau)
+- ModuleScript `LettersUI` inside StarterPlayer › StarterPlayerScripts › **LondonClient**: [LettersUI](https://github.com/ricket026/london_roblox/blob/m1-identity/src/client/LondonClient/LettersUI.luau)
+
+**Replace**
+- `Config` in ReplicatedStorage › Shared: [Config](https://github.com/ricket026/london_roblox/blob/m1-identity/src/shared/Config.luau) (`LETTER_*`)
+- `PropertyUI` in StarterPlayerScripts › LondonClient: [PropertyUI](https://github.com/ricket026/london_roblox/blob/m1-identity/src/client/LondonClient/PropertyUI.luau) (a date fix)
+
+Start-up lines:
+- **LondonServer**: under `local Book = require(script:WaitForChild("Book"))` add
+  `local Letters = require(script:WaitForChild("Letters"))`, and under `Book.init()` add `Letters.init()`.
+- **LondonClient**: under the `BookUI` line add
+  ```lua
+  require(script:WaitForChild("LettersUI")).init() -- letters to friends (T33)
+  ```
+
+Test (Play, two players): **More › Letters › Write**, pick the other player, write, **Send**
+(a 1d stamp). They see "A letter from … has arrived" and **Letters (1)**; Read shows it. Letters
+to a Roblox friend who isn't in the server wait for their next visit. Letters use the
+`Letters_v1` DataStore, so in Studio they last until Play stops (the mock store). Real letters
+need **Studio access to API services** on, or the published game. Letters are only sent and read
+between players Roblox lets chat privately.
 
 ## After the last step: the start-up scripts
 Once every step above is in, the two start-up scripts can simply be **replaced entirely** with

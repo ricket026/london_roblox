@@ -76,8 +76,12 @@ end
 local renderPanel: () -> ()
 local openKeys: (deed: { [string]: any }) -> ()
 
+local MONTHS = { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" }
+
+-- "28 Oct" (the table form of os.date works everywhere in Roblox).
 local function dateText(t: number): string
-	return os.date("%d %b", t) :: string
+	local d = os.date("*t", t) :: any
+	return string.format("%d %s", d.day, MONTHS[d.month])
 end
 
 renderPanel = function()

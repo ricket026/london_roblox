@@ -314,7 +314,14 @@ Mark progress in the table in `activities/README.md`.
   🔒 Needs the place published and Studio API access on (ROADMAP "before M0" checklist).
 
 ### T32 · Parties and join-friends ⬜ · 2–6 players teleport/spawn together.
-### T33 · Daily tasks and letters 🟡 (3 daily tasks from Config.DAILY_POOL done; letters to do) · **Specs** PLAYER_GATHERING §4 · Filtered letters, `CanUsersDirectChatAsync` check (TECH §8).
+### T33 · Daily tasks and letters ✅ (code + tests; needs a Play-test) · **Specs** PLAYER_GATHERING §4 · Filtered letters, `CanUsersDirectChatAsync` check (TECH §8).
+- **Letters built** `LondonServer.Letters` + `LondonClient.LettersUI` (in the More menu),
+  `Config.LETTER_*`, `tests/test_letters.luau`. To players here or Roblox friends (offline too); a
+  letterbox per user in the `Letters_v1` DataStore; stored as written and filtered for the reader
+  when read (fail closed); `CanUsersDirectChatAsync` checked on send and on read; a 1d stamp
+  charged only once posted; 5 a day; 20 in a box; kept 30 days. **Still to do** calling cards
+  left at houses (with P10 visiting), "delivered to your house" (the letterbox prop at the door),
+  the Postman carrying player letters.
 
 ---
 

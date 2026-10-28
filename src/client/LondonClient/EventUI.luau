@@ -2,7 +2,7 @@
 -- LondonClient.EventUI (stub): events (EVENTS.md §1). Plain on purpose.
 --   A line under the proclamation banner while something is on: its name, the step (or "begins
 --   in"), time left and how far away it is.
---   An "Events" button (top right, under Votes): what's on (sign up to a part, leave; the host:
+--   "Events" in the More menu (top right): what's on (sign up to a part, leave; the host:
 --   Next step, End) and, for those who may host, what they can start.
 -- Server: LondonServer.Events (Event.Get / Start / SignUp / Leave / Advance / End; pushes
 --   Announce, Step, Finished, Notice).
@@ -142,7 +142,7 @@ function EventUI.init()
 		TextTruncate = Enum.TextTruncate.AtEnd,
 		Visible = false,
 	})
-	button = ui.button(gui, "Events", { Name = "EventsButton", AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -12, 0, 204), Size = UDim2.fromOffset(84, 30), TextSize = 16, Visible = false })
+	button = EconomyUI.menuButton("EventsButton", "Events", 10)
 	panel, body = ui.panel("EventPanel", "Events")
 	button.Activated:Connect(function()
 		panel.Visible = not panel.Visible

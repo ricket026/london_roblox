@@ -109,9 +109,10 @@ same for UI modules. `ReplicatedStorage.Shared` holds modules both sides use.
 | Server: ThroneRoom | throne room Open / Closed / Session (RoomZone), the floor, chat gating, audience book and queue |
 | Server: Events | event framework: `Config.EVENTS` data + `Events.hook`; host / schedule / random / decree; rewards |
 | Server: Onboarding | first join (rules card, starter job) and the "Next steps" goals (`Config.GOALS`) |
-| Server: Book | the collection book from `profile.collection`; completed pages |
+| Server: Book | the collection book from `profile.collection`; completed pages; hobby titles (Pastimes) |
+| Server: Letters | letters to friends (a DataStore letterbox per user; filtered on read; direct-chat check) |
 | Server: Admin, AdminLog, Analytics, Doors, Debug | M0 (Debug = Studio-only test bindable) |
-| Client: CharacterUI, IdentityUI, ClockHUD, Activities (+ Chess, Strength), EconomyUI, BuildUI, PropertyUI, ShopUI, JobUI, DailyUI, SpeechUI, ThroneUI, CourtUI, VoteUI, ThroneRoomUI, EventUI, OnboardingUI, BookUI | menus and HUD stubs |
+| Client: CharacterUI, IdentityUI, ClockHUD, Activities (+ Chess, Strength), EconomyUI, BuildUI, PropertyUI, ShopUI, JobUI, DailyUI, SpeechUI, ThroneUI, CourtUI, VoteUI, ThroneRoomUI, EventUI, OnboardingUI, BookUI, LettersUI | menus and HUD stubs (secondary panels open from `EconomyUI.menuButton`, the More menu) |
 
 Data (`Shared.Types`): one profile per account. **Account-wide**: money, collection, Robux
 purchases, outfits/vehicles/rental, moderation record. **Per character slot**: name and look.
@@ -139,7 +140,7 @@ Extension points:
 - New building piece: add a row to art/kit.md and the same entry to `Shared.Kit` (test_kit fails
   until both match); new colours go at the END of `Shared.Palette` (saved by index).
 - Net domains in use: `Profile`, `Admin`, `Identity`, `Character`, `Activity`, `Economy`,
-  `Inventory`, `Counter`, `Exchange`, `Property`, `Build`, `Shop`, `Job`, `Daily`, `Appointment`, `Phrase`, `Throne`, `Court`, `Decree`, `Vote`, `Room`, `Event`, `Onboarding`, `Book`. `Net.listen` keeps one listener per action.
+  `Inventory`, `Counter`, `Exchange`, `Property`, `Build`, `Shop`, `Job`, `Daily`, `Appointment`, `Phrase`, `Throne`, `Court`, `Decree`, `Vote`, `Room`, `Event`, `Onboarding`, `Book`, `Letter`. `Net.listen` keeps one listener per action.
 
 ## Working with the user
 

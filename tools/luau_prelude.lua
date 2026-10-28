@@ -1473,6 +1473,9 @@ methods("Player", {
 	GetRankInGroup = function()
 		return 0
 	end,
+	IsFriendsWith = function(self, other)
+		return __friends[tostring(self.UserId) .. ":" .. tostring(other)] == true or __friends[tostring(other) .. ":" .. tostring(self.UserId)] == true
+	end,
 	IsInGroup = function()
 		return false
 	end,
@@ -1728,13 +1731,23 @@ methods("MarketplaceService", {
 		return { Name = "?", PriceInRobux = 0 }
 	end,
 })
+__noDirectChat = {}
+__friends = {} -- __friends["<a>:<b>"] = true for Player:IsFriendsWith
 local TextChat = service("TextChatService")
 methods("TextChatService", {
 	CanUsersChatAsync = function()
 		return true
 	end,
-	CanUsersDirectChatAsync = function()
-		return true
+	-- like Roblox: the ids (of those asked) the requester may chat with; tests list blocked
+	-- pairs in __noDirectChat["<a>:<b>"] = true
+	CanUsersDirectChatAsync = function(self, requester, ids)
+		local out = {}
+		for _, id in ipairs(ids or {}) do
+			if not __noDirectChat[tostring(requester) .. ":" .. tostring(id)] and not __noDirectChat[tostring(id) .. ":" .. tostring(requester)] then
+				table.insert(out, id)
+			end
+		end
+		return out
 	end,
 	DisplayBubble = function() end,
 })

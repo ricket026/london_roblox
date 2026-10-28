@@ -8,6 +8,9 @@
 --     other systems add kinds with EconomyUI.onCounter(kind, fn(body, msg, order) -> nil).
 --   Offers to you: Exchange.Offered -> Accept / Decline (Exchange.Answer); Exchange.Closed.
 --   EconomyUI.toast(text) shows a short message at the bottom of the screen.
+--   EconomyUI.menuButton(name, label, order) -> TextButton: a button in the "More" menu (top
+--     right, under Property) for the panels that don't need a place of their own (Votes, Events,
+--     Book, Letters). The owner sets its Visible and Activated; the menu shows while any is visible.
 --   EconomyUI.openCounter(msg) re-shows the counter panel (other modules refresh their menus).
 --   EconomyUI.ui: the plain widgets (text, button, line, row, panel, clear, counter, focus) for the
 --   other stub UIs (PropertyUI, BuildUI), so they share one look until the UI pass.
@@ -37,6 +40,8 @@ local inv: { [string]: any } = { bag = {}, storage = {}, slots = Config.BAG_SLOT
 local counterKinds: { [string]: (ScrollingFrame, { [string]: any }, () -> number) -> () } = {}
 
 local gui: ScreenGui
+local moreButton: TextButton
+local moreFrame: Frame
 local walletLabel: TextLabel
 local bankLabel: TextLabel
 local bagButton: TextButton
@@ -629,6 +634,31 @@ local function build()
 	bagButton = button(gui, "Bag", { Name = "BagButton", AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -12, 0, 52), Size = UDim2.fromOffset(84, 34) })
 	bagButton.Activated:Connect(toggleBag)
 
+	-- "More": a grid of buttons to the left of the right-hand column
+	moreButton = button(gui, "More ▾", { Name = "MoreButton", AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -12, 0, 168), Size = UDim2.fromOffset(84, 30), TextSize = 16, Visible = false })
+	moreFrame = Instance.new("Frame")
+	moreFrame.Name = "More"
+	moreFrame.AnchorPoint = Vector2.new(1, 0)
+	moreFrame.Position = UDim2.new(1, -102, 0, 52)
+	moreFrame.Size = UDim2.fromOffset(252, 0)
+	moreFrame.AutomaticSize = Enum.AutomaticSize.Y
+	moreFrame.BackgroundColor3 = PAPER
+	moreFrame.BackgroundTransparency = 0.15
+	moreFrame.BorderSizePixel = 0
+	moreFrame.Visible = false
+	moreFrame.Parent = gui
+	local grid = Instance.new("UIGridLayout")
+	grid.CellSize = UDim2.fromOffset(120, 30)
+	grid.CellPadding = UDim2.fromOffset(4, 4)
+	grid.SortOrder = Enum.SortOrder.LayoutOrder
+	grid.Parent = moreFrame
+	local pad = Instance.new("UIPadding")
+	pad.PaddingLeft, pad.PaddingTop, pad.PaddingBottom = UDim.new(0, 4), UDim.new(0, 4), UDim.new(0, 4)
+	pad.Parent = moreFrame
+	moreButton.Activated:Connect(function()
+		moreFrame.Visible = not moreFrame.Visible
+	end)
+
 	bagPanel, bagBody = panel("BagPanel", "Bag")
 	givePanel, giveBody = panel("GivePanel", "Give")
 	counterPanel, counterBody, counterTitle = panel("CounterPanel", "Counter")
@@ -667,6 +697,29 @@ local function build()
 		Visible = false,
 	})
 	gui.Parent = player:WaitForChild("PlayerGui")
+end
+
+local function refreshMore()
+	local any = false
+	for _, b in moreFrame:GetChildren() do
+		if b:IsA("GuiButton") and b.Visible then
+			any = true
+		end
+	end
+	moreButton.Visible = any
+	if not any then
+		moreFrame.Visible = false
+	end
+end
+
+function EconomyUI.menuButton(name: string, label: string, order: number): TextButton
+	local b = button(moreFrame, label, { Name = name, LayoutOrder = order, TextSize = 16, Visible = false })
+	b:GetPropertyChangedSignal("Visible"):Connect(refreshMore)
+	b.Activated:Connect(function()
+		moreFrame.Visible = false
+	end)
+	refreshMore()
+	return b
 end
 
 function EconomyUI.init()

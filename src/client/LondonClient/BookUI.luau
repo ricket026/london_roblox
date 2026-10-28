@@ -1,6 +1,6 @@
 --!strict
 -- LondonClient.BookUI (stub): the collection book (ACTIVITIES §4). Plain on purpose.
---   A "Book" button (top right, under Events) opens one page at a time (◀ ▶): what you've found
+--   "Book" in the More menu (top right) opens one page at a time (◀ ▶): what you've found
 --   and how often, "? ? ?" for what you haven't, the page count, and a mark when it's complete.
 --   The Pastimes tab: each hobby's level and XP, the titles it unlocks, Wear / Take off.
 -- Server: LondonServer.Book (Book.Get / Pastimes / Wear; pushes Completed, Notice).
@@ -128,8 +128,7 @@ function BookUI.state(): { [string]: any }
 end
 
 function BookUI.init()
-	local gui = EconomyUI.gui()
-	button = ui.button(gui, "Book", { Name = "BookButton", AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -12, 0, 240), Size = UDim2.fromOffset(84, 30), TextSize = 16, Visible = false })
+	button = EconomyUI.menuButton("BookButton", "Book", 20)
 	panel, body, title = ui.panel("BookPanel", "Collection book")
 	button.Activated:Connect(function()
 		if panel.Visible then
