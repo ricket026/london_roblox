@@ -39,12 +39,15 @@ merged. Open a pull request only when the user asks.
 python3 tools/check_luau.py      # block/bracket balance, Module.field references, unused locals
 python3 tools/luau_test.py       # runs tests/*.luau against the real src/ modules (needs `pip install lupa`)
 python3 tools/chess_perft.py     # chess rules (Python port of Shared.Chess) vs standard counts
+python3 tools/check_sites.py     # Config map positions vs london.rbxl + map_layout (pip install lz4 zstandard)
 ```
 All must pass before you commit. `luau_test.py` converts src/ to plain Lua (`tools/luau2lua.py`,
 same line numbers) and runs it with `tools/luau_prelude.lua` standing in for Roblox: instances,
 signals, remotes, players, a DataStore, CFrame/Vector3 maths and **virtual time**
 (`__advance(seconds)`). Tests can boot the real server (`__run(__find("ServerScriptService.LondonServer"))`),
 add players (`__addPlayer`) and call remotes through `Net._dispatch`; see `tests/test_characters.luau`.
+Client modules load with `__asClient(player, fn)` (own module copies, LocalPlayer, pushes fire
+OnClientEvent); press buttons with `button.Activated:Fire()`; see `tests/test_economy_ui.luau`.
 **Write tests for every new system.** None of this is a type checker or the real engine: say plainly in your report what still needs a
 Play-test in Studio. Map positions can be checked against the place file's parts
 (the earlier review did this; positions for activity sites are in `Config`, with Y found by
@@ -59,8 +62,9 @@ raycast at runtime).
   of `Net.V` validators, a rate limit, and `can =` a `Roles.ACTIONS` entry when permissioned).
   Unknown or missing fields are rejected, so client payloads must match the schema exactly.
 - **A Luau line must never start with `(`**; bind a local first.
-- Money: integer pence only (`Shared.Money` to format). Spend with `Profiles.charge`, pay with
-  `Profiles.addPence` (until the Economy ledger task replaces both, see TASKS.md).
+- Money: integer pence only (`Shared.Money` to format). Every change goes through
+  `LondonServer.Economy` with a reason: `Economy.pay(player, pence, reason, ref)`,
+  `Economy.charge(...)` (wallet then bank), `Economy.change` (fines). Not `Profiles.addPence`.
 - Player-visible text in British English. Player-written text goes through `Shared.Text`
   filtering (fail closed). Names through `Shared.Names` rules.
 - UI is a deliberate **plain stub** (Garamond on dark panels) until the user supplies reference
@@ -80,13 +84,15 @@ same for UI modules. `ReplicatedStorage.Shared` holds modules both sides use.
 |---|---|
 | Shared: Config, Net, Roles, Money, Text, Types | foundations (M0) |
 | Shared: Stations, Names, Looks, Hobbies, Collection, Chess, Meter | role table, name rules, look presets, hobby levels, collection items, chess rules, timing meter |
-| Server: Profiles + Store | profile schema v2, session lock, autosave, mock store in Studio |
+| Shared: Items | every item: price, stack, use, holdable, furniture, player-made |
+| Server: Profiles + Store | profile schema v3, session lock, autosave, mock store in Studio |
 | Server: Characters | save slots, creator, linked slots, spawning from a HumanoidDescription, respawn |
 | Server: Identity | per-server roles with seats, overhead name tags |
 | Server: WorldClock | shared 24-min day, `Phase` attribute, `PhaseChanged` |
 | Server: Activities (+ Ducks, Strength, Mudlark, Chess) | activity framework and the first four activities |
+| Server: Economy, Inventory, Counters, Exchange, World | money ledger + bank, bag/storage + held item, NPC counters, hand-overs, map helpers |
 | Server: Admin, AdminLog, Analytics, Doors, Debug | M0 (Debug = Studio-only test bindable) |
-| Client: CharacterUI, IdentityUI, ClockHUD, Activities (+ Chess, Strength) | menus and HUD stubs |
+| Client: CharacterUI, IdentityUI, ClockHUD, Activities (+ Chess, Strength), EconomyUI | menus and HUD stubs |
 
 Data (`Shared.Types`): one profile per account. **Account-wide**: money, collection, Robux
 purchases, outfits/vehicles/rental, moderation record. **Per character slot**: name and look.
@@ -97,7 +103,10 @@ Extension points:
 - New activity: a module under `Activities/` returning `{ init(A), leave(player)? }`; add its name
   to `A.MODULES`. Use `A.claim/release`, `A.reward`, `A.score`, `A.board`, `A.ground`, `A.part`.
 - Something that must settle before a character switch: `Characters.onBeforeChange(fn)`.
-- Net domains in use: `Profile`, `Admin`, `Identity`, `Character`, `Activity`.
+- New NPC counter: `Counters.add{ id, kind, name, x, z, yaw }` (server) and, for a new kind,
+  `Counters.onOpen(kind, fn)` + `EconomyUI.onCounter(kind, fn)` (client).
+- Net domains in use: `Profile`, `Admin`, `Identity`, `Character`, `Activity`, `Economy`,
+  `Inventory`, `Counter`, `Exchange`. `Net.listen` keeps one listener per action.
 
 ## Working with the user
 

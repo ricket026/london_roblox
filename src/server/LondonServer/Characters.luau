@@ -25,6 +25,7 @@ local Looks = require(Shared:WaitForChild("Looks"))
 local Hobbies = require(Shared:WaitForChild("Hobbies"))
 local Types = require(Shared:WaitForChild("Types"))
 local Profiles = require(script.Parent:WaitForChild("Profiles"))
+local Economy = require(script.Parent:WaitForChild("Economy"))
 local Analytics = require(script.Parent:WaitForChild("Analytics"))
 local Identity = require(script.Parent:WaitForChild("Identity"))
 
@@ -302,7 +303,7 @@ function Characters.create(player: Player, key: string, first: any, last: any, l
 	if p.slots[key] then -- the name check yields; another request may have filled the slot
 		return "That slot is already in use."
 	end
-	if price > 0 and not Profiles.charge(player, price) then
+	if price > 0 and not Economy.charge(player, price, "character", "slot " .. key) then
 		return string.format("A new character costs %s.", Money.format(price))
 	end
 	local char = "c" .. p.nextChar
@@ -334,7 +335,7 @@ function Characters.link(player: Player, key: string, fromKey: string, first: an
 	if p.slots[key] or p.slots[fromKey] ~= from then -- changed while the name check yielded
 		return "Your slots changed. Please try again."
 	end
-	if not Profiles.charge(player, Config.SLOT_LINK_PRICE) then
+	if not Economy.charge(player, Config.SLOT_LINK_PRICE, "character", "link " .. key) then
 		return string.format("Sharing a character's progress costs %s.", Money.format(Config.SLOT_LINK_PRICE))
 	end
 	newSlot(p, key, from.char, f, l, look)

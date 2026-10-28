@@ -2,7 +2,7 @@
 -- LondonServer.Debug: Studio-only test bindable, ServerStorage.LondonDebug (never created live).
 -- From the Server datamodel: game.ServerStorage.LondonDebug:Invoke("givePence", userId, 120)
 -- Commands: profile, givePence, setStaff, rejoin, lockTest, raw, setRaw, admin, net, analytics,
--- setRole, clock, play.
+-- setRole, clock, play, giveItem, ledger, totals.
 local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -19,6 +19,8 @@ local Analytics = require(script.Parent:WaitForChild("Analytics"))
 local Identity = require(script.Parent:WaitForChild("Identity"))
 local Characters = require(script.Parent:WaitForChild("Characters"))
 local WorldClock = require(script.Parent:WaitForChild("WorldClock"))
+local Economy = require(script.Parent:WaitForChild("Economy"))
+local Inventory = require(script.Parent:WaitForChild("Inventory"))
 
 local Debug = {}
 
@@ -34,7 +36,19 @@ local cmds: { [string]: (...any) -> any } = {
 		return HttpService:JSONEncode(Profiles.get(plr(userId)))
 	end,
 	givePence = function(userId, n)
-		return Profiles.addPence(plr(userId), n)
+		return (Economy.change(plr(userId), n, "admin", "debug"))
+	end,
+	-- giveItem(userId, itemId, count): into the bag (furniture into storage)
+	giveItem = function(userId, itemId, count)
+		return Inventory.add(plr(userId), itemId, count or 1)
+	end,
+	-- ledger(userId): this session's money lines, newest first
+	ledger = function(userId)
+		return HttpService:JSONEncode(Economy.recent(plr(userId)))
+	end,
+	-- totals(): money in (+) and out (-) of this server by reason since it started
+	totals = function()
+		return HttpService:JSONEncode(Economy.totals())
 	end,
 	setStaff = function(userId, lvl)
 		plr(userId):SetAttribute(Roles.STAFF_ATTR, lvl)

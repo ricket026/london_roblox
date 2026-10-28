@@ -12,7 +12,7 @@ keep the scripts you touch to the list (or say why), run `tools/check_luau.py`, 
 
 ---
 
-## Done so far (2026-10-27, branch `m1-identity`)
+## Done so far (2026-10-28, branch `m1-identity`)
 
 | | What | Notes |
 |---|---|---|
@@ -22,6 +22,7 @@ keep the scripts you touch to the list (or say why), run `tools/check_luau.py`, 
 | ✅ | Station roles with seat limits + playtime gates, overhead tags | Not Play-tested |
 | ✅ | World clock (24-min day, phases) + clock HUD | Not Play-tested |
 | ✅ | Activity framework + ducks, test your strength, mudlarking, chess | Not Play-tested; chess rules pass perft |
+| ✅ | Phase 2 economy core: ledger, wallet HUD, bag, NPC counters, bank, hand-overs (T09, T10, T11, T15, P01) | Not Play-tested; `tests/test_economy*.luau`; INSTALL step 6 |
 
 ---
 
@@ -46,13 +47,15 @@ Specs: `PROPERTY.md`, `BUILDING.md`, `SHOPS.md` (user decisions 2026-10-27: port
 rent or buy, kit building + decor, wholesale + player-made goods). Do them in this order; the
 economy core (T09, T10, T15, T11) comes first and is listed under M2 below.
 
-### P01 · Items and inventory ⬜
+### P01 · Items and inventory ✅ (2026-10-28, not Play-tested)
 - **Specs** SHOPS §1 · **Depends** T09 · **Size** M
 - `Shared.Items` (definitions + categories), server `Inventory` (bag 20 stacks, storage), give
   prompt (both confirm), consumable/holdable use. Profile v3 field `inventory`.
 - **Done when** a player buys a bun at a counter (T15), carries it, gives it to a friend, who eats it.
+- **Built:** `Shared.Items`, `LondonServer.Inventory`, `LondonServer.Exchange`, client `EconomyUI`
+  (bag, Give, offer popup). Play-test: the held part's grip on R15 and R6, Give with 2 players.
 
-### P02 · Profile v3: deeds and storage ⬜
+### P02 · Profile v3: deeds and storage 🟡 (v3 schema + migration done; `PropertyBuild_v1` store to do)
 - **Specs** PROPERTY §6 · **Size** S · `properties`, `storage` (removals), `inventory` (P01) with a
   v2 → v3 migration in `Profiles`; new store `PropertyBuild_v1` written under the profile's lock
   token. Update `Shared.Types` and TECH §5.1.
@@ -160,17 +163,19 @@ economy core (T09, T10, T15, T11) comes first and is listed under M2 below.
 
 ## M2: economy and vehicles
 
-### T09 · Economy ledger ⬜
+### T09 · Economy ledger ✅ (2026-10-28, not Play-tested)
 - **Specs** ECONOMY §8, §9 · **Size** M
 - `Economy.change(player, delta, reason, ref?)` per spec: reason enum, debt only for fines (to
   −£5), large-transfer and admin/product logging, per-server totals per reason. Replace every
   `Profiles.addPence` / `Profiles.charge` call (Activities, Characters, Ducks).
 - **Done when** all money moves through it and an owner command prints faucet/sink totals.
+- **Built:** `LondonServer.Economy`; totals via Debug `totals` (Studio). A live-server owner chat
+  command (`/money`) is still to add to `Admin` with the staff panel.
 
-### T10 · Wallet HUD ⬜
+### T10 · Wallet HUD ✅ (in `EconomyUI`, not Play-tested)
 - Client stub showing wallet (and bank on tap) in £sd from `Profile.Wallet`. **Size** S
 
-### T11 · Bank and transfers ⬜
+### T11 · Bank and transfers ✅ (2026-10-28, not Play-tested)
 - **Specs** ECONOMY §7 · **Depends** T09 · **Size** M
 - Deposit/withdraw at the Bank of England counter and post offices (prompts), hand-over transfer
   (both confirm), daily £100 cap for accounts with < 5 h playtime.
@@ -192,11 +197,14 @@ economy core (T09, T10, T15, T11) comes first and is listed under M2 below.
 - **Done when** (ROADMAP M2) a player buys a bicycle that persists; a second player rides in a
   cab and an omnibus; hitting a pedestrian never hurts them.
 
-### T15 · Counter menu (buying from NPC sellers) ⬜
+### T15 · Counter menu (buying from NPC sellers) ✅ (2026-10-28, not Play-tested)
 - **Depends** T09, P01 · **Size** S · ROADMAP Phase 2 · A generic counter: prompt → list of items
   with prices (from Config / `Shared.Items`) → buy into the bag or storage. Reused by estate agents
   (P03), wholesale suppliers (S02), kiosks, the bicycle shop and tailors. Player-run shops (S01)
   use the same menu with the shop's own stock and prices.
+- **Built:** `LondonServer.Counters` (Config.COUNTERS: 5 banks/post offices, 6 shops, positions
+  pass `tools/check_sites.py`) + the counter panel in `EconomyUI`. New kinds:
+  `Counters.onOpen` (server) and `EconomyUI.onCounter` (client).
 
 ### T16 · Daily stipend and streak ⬜
 - **Specs** ECONOMY §4, PLAYER_GATHERING §4 · **Size** S · 1s, rising to 7s over a 7-day streak.

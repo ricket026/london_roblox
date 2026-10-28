@@ -20,7 +20,7 @@ type Profile = Types.Profile
 type Entry = { data: Profile, token: string, saving: boolean, lastTick: number, isNew: boolean }
 
 local Profiles = {}
-Profiles.VERSION = 2
+Profiles.VERSION = 3
 Profiles.TOKEN = (if game.JobId ~= "" then game.JobId else "studio") .. "/" .. HttpService:GenerateGUID(false)
 
 local store = Store.open(Config.PROFILE_STORE)
@@ -69,6 +69,12 @@ MIGRATIONS[1] = function(d)
 	d.name, d.jobs, d.hobbies, d.bests, d.titles, d.offices, d.licences = nil, nil, nil, nil, nil, nil, nil
 end
 
+-- v2 -> v3 (2026-10-28): inventory and property. New fields are filled in by reconcile; the
+-- unused v1 lease field goes.
+MIGRATIONS[2] = function(d)
+	d.rental = nil
+end
+
 local function key(userId: number): string
 	return "u_" .. userId
 end
@@ -81,10 +87,12 @@ function Profiles.defaults(): Profile
 		collection = {},
 		purchases = {},
 		outfits = { owned = {}, equipped = {} },
-		rental = { houseId = nil, paidUntil = 0 },
 		vehicles = {},
 		record = { arrests = 0, warnings = {}, mutedUntil = 0 },
-		limits = { activityWindow = 0, activityPaid = 0 },
+		limits = { activityWindow = 0, activityPaid = 0, transferDay = "", transferred = 0 },
+		inventory = { bag = {}, storage = {} },
+		properties = {},
+		nextDeed = 1,
 		settings = {},
 		firstJoin = os.time(),
 		playtime = 0,

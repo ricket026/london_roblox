@@ -203,4 +203,52 @@ Config.CHESS_START_DELAY = 3 -- seconds after both sit before the first move
 -- Board glyphs; swap for letters ("K", "Q"...) if a device lacks the chess font.
 Config.CHESS_GLYPHS = { K = "♚", Q = "♛", R = "♜", B = "♝", N = "♞", P = "♟" }
 
+-- Economy (LondonServer.Economy, ECONOMY.md §7-9) ------------------------------
+Config.DEBT_MAX = 240 * 5 -- fines may take a wallet down to -£5 (LAW §6)
+Config.LEDGER_MEMORY = 50 -- recent ledger lines kept per player this session (shown in the bank)
+Config.LEDGER_LOG_OVER = 240 * 10 -- single changes of £10+ are written to the owner's log
+Config.NEW_ACCOUNT_SECONDS = 5 * 3600 -- accounts with less playtime than this are "new" (ECONOMY §7)
+Config.NEW_ACCOUNT_DAILY_TRANSFER = 240 * 100 -- pence a new account may hand to others per UTC day (£100)
+Config.BANK_RATE = { count = 6, per = 5 } -- deposits/withdrawals per player
+Config.BANK_PRESETS = { 12, 60, 240, 1200 } -- quick amounts in the bank menu (1s, 5s, £1, £5)
+
+-- Inventory (LondonServer.Inventory, SHOPS.md §1) -------------------------------
+Config.BAG_SLOTS = 20 -- stacks carried
+Config.INVENTORY_RATE = { count = 8, per = 4 } -- use/hold calls per player
+Config.HOLD_PART_SIZE = 0.6 -- studs, size of the greybox held item
+
+-- Hand-overs between players (LondonServer.Exchange) --------------------------
+Config.EXCHANGE_RANGE = 10 -- studs between giver and receiver
+Config.EXCHANGE_TIMEOUT = 30 -- seconds an offer waits for an answer
+Config.EXCHANGE_RATE = { count = 4, per = 10 } -- offers per player
+
+-- NPC counters (LondonServer.Counters, TASKS T15) -------------------------------
+-- kind "shop" sells `stock` (item ids, at the item's base price × markup); kind "bank" is a bank or
+-- post office counter (deposits/withdrawals). x/z are map studs, Y by raycast; yaw = degrees the
+-- counter faces, toward its customers (0 = -Z, 90 = -X, 180 = +Z, 270 = +X). Positions pass
+-- tools/check_sites.py (not on a lot, a carriageway or a landmark); nudge them in Studio.
+Config.COUNTER_RANGE = 12 -- studs a customer may stand from the counter
+Config.COUNTER_RATE = { count = 6, per = 3 } -- buy calls per player
+Config.COUNTERS = {
+	{ id = "bank_city", kind = "bank", name = "Bank of England", x = -14, z = -2560, yaw = 270 }, -- east face of the Bank
+	{ id = "po_trafalgar", kind = "bank", name = "Post Office, Charing Cross", x = 40, z = -1140, yaw = 180 },
+	{ id = "po_covent", kind = "bank", name = "Post Office, Covent Garden", x = -216, z = -1490, yaw = 270 },
+	{ id = "po_mayfair", kind = "bank", name = "Post Office, Mayfair", x = -690, z = 226, yaw = 180 }, -- Berkeley Sq, facing Davies St
+	{ id = "po_eastend", kind = "bank", name = "Post Office, Spitalfields", x = -440, z = -2975, yaw = 180 }, -- Spitalfields Market
+	{ id = "kiosk_park", kind = "shop", name = "Park Refreshment Kiosk", x = 150, z = -268, yaw = 90,
+		stock = { "tea", "lemonade", "bun", "cake_slice", "sandwich" } },
+	{ id = "stall_fruit", kind = "shop", name = "Fruit & Flowers", x = -170, z = -1334, yaw = 180,
+		stock = { "apple", "orange", "violets", "rose" } },
+	{ id = "newsagent_trafalgar", kind = "shop", name = "Newsagent", x = 100, z = -1000, yaw = 180,
+		stock = { "newspaper", "letter_paper", "calling_card" } },
+	{ id = "chemist_leicester", kind = "shop", name = "Chemist", x = -305, z = -1086, yaw = 90,
+		stock = { "smelling_salts", "motor_spirit" } },
+	{ id = "ironmonger_clerkenwell", kind = "shop", name = "Ironmonger", x = -640, z = -2132, yaw = 0, -- pavement outside Smithfield
+		stock = { "watering_can", "seed_packet", "fishing_rod_fine" } },
+	{ id = "furniture_clerkenwell", kind = "shop", name = "Furniture Warehouse", x = -570, z = -2132, yaw = 0,
+		stock = { "bed_double", "wardrobe", "table_dining", "armchair", "sofa", "sideboard", "bookcase", "desk",
+			"fireplace", "standard_lamp", "chandelier", "clock_long", "plant_pot", "piano_upright", "kitchen_range",
+			"dresser", "sink", "counter_till", "display_case", "barrel", "flower_stand" } },
+}
+
 return Config

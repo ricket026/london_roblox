@@ -73,6 +73,19 @@ MODULES
              Activity.StrengthSwing / ChessMove / ChessResign.
     WorldClock (M1) shared clock from server time (Config.DAY_MINUTES), drives Lighting.ClockTime,
              Lighting attr "Phase", WorldClock.PhaseChanged for lamplighters (M3).
+    Economy (Phase 2) the money ledger: every change has a reason (REASONS: faucet / sink / move),
+             change/pay/charge (wallet then bank, all or nothing), deposit/withdraw, transfer
+             (new accounts: Config.NEW_ACCOUNT_DAILY_TRANSFER a day), recent lines + server totals,
+             big changes to AdminLog. Remotes Economy.Ledger / Bank. Use it, not Profiles.addPence.
+    Inventory (Phase 2) bag (Config.BAG_SLOTS stacks) + storage (furniture, no limit) in the
+             profile; stacks keep the maker of player-made items. Held item = welded part
+             "HeldItem" + player attr HeldItem. Remotes Inventory.Get / Use / Hold; pushes State.
+    World    ground raycast (skips markers and built folders), part, folder, near, sign.
+    Counters (Phase 2) NPC counters from Config.COUNTERS (shop / bank; others via onOpen) built in
+             workspace.Counters; prompt pushes Counter.Open. Remote Counter.Buy. Counters.add for
+             estate agents and wholesalers (Phase 3-4).
+    Exchange (Phase 2) in-person hand-overs of money and/or a stack; checked again on accept.
+             Remotes Exchange.Offer / Answer / Cancel; pushes Offered, Closed.
   ReplicatedStorage.Shared (M1 additions)
     Stations every role, its station, claim rule, seats, playtime gate.
     Names    name rules + period name suggestions.
@@ -80,12 +93,17 @@ MODULES
     Hobbies  hobby XP -> level (Config.HOBBY_XP_*).
     Chess    full chess rules (server authority, client move hints).
     Meter    timing meter curve shared by client and server.
-  StarterPlayerScripts.LondonClient  wallet state + staff notices into RBXSystem chat.
+    Items    (Phase 2) every item: name, category, base price, stack size, use text, holdable,
+             furniture kit id, player-made.
+  StarterPlayerScripts.LondonClient  boots the UI modules + staff notices into RBXSystem chat.
     CharacterUI (stub) character menu at session start / "Characters" button: slots, creator,
              share progress, rename, delete. Menu camera from Config.MENU_CAMERA.
     IdentityUI (stub) "Station" role menu bottom-left.
     ClockHUD   (stub) "6:45 pm · Dusk" at the top.
     Activities (stub) reward toasts + Strength meter + Chess board for seated players.
+    EconomyUI  (stub) wallet top right, bag (B), Give, counter menus (shop, bank;
+             EconomyUI.onCounter(kind, fn) for more), offer popup, toasts. The only module that
+             listens to Profile.Wallet (Net.listen keeps one listener per action).
   ReplicatedFirst.LoadingScreen       stub title card until "ProfileLoaded".
 
 STAFF
@@ -96,6 +114,8 @@ OPEN / LATER
   Console shows 3x "ContentId rbxassetid://203785492 ... Asset type does not match" with all
   London scripts disabled too: engine/baseplate noise, not ours.
   Money deltas (TECH §5.1 note) not separate yet: whole profile is saved under the session lock.
+  Counters stand where tools/check_sites.py says the ground is clear (no lot, carriageway or
+  landmark); it reads parts only, so check terrain slopes and facing in Studio.
   Offline mutes not supported (target must be in the server). Consider Players:BanAsync at publish.
 ]]
 -- 2026-10-26 LondonServer.Doors: tag "Door" + attrs DoorHinge (Vector3), DoorOpenDeg, DoorGroup, DoorLocked;

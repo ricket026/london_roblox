@@ -25,7 +25,13 @@ export type Progress = {
 	honours: { string }, -- cosmetic "highest honour held" records (COURT_PARLIAMENT, Q4)
 }
 
--- Schema v2 (TECH.md §5.1, revised 2026-10-27 for character slots). One per account.
+-- One stack of items (Shared.Items). `by` / `byName`: the maker of a player-made item.
+export type Stack = { i: string, n: number, by: number?, byName: string? }
+
+-- A property deed (PROPERTY.md §6); filled in by LondonServer.Property.
+export type Deed = { [string]: any }
+
+-- Schema v3 (TECH.md §5.1; v2 2026-10-27 character slots, v3 2026-10-28 inventory + property). One per account.
 export type Profile = {
 	v: number, -- schema version, migrated on load
 	-- account-wide
@@ -34,10 +40,15 @@ export type Profile = {
 	collection: { [string]: number }, -- Shared.Collection id -> times found
 	purchases: { [string]: number }, -- Robux gamepass / product id -> count (M9)
 	outfits: { owned: { string }, equipped: { [string]: string } },
-	rental: { houseId: string?, paidUntil: number },
 	vehicles: { { id: string, kind: string, livery: string, condition: number } },
 	record: { arrests: number, warnings: { any }, mutedUntil: number },
-	limits: { activityWindow: number, activityPaid: number }, -- hourly pastime pay cap (os.time window start)
+	limits: {
+		activityWindow: number, activityPaid: number, -- hourly pastime pay cap (os.time window start)
+		transferDay: string, transferred: number, -- pence handed to others on that UTC day (new accounts)
+	},
+	inventory: { bag: { Stack }, storage: { Stack } }, -- bag = carried (Config.BAG_SLOTS); storage = home/shop
+	properties: { [string]: Deed }, -- deed id -> deed (PROPERTY.md)
+	nextDeed: number,
 	settings: { [string]: any },
 	firstJoin: number,
 	playtime: number, -- seconds, whole account

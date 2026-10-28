@@ -22,6 +22,7 @@ local Collection = require(Shared:WaitForChild("Collection"))
 local Profiles = require(script.Parent:WaitForChild("Profiles"))
 local Analytics = require(script.Parent:WaitForChild("Analytics"))
 local Characters = require(script.Parent:WaitForChild("Characters"))
+local Economy = require(script.Parent:WaitForChild("Economy"))
 
 local A = {}
 A.MODULES = { "Ducks", "Strength", "Mudlark", "Chess" }
@@ -86,7 +87,7 @@ function A.reward(player: Player, opts: RewardOpts)
 	end
 	local msg: { [string]: any } = { activity = opts.activity }
 	local pence = math.min(math.floor(opts.pence or 0), payRoom(p))
-	if pence > 0 and Profiles.addPence(player, pence) then
+	if pence > 0 and Economy.pay(player, pence, "pastime", opts.activity) then
 		p.limits.activityPaid += pence
 		msg.pence = Money.format(pence)
 	elseif (opts.pence or 0) > 0 then

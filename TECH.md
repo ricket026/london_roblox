@@ -87,21 +87,25 @@ Workspace
 
 ### 5.1 Player profile (DataStore `Profile_v1`, key `u_<userId>`)
 
-Schema v2 (2026-10-27): one profile per account holding character save slots. Exact types in
-`Shared.Types`; v1 profiles migrate on load (the old identity becomes slot 1).
+Schema v3 (2026-10-28): one profile per account holding character save slots. Exact types in
+`Shared.Types`; older profiles migrate on load (v1: the old identity becomes slot 1; v2: the
+unused `rental` field goes, and inventory, properties and the transfer limits are added).
 
 ```lua
 {
-  v = 2,                    -- schema version, migrate on load
+  v = 3,                    -- schema version, migrate on load
   -- account-wide (shared by every character)
   pence = 0, bank = 0,      -- wallet and bank, integer pence
   collection = {},          -- curio id -> times found
   purchases = {},           -- Robux gamepass / product id -> count
   outfits = { owned = {}, equipped = {} },
-  rental = { houseId = nil, paidUntil = 0 },
   vehicles = { { id = "", kind = "hansom", livery = "", condition = 100 } },
   record = { arrests = 0, warnings = {}, mutedUntil = 0 },  -- moderation follows the player
-  limits = { activityWindow = 0, activityPaid = 0 },       -- hourly pastime pay cap
+  limits = { activityWindow = 0, activityPaid = 0,         -- hourly pastime pay cap
+             transferDay = "", transferred = 0 },           -- new-account hand-over cap (UTC day)
+  inventory = { bag = { { i = "tea", n = 2, by = nil, byName = nil } }, storage = {} },
+  properties = {},          -- deeds (PROPERTY §6, Phase 3)
+  nextDeed = 1,
   settings = {}, firstJoin = 0, playtime = 0,
   -- characters (Config.MAX_SLOTS; string keys because DataStore JSON can't hold sparse arrays)
   slots = { ["1"] = { char = "c1", name = { first, last, changedAt }, look = { skin, hair, outfit }, createdAt } },

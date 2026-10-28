@@ -9,7 +9,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 
 local Config = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Config"))
-local Profiles = require(script.Parent.Parent:WaitForChild("Profiles"))
+local Economy = require(script.Parent.Parent:WaitForChild("Economy"))
 local WorldClock = require(script.Parent.Parent:WaitForChild("WorldClock"))
 
 local Ducks = {}
@@ -119,7 +119,7 @@ local function feed(player: Player, standPos: Vector3)
 		A.notice(player, "The birds are busy. Try again in a moment.")
 		return
 	end
-	if not Profiles.addPence(player, -Config.DUCKS_SEED_PRICE) then
+	if not Economy.charge(player, Config.DUCKS_SEED_PRICE, "purchase", "duck_seed") then
 		A.notice(player, string.format("A bag of seed costs %dd.", Config.DUCKS_SEED_PRICE))
 		return
 	end

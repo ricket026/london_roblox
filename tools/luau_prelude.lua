@@ -188,7 +188,7 @@ function __advance(dt)
 			task.spawn(item.fn, table.unpack(item.args, 1, item.args.n))
 		end
 	end
-	__now = target
+	__now = math.max(__now, target) -- a nested __advance (from inside a test) may have gone further
 end
 local rawclock = os.clock
 os.clock = function()
@@ -1348,6 +1348,12 @@ function __newCharacter(name)
 	head.Size = v3(2, 1, 1)
 	head.CFrame = cf(0, 4.5, 0)
 	head.Parent = m
+	for _, hand in ipairs({ "RightHand", "LeftHand" }) do
+		local h = __newInstance("Part", hand)
+		h.Size = v3(0.6, 0.6, 0.6)
+		h.CFrame = cf(hand == "RightHand" and 1.5 or -1.5, 2, 0)
+		h.Parent = m
+	end
 	m.PrimaryPart = root
 	return m
 end
@@ -1870,6 +1876,8 @@ function __load(obj)
 	end
 	return fn
 end
+local clientLoaded = {}
+local loadingClient = false
 local rawrequire = require
 function require(obj)
 	if type(obj) ~= "table" then
@@ -1878,17 +1886,34 @@ function require(obj)
 	if not obj:IsA("ModuleScript") then
 		error("require() needs a ModuleScript, got " .. tostring(obj.ClassName) .. " " .. obj:GetFullName())
 	end
-	local hit = loaded[obj]
+	local cache = loadingClient and clientLoaded or loaded
+	local hit = cache[obj]
 	if hit then
 		if hit.loading then
 			error("circular require of " .. obj:GetFullName())
 		end
 		return hit.value
 	end
-	loaded[obj] = { loading = true }
+	cache[obj] = { loading = true }
 	local v = __load(obj)()
-	loaded[obj] = { value = v }
+	cache[obj] = { value = v }
 	return v
+end
+-- Client side: __asClient(player, fn) runs fn as that player's client. Players.LocalPlayer is
+-- set, pushes to that player fire OnClientEvent, client calls come from them, and require()
+-- inside fn loads separate client copies of modules (a client has its own Net, listeners...).
+-- Only loading is switched, so fn must not yield; code that runs later keeps its copies.
+function __asClient(player, fn)
+	rawget(game:GetService("Players"), "_props").LocalPlayer = player
+	__localPlayer = player
+	__clientListening = true
+	local wasServer = __isServer
+	__isServer, loadingClient = false, true
+	local ok, err = pcall(fn)
+	__isServer, loadingClient = wasServer, false
+	if not ok then
+		error(err, 0)
+	end
 end
 -- Run a Script/LocalScript (boot scripts) in its own thread.
 function __run(obj)
