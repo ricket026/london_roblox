@@ -31,6 +31,7 @@ Never paste a `.rbxmx` file or anything starting with `<roblox` into a script.
 | 7 | Homes and building: estate agents, rent/buy, plots, template houses, build mode, keys (Phase 3) | ⬜ |
 | 8 | Shops, jobs and gas lamps: tills, suppliers, stalls, postman, newsboy, lamplighter, baker, carpenter, shop assistant (Phases 4–5, T04) | ⬜ |
 | 9 | Appointments at the hubs every 10 minutes, today's tasks panel (T30, T33) | ⬜ |
+| 10 | Quick phrases and gestures: speak without typing (T05) | ⬜ |
 
 Do the steps **in order**: each needs the ones before it (a script that waits for a missing one
 just hangs; `tools/check_install.py` checks this list against the code). The links always show
@@ -257,9 +258,7 @@ Test (Play; two players for buying: Test › Clients and Servers):
 - ModuleScript `Appointments` inside ServerScriptService › **LondonServer**: [Appointments](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Appointments.luau)
 - ModuleScript `DailyUI` inside StarterPlayer › StarterPlayerScripts › **LondonClient**: [DailyUI](https://github.com/ricket026/london_roblox/blob/m1-identity/src/client/LondonClient/DailyUI.luau)
 
-After this step the two start-up scripts can simply be **replaced entirely** with the GitHub
-versions ([server](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/init.server.luau), [client](https://github.com/ricket026/london_roblox/blob/m1-identity/src/client/LondonClient/init.client.luau)).
-Or add the lines by hand:
+Start-up lines:
 - **LondonServer**: under `local Daily = require(script:WaitForChild("Daily"))` add
   `local Appointments = require(script:WaitForChild("Appointments"))`, and under `Jobs.init()` add
   `Appointments.init()`.
@@ -272,4 +271,28 @@ Test (Play): under the clock, "Next: The Changing of the Guard at the Palace · 
 when it starts a red flag goes up there and the line says "Now:". Stand by the flag for half a
 minute: a memento goes in your collection book. **Today** shows three tasks (they pay 2s each)
 and your stipend streak (1s on the first day, up to 7s on the seventh day in a row).
+
+## Step 10: quick phrases and gestures
+**New scripts**
+- ModuleScript `Phrases` inside ReplicatedStorage › **Shared**: [Phrases](https://github.com/ricket026/london_roblox/blob/m1-identity/src/shared/Phrases.luau)
+- ModuleScript `Speech` inside ServerScriptService › **LondonServer**: [Speech](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Speech.luau)
+- ModuleScript `SpeechUI` inside StarterPlayer › StarterPlayerScripts › **LondonClient**: [SpeechUI](https://github.com/ricket026/london_roblox/blob/m1-identity/src/client/LondonClient/SpeechUI.luau)
+
+Start-up lines:
+- **LondonServer**: under `local Appointments = require(script:WaitForChild("Appointments"))` add
+  `local Speech = require(script:WaitForChild("Speech"))`, and under `Appointments.init()` add `Speech.init()`.
+- **LondonClient**: under the `DailyUI` line add
+  ```lua
+  require(script:WaitForChild("SpeechUI")).init() -- quick phrases and gestures (T05)
+  ```
+
+Test (Play, two players): **Say** (bottom left) › pick a line: a speech bubble over your head for
+both players, and the line in the other player's chat. **Wave**, **Cheer** and **Point** play
+Roblox's own emotes. Bow, curtsy, salute, doff hat and applaud need animations: publish them and
+put their ids in `Config.EMOTE_ANIMATIONS`.
+
+## After the last step: the start-up scripts
+Once every step above is in, the two start-up scripts can simply be **replaced entirely** with
+the GitHub versions instead of adding lines by hand:
+[server](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/init.server.luau), [client](https://github.com/ricket026/london_roblox/blob/m1-identity/src/client/LondonClient/init.client.luau).
 

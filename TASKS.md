@@ -23,6 +23,7 @@ keep the scripts you touch to the list (or say why), run `tools/check_luau.py`, 
 | ✅ | World clock (24-min day, phases) + clock HUD | Not Play-tested |
 | ✅ | Activity framework + ducks, test your strength, mudlarking, chess | Not Play-tested; chess rules pass perft |
 | ✅ | Phase 2 economy core: ledger, wallet HUD, bag, NPC counters, bank, hand-overs (T09, T10, T11, T15, P01) | Not Play-tested; `tests/test_economy*.luau`; INSTALL step 4 |
+| ✅ | Quick phrases as speech bubbles + gestures (T05) | Not Play-tested; `tests/test_speech.luau`; INSTALL step 10 |
 | ✅ | Daily stipend streak (T16), daily tasks (T33 part), hub appointments every 10 min with mementos (T30), DailyUI | Not Play-tested; `tests/test_daily.luau`; INSTALL steps 4, 9 |
 | ✅ | Streets: gas lamps (T04), lamplighter (T18), lighting by phase + weather (T07), terminus spawn (T03) | Not Play-tested; `tests/test_lamps.luau`; INSTALL steps 4, 6, 8 |
 | ✅ | 3D part outfits and hats for all six outfits (T06) | Not Play-tested; `tests/test_wardrobe.luau`; INSTALL step 4 |
@@ -148,7 +149,7 @@ economy core (T09, T10, T15, T11) comes first and is listed under M2 below.
   the lamplighter job (T18) takes over.
 - **Done when** every street has lamps that light at Dusk and go out at Dawn; < 1,500 parts.
 
-### T05 · Quick-phrase wheel + etiquette emotes ⬜
+### T05 · Quick-phrase wheel + etiquette emotes ✅ (2026-10-28: Shared.Phrases, Speech, SpeechUI; wave/cheer/point built in, the other gestures wait for animation ids in Config.EMOTE_ANIMATIONS; not Play-tested)
 - **Specs** DESIGN §9 (chat-light RP is core, Q5), COURT §4 bow/curtsy · **Size** M
 - Game-written phrase list in a Shared module (period lines: "Good day!", "Your Majesty.",
   "Stop, thief!", "Cab, sir?"...), sent by id, shown as speech bubbles to everyone nearby

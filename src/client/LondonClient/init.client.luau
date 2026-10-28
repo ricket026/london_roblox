@@ -19,6 +19,7 @@ require(script:WaitForChild("PropertyUI")).init() -- estate agents, your propert
 require(script:WaitForChild("ShopUI")).init() -- shop tills, market stalls, suppliers (Phase 4)
 require(script:WaitForChild("JobUI")).init() -- job tracker (Phase 5)
 require(script:WaitForChild("DailyUI")).init() -- appointments countdown, today's tasks (Phase 6)
+require(script:WaitForChild("SpeechUI")).init() -- quick phrases and gestures (T05)
 
 Net.listen("Admin", "Notice", function(msg)
 	if type(msg.text) ~= "string" then

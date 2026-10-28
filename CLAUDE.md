@@ -21,8 +21,9 @@ contract, the pipeline, the asset list), decisions in `OPEN_QUESTIONS.md`. Modul
     scripts (`LondonServer`, `LondonClient`) give the exact lines to add.
   - **Update `INSTALL.md`** (status table + a new step) in the same commit. Links show the
     latest code, so a change to an already-listed script can make an earlier step need a later
-    one: run `tools/check_install.py` and move or merge steps until it passes. Only the last
-    step may say "replace the start-up scripts with the GitHub versions".
+    one: run `tools/check_install.py` and move or merge steps until it passes. New steps go
+    above the closing "After the last step" section (the only place that says to replace the
+    start-up scripts with the GitHub versions).
   - Never ask them to paste generated or `.rbxmx` text into a script. Don't build installers
     or generators for them (they asked for plain copy-paste).
 - Agents with Studio access (Studio MCP, TECH.md §1): any script you change in Studio must be
@@ -102,8 +103,9 @@ same for UI modules. `ReplicatedStorage.Shared` holds modules both sides use.
 | Server: Jobs (+ Shared.Ranks) | job framework (duty by role, server-checked steps, pay caps, ranks) and Postman, Newsboy, Lamplighter, Baker, Carpenter |
 | Server: Lamps | gas lamps along every road (from MapLayoutData), lit by lamplighters or the city's fallback |
 | Server: Daily, Appointments | stipend streak + daily tasks (`Daily.record(player, event)`), hub appointments every 10 min |
+| Shared: Phrases + Server: Speech | quick phrases as speech bubbles (chat-light RP) |
 | Server: Admin, AdminLog, Analytics, Doors, Debug | M0 (Debug = Studio-only test bindable) |
-| Client: CharacterUI, IdentityUI, ClockHUD, Activities (+ Chess, Strength), EconomyUI, BuildUI, PropertyUI, ShopUI, JobUI, DailyUI | menus and HUD stubs |
+| Client: CharacterUI, IdentityUI, ClockHUD, Activities (+ Chess, Strength), EconomyUI, BuildUI, PropertyUI, ShopUI, JobUI, DailyUI, SpeechUI | menus and HUD stubs |
 
 Data (`Shared.Types`): one profile per account. **Account-wide**: money, collection, Robux
 purchases, outfits/vehicles/rental, moderation record. **Per character slot**: name and look.
@@ -123,7 +125,7 @@ Extension points:
 - New building piece: add a row to art/kit.md and the same entry to `Shared.Kit` (test_kit fails
   until both match); new colours go at the END of `Shared.Palette` (saved by index).
 - Net domains in use: `Profile`, `Admin`, `Identity`, `Character`, `Activity`, `Economy`,
-  `Inventory`, `Counter`, `Exchange`, `Property`, `Build`, `Shop`, `Job`, `Daily`, `Appointment`. `Net.listen` keeps one listener per action.
+  `Inventory`, `Counter`, `Exchange`, `Property`, `Build`, `Shop`, `Job`, `Daily`, `Appointment`, `Phrase`. `Net.listen` keeps one listener per action.
 
 ## Working with the user
 

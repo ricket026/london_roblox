@@ -79,12 +79,14 @@ local function build(pos: Vector3, routeId: string, n: number): BasePart
 	local pole = World.part({ Name = "Pole", Size = Vector3.new(0.35, 9, 0.35), CFrame = CFrame.new(pos + Vector3.new(0, 4.5, 0)), Color = Palette.color("iron_black"), Material = Enum.Material.Metal })
 	pole.Parent = model
 	local lantern = World.part({ Name = "Lantern", Size = Vector3.new(0.9, 1.3, 0.9), CFrame = CFrame.new(pos + Vector3.new(0, 9.6, 0)), CanCollide = false })
-	local light = Instance.new("PointLight")
-	light.Range = Config.LAMP_LIGHT_RANGE
-	light.Brightness = 1.4
-	light.Color = LIT
-	light.Shadows = false
-	light.Parent = lantern
+	if Config.LAMP_LIGHTS then
+		local light = Instance.new("PointLight")
+		light.Range = Config.LAMP_LIGHT_RANGE
+		light.Brightness = 1.4
+		light.Color = LIT
+		light.Shadows = false
+		light.Parent = lantern
+	end
 	lantern:SetAttribute("Route", routeId)
 	lantern:SetAttribute("LampId", n)
 	lantern.Parent = model

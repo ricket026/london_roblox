@@ -74,6 +74,8 @@ MODULES
     WorldClock (M1) shared clock from server time (Config.DAY_MINUTES), drives Lighting.ClockTime,
              Lighting attr "Phase", WorldClock.PhaseChanged for lamplighters (M3). Tweens
              Lighting + Atmosphere per phase (Config.LIGHTING); setWeather clear/rain/fog.
+    Speech   quick phrases by id (Shared.Phrases): a bubble over the head for everyone and a chat
+             line for those within Config.SPEECH_RANGE. Remote Phrase.Say (event); push Said.
     Daily    stipend streak on the first arrival of each UTC day; 3 daily tasks per account
              (Config.DAILY_POOL) fed by Daily.record(player, event) from Jobs, Shops, Counters,
              Activities and Appointments. Pushes Daily.State/Notice.
@@ -144,6 +146,7 @@ MODULES
     ClockHUD   (stub) "6:45 pm · Dusk" at the top.
     Activities (stub) reward toasts + Strength meter + Chess board for seated players.
     ShopUI     (stub) counter kinds "playershop", "stall", "supplier" in EconomyUI's panel.
+    SpeechUI   (stub) "Say" panel: phrases by category, gestures (PlayEmote / EMOTE_ANIMATIONS).
     DailyUI    (stub) appointment countdown under the clock; "Today" tasks + streak panel.
     JobUI      (stub) job tracker top left: step, distance, shift pay, Skip; marker + hold prompt.
     BuildUI    (stub) build mode: orbit camera, catalogue, ghost + reasons, undo/redo; draws

@@ -168,6 +168,7 @@ Config.LAMP_SPACING = 120 -- studs between lamps along a road (alternating sides
 Config.LAMP_KERB = 1.5 -- studs from the kerb line onto the pavement
 Config.LAMP_ROUTE = 12 -- lamps per lamplighter route
 Config.LAMP_MIN_GAP = 30 -- studs: a lamp this close to another (junctions) isn't built
+Config.LAMP_LIGHTS = true -- real PointLights in lamps; false keeps only the glowing lantern (if phones lag)
 Config.LAMP_LIGHT_RANGE = 18 -- studs a lit lamp lights (style.md: warm pools, few lights)
 Config.LAMP_LIGHT_COLOUR = { 255, 196, 120 }
 Config.LAMP_NPC_DELAY = 180 -- seconds into dusk / dawn before the city's own lamplighters do the rest
@@ -465,5 +466,13 @@ Config.APPOINTMENTS = {
 	{ id = "guard", title = "The Changing of the Guard", place = "the Palace", x = 0, z = -20, memento = "memento_guard" },
 	{ id = "auction", title = "The flower auction", place = "Covent Garden market", x = -140, z = -1480, memento = "memento_auction" },
 }
+
+-- Speech (DESIGN §9 chat-light roleplay; TASKS T05) ---------------------------------------------
+Config.SPEECH_SECONDS = 4 -- how long a speech bubble stays up
+Config.SPEECH_RANGE = 70 -- studs: nearby players also get the line in their chat window
+Config.SPEECH_RATE = { count = 3, per = 6 } -- phrases per player
+-- Animation ids for the etiquette emotes without a Roblox default (Shared.Phrases.EMOTES).
+-- 0 = not made yet: the button says so. Never guess ids; the user publishes them.
+Config.EMOTE_ANIMATIONS = { bow = 0, curtsy = 0, doff = 0, salute = 0, applaud = 0 }
 
 return Config
