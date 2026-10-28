@@ -101,6 +101,10 @@ MODULES
              (newest 3), Decrees.recent for the Gazette; levers by Decrees.lever (bank_holiday sets
              workspace attr BankHolidayUntil; Jobs.pay ×Config.BANK_HOLIDAY_PAY). Remotes
              Decree.Get/Issue.
+    Votes    (M4, T38) one vote at a time: no confidence in a seated role (Config.CONFIDENCE_*;
+             passes → default role, Identity.bar, Court.undoGrantsBy) or a kick (Config.KICK_*;
+             kicked + per-server rejoin bar). Starter's yes, reasons from lists, early close,
+             lapses if the target leaves. Remotes Vote.Get/Start/Cast; pushes Open/Tally/Closed.
     Lamps    gas lamps built along MapLayoutData's roads (Config.LAMP_*), tag "Lamp", attrs
              Route/Lit; lamplighters (Jobs) or the city's fallback light and put them out.
     Economy (Phase 2) the money ledger: every change has a reason (REASONS: faucet / sink / move),
@@ -173,6 +177,8 @@ MODULES
              address, Renounce; for granters a player list, titles with a place, offices, the
              royal family, revoke with a reason, a confirm step; offer popup Accept/Decline;
              the Monarch's decree form; the decree banner for everyone.
+    VoteUI     (stub) "Votes" top right: players with Kick / No confidence, reasons, Start; the
+             vote box on the right with the tally and Yes / No.
     DailyUI    (stub) appointment countdown under the clock; "Today" tasks + streak panel.
     JobUI      (stub) job tracker top left: step, distance, shift pay, Skip; marker + hold prompt.
     BuildUI    (stub) build mode: orbit camera, catalogue, ghost + reasons, undo/redo; draws

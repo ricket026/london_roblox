@@ -125,6 +125,10 @@ function Throne.claim(player: Player, role: string): (boolean, string?)
 	if r and r.minPlaytime and Profiles.playtime(player) < r.minPlaytime then
 		return false, string.format("The throne needs %d h of playtime.", math.ceil(r.minPlaytime / 3600))
 	end
+	local barred = Identity.barred(player, role)
+	if barred then
+		return false, barred
+	end
 	accede(player, role)
 	return true
 end
@@ -138,7 +142,7 @@ local function offerNext(role: string)
 	local o = offers[role] or { player = nil :: any, expires = 0, asked = {} }
 	offers[role] = o
 	for _, royal in Identity.holdersOf("Royal") do
-		if not o.asked[royal] and royal.Parent == Players then
+		if not o.asked[royal] and royal.Parent == Players and not Identity.barred(royal, role) then
 			o.asked[royal] = true
 			o.player = royal
 			o.expires = os.clock() + Config.THRONE_OFFER_SECONDS

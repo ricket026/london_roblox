@@ -9,6 +9,8 @@
 -- Remotes (Identity domain, calls): Get, ChooseRole { role }.
 --   Identity.grant(player, roleId) (game-rule roles: throne, offices), Identity.holdersOf(roleId),
 --   Identity.refreshTag(player) (after the form of address changes).
+--   Identity.bar(player, roleId, seconds) / Identity.barred(player, roleId) -> reason? (a holder
+--   removed by no confidence can't take that role again for a while; per server, by user id).
 -- Pushes: Identity.State (to one player), Identity.Seats (to everyone, on any seat change).
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -27,6 +29,7 @@ Identity.NAME_ATTR = "RPName"
 
 local holders: { [string]: { Player } } = {} -- roleId -> players holding a limited seat
 local switchedAt: { [Player]: number } = {}
+local bars: { [number]: { [string]: number } } = {} -- userId -> roleId -> os.clock() the bar ends
 
 local function rpName(player: Player): string?
 	local a = player:GetAttribute(Identity.NAME_ATTR)
@@ -163,6 +166,22 @@ local function setRole(player: Player, roleId: string)
 	Net.pushAll("Identity", "Seats", { seats = seatCounts() })
 end
 
+function Identity.bar(player: Player, roleId: string, seconds: number)
+	local b = bars[player.UserId] or {}
+	bars[player.UserId] = b
+	b[roleId] = os.clock() + seconds
+end
+
+-- Why the player may not hold the role just now (a no-confidence bar), or nil.
+function Identity.barred(player: Player, roleId: string): string?
+	local ends = (bars[player.UserId] or {})[roleId]
+	local left = if ends then ends - os.clock() else 0
+	if left > 0 then
+		return string.format("You were voted out of that role; you can take it again in %d min.", math.ceil(left / 60))
+	end
+	return nil
+end
+
 -- Returns nil if the player may take the role, else the reason.
 function Identity.canTake(player: Player, roleId: string): string?
 	local r = Stations.BY_ID[roleId]
@@ -181,6 +200,10 @@ function Identity.canTake(player: Player, roleId: string): string?
 	end
 	if r.minPlaytime and Profiles.playtime(player) < r.minPlaytime then
 		return string.format("Needs %d h of playtime.", math.ceil(r.minPlaytime / 3600))
+	end
+	local barred = Identity.barred(player, roleId)
+	if barred then
+		return barred
 	end
 	if r.seats and #(holders[roleId] or {}) >= r.seats then
 		return "All seats are taken in this server."

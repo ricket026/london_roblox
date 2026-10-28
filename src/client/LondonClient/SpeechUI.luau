@@ -1,6 +1,6 @@
 --!strict
 -- LondonClient.SpeechUI (stub): the quick-phrase wheel and etiquette emotes (DESIGN §9, TASKS T05).
--- Plain on purpose. A "Say" button (bottom left, by the Station button) opens the phrases by
+-- Plain on purpose. A "Say" button (bottom left, after Station and Characters) opens the phrases by
 -- category and the emotes; a phrase goes to the server by id (Phrase.Say) and appears as a
 -- speech bubble for everyone. Lines said nearby (Phrase.Said) also go in the chat window.
 -- Emotes: Roblox's default wave / cheer / point (Humanoid:PlayEmote); the rest play
@@ -102,7 +102,7 @@ end
 
 function SpeechUI.init()
 	local gui = EconomyUI.gui()
-	button = ui.button(gui, "Say", { Name = "SayButton", AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0, 240, 1, -12), Size = UDim2.fromOffset(90, 40), Visible = false })
+	button = ui.button(gui, "Say", { Name = "SayButton", AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0, 388, 1, -12), Size = UDim2.fromOffset(90, 40), Visible = false })
 	panel, body = ui.panel("SpeechPanel", "Say")
 	button.Activated:Connect(function()
 		panel.Visible = not panel.Visible

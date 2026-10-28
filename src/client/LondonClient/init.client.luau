@@ -22,6 +22,7 @@ require(script:WaitForChild("DailyUI")).init() -- appointments countdown, today'
 require(script:WaitForChild("SpeechUI")).init() -- quick phrases and gestures (T05)
 require(script:WaitForChild("ThroneUI")).init() -- the throne: offers, proclamations, abdicate (T34)
 require(script:WaitForChild("CourtUI")).init() -- titles, offices, forms of address (T35, T08)
+require(script:WaitForChild("VoteUI")).init() -- no confidence and vote-kick (T38)
 
 Net.listen("Admin", "Notice", function(msg)
 	if type(msg.text) ~= "string" then

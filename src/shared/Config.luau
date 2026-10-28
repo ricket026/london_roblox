@@ -511,4 +511,22 @@ Config.DECREE_BOARDS = {
 Config.BANK_HOLIDAY_PAY = 1.5
 Config.BANK_HOLIDAY_SECONDS = Config.DAY_MINUTES * 60 -- one in-game day
 
+-- Votes: no confidence and vote-kick (DESIGN §10, COURT_PARLIAMENT §2; TASKS T38) -----------------
+Config.VOTE_SECONDS = 60 -- how long a vote stays open
+Config.VOTE_START_COOLDOWN = 600 -- seconds before the same player can start another vote
+Config.VOTE_RATE = { count = 6, per = 10 } -- vote calls per player
+-- No confidence in a seated role (King, Queen, royal family, Household, judges...): passes with
+-- at least this share of the votes cast as yes, and at least VOTES_MIN votes cast.
+Config.CONFIDENCE_SHARE = 0.6
+Config.CONFIDENCE_VOTES_MIN = 6
+Config.CONFIDENCE_TARGET_COOLDOWN = 900 -- seconds before the same holder can face another vote
+Config.CONFIDENCE_BAR_SECONDS = 1800 -- a removed holder can't take that role again for this long
+Config.CONFIDENCE_REASONS = { "Abusing the role", "Never here", "Disrupting the court" }
+-- Vote-kick: passes with yes votes from at least this share of the other players in the server,
+-- and at least KICK_YES_MIN yes votes. The kicked player can't rejoin this server for KICK_BAR.
+Config.KICK_SHARE = 0.6
+Config.KICK_YES_MIN = 8
+Config.KICK_BAR_SECONDS = 1800
+Config.KICK_REASONS = { "Griefing", "Random killing", "Harassment", "Exploiting" }
+
 return Config

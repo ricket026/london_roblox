@@ -278,6 +278,9 @@ local function canTakeRole(target: Player, role: string): string?
 	if not seatsFree(role) then
 		return "There's no seat free."
 	end
+	if Identity.barred(target, role) then
+		return "They were voted out of that role a short while ago."
+	end
 	return nil
 end
 

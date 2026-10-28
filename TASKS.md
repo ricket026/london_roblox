@@ -334,7 +334,14 @@ Mark progress in the table in `activities/README.md`.
   Studio (`yaw`), the Gazette front page (`Decrees.recent()`), the other levers as their systems
   arrive: `Decrees.lever(id, { name, check, apply })` for pardons (M5), summon/dissolve
   Parliament (M7), a ball or procession (T39).
-### T38 · No-confidence votes and vote-kick ⬜ · **Specs** DESIGN §10, COURT §2 · Thresholds per spec, logged.
+### T38 · No-confidence votes and vote-kick ✅ (code + tests; needs a Play-test) · **Specs** DESIGN §10, COURT §2 · Thresholds per spec, logged.
+- **Built** `LondonServer.Votes` + `LondonClient.VoteUI`, `Identity.bar` / `Identity.barred` (checked
+  by the role menu, the throne and Court offers), `Config.VOTE_*`, `CONFIDENCE_*`, `KICK_*`,
+  `tests/test_votes.luau`. No confidence against any seated role; vote-kick with a 30-minute
+  rejoin bar for that server; one vote at a time, closes early when all have voted; reasons from
+  fixed lists; AdminLog `vote.*`. Choices in Q30.
+- **Not yet** AFK removal from a seat (COURT §2 "AFK for 10 min"), the 5-minute claim cooldown
+  between seats, vote buttons in the quick-phrase wheel (DESIGN §9).
 ### T39 · Event framework ⬜ · **Specs** EVENTS §1, §3, §4 · Announce → gather → steps → finish, NPC fill, scheduling.
 ### T40 · Changing of the Guard + balcony appearance ⬜ · **Depends** T39, T24 · Route in `Map.Routes`.
 

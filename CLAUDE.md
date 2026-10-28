@@ -105,8 +105,9 @@ same for UI modules. `ReplicatedStorage.Shared` holds modules both sides use.
 | Server: Daily, Appointments | stipend streak + daily tasks (`Daily.record(player, event)`), hub appointments every 10 min |
 | Shared: Phrases + Server: Speech | quick phrases as speech bubbles (chat-light RP) |
 | Server: Throne, Court, Decrees (+ Shared.Titles) | the thrones (claim, succession, abdication, reign count); titles, Household offices, royal invitations, forms of address, precedence; royal decrees, decree boards, levers (bank holiday) |
+| Server: Votes | no-confidence votes (seated roles; bar via `Identity.bar`) and vote-kicks (rejoin bar) |
 | Server: Admin, AdminLog, Analytics, Doors, Debug | M0 (Debug = Studio-only test bindable) |
-| Client: CharacterUI, IdentityUI, ClockHUD, Activities (+ Chess, Strength), EconomyUI, BuildUI, PropertyUI, ShopUI, JobUI, DailyUI, SpeechUI, ThroneUI, CourtUI | menus and HUD stubs |
+| Client: CharacterUI, IdentityUI, ClockHUD, Activities (+ Chess, Strength), EconomyUI, BuildUI, PropertyUI, ShopUI, JobUI, DailyUI, SpeechUI, ThroneUI, CourtUI, VoteUI | menus and HUD stubs |
 
 Data (`Shared.Types`): one profile per account. **Account-wide**: money, collection, Robux
 purchases, outfits/vehicles/rental, moderation record. **Per character slot**: name and look.
@@ -131,7 +132,7 @@ Extension points:
 - New building piece: add a row to art/kit.md and the same entry to `Shared.Kit` (test_kit fails
   until both match); new colours go at the END of `Shared.Palette` (saved by index).
 - Net domains in use: `Profile`, `Admin`, `Identity`, `Character`, `Activity`, `Economy`,
-  `Inventory`, `Counter`, `Exchange`, `Property`, `Build`, `Shop`, `Job`, `Daily`, `Appointment`, `Phrase`, `Throne`, `Court`, `Decree`. `Net.listen` keeps one listener per action.
+  `Inventory`, `Counter`, `Exchange`, `Property`, `Build`, `Shop`, `Job`, `Daily`, `Appointment`, `Phrase`, `Throne`, `Court`, `Decree`, `Vote`. `Net.listen` keeps one listener per action.
 
 ## Working with the user
 
