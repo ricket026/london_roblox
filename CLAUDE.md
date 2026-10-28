@@ -104,9 +104,9 @@ same for UI modules. `ReplicatedStorage.Shared` holds modules both sides use.
 | Server: Lamps | gas lamps along every road (from MapLayoutData), lit by lamplighters or the city's fallback |
 | Server: Daily, Appointments | stipend streak + daily tasks (`Daily.record(player, event)`), hub appointments every 10 min |
 | Shared: Phrases + Server: Speech | quick phrases as speech bubbles (chat-light RP) |
-| Server: Throne | the King's and Queen's thrones: claim, line of succession, abdication, reign count |
+| Server: Throne, Court (+ Shared.Titles) | the thrones (claim, succession, abdication, reign count); titles, Household offices, royal invitations, forms of address, precedence |
 | Server: Admin, AdminLog, Analytics, Doors, Debug | M0 (Debug = Studio-only test bindable) |
-| Client: CharacterUI, IdentityUI, ClockHUD, Activities (+ Chess, Strength), EconomyUI, BuildUI, PropertyUI, ShopUI, JobUI, DailyUI, SpeechUI, ThroneUI | menus and HUD stubs |
+| Client: CharacterUI, IdentityUI, ClockHUD, Activities (+ Chess, Strength), EconomyUI, BuildUI, PropertyUI, ShopUI, JobUI, DailyUI, SpeechUI, ThroneUI, CourtUI | menus and HUD stubs |
 
 Data (`Shared.Types`): one profile per account. **Account-wide**: money, collection, Robux
 purchases, outfits/vehicles/rental, moderation record. **Per character slot**: name and look.
@@ -119,6 +119,8 @@ Extension points:
 - Something that must settle before a character switch: `Characters.onBeforeChange(fn)`.
 - A role given by a game rule (the throne, appointed offices): `Identity.grant(player, roleId)`;
   the caller checks eligibility and seats. Seat holders in join order: `Identity.holdersOf(roleId)`.
+- A server-wide proclamation (the gold banner): `Throne.proclaim(text)`. Names as addressed:
+  `Titles.address{ first, last, role, roleName, title, place, form }`.
 - New NPC counter: `Counters.add{ id, kind, name, x, z, yaw }` (server) and, for a new kind,
   `Counters.onOpen(kind, fn)` + `EconomyUI.onCounter(kind, fn)` (client).
 - Something players do that a daily task could ask for: call `Daily.record(player, "<event>")`
@@ -128,7 +130,7 @@ Extension points:
 - New building piece: add a row to art/kit.md and the same entry to `Shared.Kit` (test_kit fails
   until both match); new colours go at the END of `Shared.Palette` (saved by index).
 - Net domains in use: `Profile`, `Admin`, `Identity`, `Character`, `Activity`, `Economy`,
-  `Inventory`, `Counter`, `Exchange`, `Property`, `Build`, `Shop`, `Job`, `Daily`, `Appointment`, `Phrase`, `Throne`. `Net.listen` keeps one listener per action.
+  `Inventory`, `Counter`, `Exchange`, `Property`, `Build`, `Shop`, `Job`, `Daily`, `Appointment`, `Phrase`, `Throne`, `Court`. `Net.listen` keeps one listener per action.
 
 ## Working with the user
 

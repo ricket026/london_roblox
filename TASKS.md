@@ -175,11 +175,14 @@ economy core (T09, T10, T15, T11) comes first and is listed under M2 below.
   thicker fog at night, light rain. Keep values in Config. Expose `WorldClock.setFog(level)` for
   the pea-souper event (T53).
 
-### T08 · Forms of address and the Titles module ⬜
+### T08 · Forms of address and the Titles module ✅ (code + tests; needs a Play-test)
 - **Specs** COURT_PARLIAMENT §3, DESIGN §6.1 · **Size** S
 - `Shared.Titles`: address strings by role/title/rank ("His/Her/Their Majesty", "The Rt Hon. the
   Earl of Kew", "Constable Last"), neutral by default, player setting His/Her/Their
   (`profile.settings.address`). Identity tags and announcements use it.
+- **Built** `Shared.Titles` (`address`, `style`, `precedence`, `better`, RANKS, PLACES); Identity's
+  tag shows line 1 the name as addressed, line 2 the style and role. The form is set in the Court
+  menu (CourtUI, "Address me as"). Police ranks ("Sergeant Last") wait for the police job ranks.
 
 ---
 
@@ -312,7 +315,15 @@ Mark progress in the table in `activities/README.md`.
   claim. The reign count is the honours entry `"reign:King:2"` (one entry per throne, counted up).
 - **Left for a Studio pass** the prompt's placement on the real seats, and the proclamation banner
   next to the clock and the "Today" button on a phone. The Coronation event belongs to T39.
-### T35 · Appointments, honours and grants menu ⬜ · **Specs** COURT §2 table, §5 · Seat caps, rate limits, logging.
+### T35 · Appointments, honours and grants menu ✅ (code + tests; needs a Play-test) · **Specs** COURT §2 table, §5
+- **Built** `LondonServer.Court` + `LondonClient.CourtUI`, Household roles in `Shared.Stations`
+  (Lord Chamberlain, Private Secretary, Equerry), `Config.COURT_*`, `tests/test_court*.luau`.
+  Titles Duke … Knight with per-server caps and a place; offices and royal invitations as offers
+  (accept within 30 s); revoke with a filtered reason; one grant a minute per granter; AdminLog
+  `court.*`; proclaimed via `Throne.proclaim`; saved highest honour (`honour:<id>` in
+  `progress.honours`); `Court.undoGrantsBy(granter)` ready for no-confidence (T38). Choices: Q29.
+- **Still to do** the Royal Warrant (needs a Shops hook: "By Appointment" sign, +5% NPC sales),
+  pardons (M5 law), Gazette entries (T33 newspaper), grants from the audience UI (T36).
 ### T36 · Throne room protocol and audience queue ⬜ · **Specs** COURT §4 · Court chat channel, floor control.
 ### T37 · Decrees ⬜ · **Specs** COURT §6 · Banner + bell, decree boards, Gazette column, lever decrees.
 ### T38 · No-confidence votes and vote-kick ⬜ · **Specs** DESIGN §10, COURT §2 · Thresholds per spec, logged.

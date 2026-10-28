@@ -22,7 +22,7 @@ Never paste a `.rbxmx` file or anything starting with `<roblox` into a script.
 |---|---|---|
 | 0 | M0 foundations (Config, Net, Roles, Money, Text, Types, Profiles, Store, Admin, AdminLog, Analytics, Doors, Debug, LoadingScreen) | ✅ in the place |
 | 1 | Character creator + save slots | ✅ installed and working (2026-10-27) |
-| 1b | Name-tag fix | ⬜ re-paste Identity |
+| 1b | Name-tag fix | ⬜ add Titles, re-paste Identity and Config |
 | 2 | Station (role) menu | ⬜ |
 | 3 | World clock | ⬜ |
 | 4 | Money, things and 3D outfits: wallet, bag, shop and bank counters, hand-overs (Phase 2, T06) | ⬜ |
@@ -32,7 +32,7 @@ Never paste a `.rbxmx` file or anything starting with `<roblox` into a script.
 | 8 | Shops, jobs and gas lamps: tills, suppliers, stalls, postman, newsboy, lamplighter, baker, carpenter, shop assistant (Phases 4–5, T04) | ⬜ |
 | 9 | Appointments at the hubs every 10 minutes, today's tasks panel (T30, T33) | ⬜ |
 | 10 | Quick phrases and gestures: speak without typing (T05) | ⬜ |
-| 11 | The throne: claim an empty throne, line of succession, abdication (T34) | ⬜ |
+| 11 | The Court: the throne (claim, succession, abdication), titles, Household offices, forms of address (T34, T35, T08) | ⬜ |
 
 Do the steps **in order**: each needs the ones before it (a script that waits for a missing one
 just hangs; `tools/check_install.py` checks this list against the code). The links always show
@@ -42,10 +42,12 @@ the latest code, so do a step's pastes in one go.
 picking a character.
 
 ## Step 1b: name over the head (and the newest settings)
-Replace the code of ServerScriptService › LondonServer › **Identity** with
-[src/server/LondonServer/Identity.luau](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Identity.luau),
-and the code of ReplicatedStorage › Shared › **Config** with
-[src/shared/Config.luau](https://github.com/ricket026/london_roblox/blob/m1-identity/src/shared/Config.luau) (it only adds settings; every later step uses them).
+- New **ModuleScript** `Titles` inside ReplicatedStorage › **Shared**:
+  [src/shared/Titles.luau](https://github.com/ricket026/london_roblox/blob/m1-identity/src/shared/Titles.luau) (titles and forms of address the name tag uses)
+- Replace the code of ServerScriptService › LondonServer › **Identity** with
+  [src/server/LondonServer/Identity.luau](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Identity.luau),
+- and the code of ReplicatedStorage › Shared › **Config** with
+  [src/shared/Config.luau](https://github.com/ricket026/london_roblox/blob/m1-identity/src/shared/Config.luau) (it only adds settings; every later step uses them).
 
 ## Step 2: station (role) menu
 - New **ModuleScript** `IdentityUI` inside StarterPlayer › StarterPlayerScripts › **LondonClient**:
@@ -292,21 +294,33 @@ both players, and the line in the other player's chat. **Wave**, **Cheer** and *
 Roblox's own emotes. Bow, curtsy, salute, doff hat and applaud need animations: publish them and
 put their ids in `Config.EMOTE_ANIMATIONS`.
 
-## Step 11: the throne (claim, succession, abdication)
+## Step 11: the Court (the throne, titles, offices)
 **New scripts**
 - ModuleScript `Throne` inside ServerScriptService › **LondonServer**: [Throne](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Throne.luau)
+- ModuleScript `Court` inside ServerScriptService › **LondonServer**: [Court](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Court.luau)
 - ModuleScript `ThroneUI` inside StarterPlayer › StarterPlayerScripts › **LondonClient**: [ThroneUI](https://github.com/ricket026/london_roblox/blob/m1-identity/src/client/LondonClient/ThroneUI.luau)
+- ModuleScript `CourtUI` inside StarterPlayer › StarterPlayerScripts › **LondonClient**: [CourtUI](https://github.com/ricket026/london_roblox/blob/m1-identity/src/client/LondonClient/CourtUI.luau)
 
 **Replace** (open the script, select all, paste the GitHub version)
-- `Config` in ReplicatedStorage › Shared: [Config](https://github.com/ricket026/london_roblox/blob/m1-identity/src/shared/Config.luau) (the throne settings at the end)
-- `Identity` in ServerScriptService › LondonServer: [Identity](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Identity.luau) (`Identity.grant`, `Identity.holdersOf`)
+- `Config` in ReplicatedStorage › Shared: [Config](https://github.com/ricket026/london_roblox/blob/m1-identity/src/shared/Config.luau) (throne and Court settings at the end)
+- `Stations` in ReplicatedStorage › Shared: [Stations](https://github.com/ricket026/london_roblox/blob/m1-identity/src/shared/Stations.luau) (the Household offices)
+- `Identity` in ServerScriptService › LondonServer: [Identity](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Identity.luau)
 
 Start-up lines:
 - **LondonServer**: under `local Speech = require(script:WaitForChild("Speech"))` add
-  `local Throne = require(script:WaitForChild("Throne"))`, and under `Speech.init()` add `Throne.init()`.
+  ```lua
+  local Throne = require(script:WaitForChild("Throne"))
+  local Court = require(script:WaitForChild("Court"))
+  ```
+  and under `Speech.init()` add
+  ```lua
+  Throne.init()
+  Court.init()
+  ```
 - **LondonClient**: under the `SpeechUI` line add
   ```lua
   require(script:WaitForChild("ThroneUI")).init() -- the throne: offers, proclamations, abdicate (T34)
+  require(script:WaitForChild("CourtUI")).init() -- titles, offices, forms of address (T35, T08)
   ```
 
 It uses the two seats already in the place: `Workspace.PalaceInteriors.ThroneRoom.Gameplay.ThroneSeat1`
@@ -316,11 +330,16 @@ It uses the two seats already in the place: `Workspace.PalaceInteriors.ThroneRoo
 Test (Play): the throne needs 2 h of playtime (Royal Family needs 1 h). In Studio, give yourself
 some: during Play, switch the command bar to **Server** and run
 `require(game.ServerScriptService.LondonServer.Profiles).get(game.Players:GetPlayers()[1]).playtime = 9000`.
-Walk up to the King's throne and hold **Claim the throne**: a gold proclamation appears under the
-clock, your role is King, and only you can sit on that throne. Top left: **Abdicate** (tap twice).
-With two players (Test › Clients and Servers), make the second one Royal Family first: when the
-King abdicates or leaves, the royal gets **Accept / Decline** in the middle of the screen for
-20 seconds.
+- Walk up to the King's throne and hold **Claim the throne**: a gold proclamation appears under
+  the clock, your role is King, the name tag reads "Their Majesty the King", and only you can sit
+  on that throne. Top left: **Abdicate** (tap twice).
+- With two players (Test › Clients and Servers): make the second one Royal Family first; when the
+  King abdicates or leaves, the royal gets **Accept / Decline** in the middle of the screen for
+  20 seconds.
+- As King, press **Court** (top left) › Choose the other player › pick a place › **Grant** a
+  title › Confirm: their tag shows "The Rt Hon. the Earl of Kew". **Offer** them an office: they
+  get Accept / Decline. Grants are one a minute. In **Court**, "Address me as" Their / His / Her
+  changes how your own tag reads.
 
 ## After the last step: the start-up scripts
 Once every step above is in, the two start-up scripts can simply be **replaced entirely** with

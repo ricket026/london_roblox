@@ -482,4 +482,13 @@ Config.THRONE_OFFER_SECONDS = 20 -- each royal in the line of succession has thi
 Config.THRONE_RATE = { count = 4, per = 10 } -- throne calls per player
 Config.THRONE_PROCLAIM_SECONDS = 8 -- how long a proclamation banner stays on screen
 
+-- The Court: honours, offices and grants (COURT_PARLIAMENT §2, §5; TASKS T35) --------------------
+-- Titles held at once in one server, per rank (Shared.Titles.RANKS).
+Config.COURT_TITLE_CAPS = { Duke = 2, Marquess = 3, Earl = 5, Viscount = 6, Baron = 8, Knight = 15 }
+Config.COURT_GRANT_COOLDOWN = 60 -- seconds between grants (or revocations) by the same granter
+Config.COURT_OFFER_SECONDS = 30 -- an offered office or royal invitation waits this long for an answer
+Config.COURT_UNDO_WINDOW = 600 -- seconds: grants made this recently are undone if the granter is removed (T38)
+Config.COURT_REASON_MAX = 80 -- characters in a revocation reason
+Config.COURT_RATE = { count = 8, per = 10 } -- Court calls per player
+
 return Config

@@ -13,6 +13,7 @@
 --   Throne.State { King?, Queen? } (monarchs' names, to everyone), Throne.Notice { text }.
 --   Throne.monarch(role) -> Player?   Throne.claim(player, role) -> ok, why
 --   Throne.accept(player, role)   Throne.abdicate(player)   Throne.reigns(progress, role) -> n
+--   Throne.proclaim(text) (the banner every player sees; LondonServer.Court uses it too)
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -37,6 +38,10 @@ end
 
 function Throne.monarch(role: string): Player?
 	return Identity.holdersOf(role)[1]
+end
+
+function Throne.proclaim(text: string)
+	Net.pushAll("Throne", "Proclaim", { text = text })
 end
 
 local function view(): { [string]: any }
@@ -93,7 +98,7 @@ local function accede(player: Player, role: string)
 	offers[role] = nil
 	Identity.grant(player, role)
 	countReign(player, role)
-	Net.pushAll("Throne", "Proclaim", { text = string.format("God save the %s! %s has come to the throne.", role, nameOf(player)) })
+	Throne.proclaim(string.format("God save the %s! %s has come to the throne.", role, nameOf(player)))
 	refreshPrompt(role)
 	pushState()
 end
@@ -155,7 +160,7 @@ end
 -- A throne fell empty: start the succession (if it wasn't already).
 function Throne.vacated(role: string)
 	if Throne.monarch(role) == nil and offers[role] == nil then
-		Net.pushAll("Throne", "Proclaim", { text = string.format("The %s's throne is empty.", string.lower(role)) })
+		Throne.proclaim(string.format("The %s's throne is empty.", string.lower(role)))
 		pushState()
 		offerNext(role)
 	end
@@ -178,7 +183,7 @@ function Throne.abdicate(player: Player): (boolean, string?)
 	if role ~= "King" and role ~= "Queen" then
 		return false, "You're not on a throne."
 	end
-	Net.pushAll("Throne", "Proclaim", { text = string.format("%s has given up the throne.", nameOf(player)) })
+	Throne.proclaim(string.format("%s has given up the throne.", nameOf(player)))
 	Identity.grant(player, Config.DEFAULT_ROLE) -- the role watcher starts the succession
 	return true
 end

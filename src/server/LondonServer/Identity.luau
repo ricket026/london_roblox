@@ -3,9 +3,12 @@
 -- from the character being played (LondonServer.Characters sets RPName). Roles are per server
 -- (Q4): held in memory, with seat limits and playtime gates from Shared.Stations, and reset to
 -- Config.DEFAULT_ROLE whenever the player switches character.
--- Player attributes (read by tags, Roles.roleOf and the client): RPName, Role.
+-- Player attributes (read by tags, Roles.roleOf and the client): RPName, Role; tags also show
+-- the per-server title (Shared.Titles attributes Title, TitlePlace) in the player's chosen form
+-- of address (profile.settings.address).
 -- Remotes (Identity domain, calls): Get, ChooseRole { role }.
---   Identity.grant(player, roleId) (game-rule roles: throne, offices), Identity.holdersOf(roleId).
+--   Identity.grant(player, roleId) (game-rule roles: throne, offices), Identity.holdersOf(roleId),
+--   Identity.refreshTag(player) (after the form of address changes).
 -- Pushes: Identity.State (to one player), Identity.Seats (to everyone, on any seat change).
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -15,6 +18,7 @@ local Config = require(Shared:WaitForChild("Config"))
 local Net = require(Shared:WaitForChild("Net"))
 local Roles = require(Shared:WaitForChild("Roles"))
 local Stations = require(Shared:WaitForChild("Stations"))
+local Titles = require(Shared:WaitForChild("Titles"))
 local Profiles = require(script.Parent:WaitForChild("Profiles"))
 
 local V = Net.V
@@ -73,10 +77,30 @@ local function refreshTag(player: Player)
 	end
 	local name = tag:FindFirstChild("RPName") :: TextLabel
 	local role = tag:FindFirstChild("RPRole") :: TextLabel
-	name.Text = rpName(player) or player.DisplayName
-	name.TextTransparency = if rpName(player) then 0 else 0.35
 	local r = Stations.BY_ID[Roles.roleOf(player)]
-	role.Text = if r and r.id ~= Config.DEFAULT_ROLE then r.name else ""
+	local slot = Profiles.activeSlot(player)
+	local profile = Profiles.get(player)
+	if slot and rpName(player) then
+		local place = player:GetAttribute(Titles.PLACE_ATTR)
+		local line1, line2 = Titles.address({
+			first = slot.name.first,
+			last = slot.name.last,
+			role = Roles.roleOf(player),
+			roleName = if r then r.name else nil,
+			title = player:GetAttribute(Titles.ATTR) :: any,
+			place = if type(place) == "string" then place else nil,
+			form = if profile then profile.settings.address else nil,
+		})
+		name.Text, role.Text = line1, line2
+	else
+		name.Text = rpName(player) or player.DisplayName
+		role.Text = if r and r.id ~= Config.DEFAULT_ROLE then r.name else ""
+	end
+	name.TextTransparency = if rpName(player) then 0 else 0.35
+end
+
+function Identity.refreshTag(player: Player)
+	refreshTag(player)
 end
 
 -- The tag lives on the character, not the Head: applying a HumanoidDescription swaps the
@@ -242,9 +266,11 @@ function Identity.init()
 		player:GetAttributeChangedSignal(Identity.NAME_ATTR):Connect(function()
 			refreshTag(player)
 		end)
-		player:GetAttributeChangedSignal(Roles.ROLE_ATTR):Connect(function()
-			refreshTag(player)
-		end)
+		for _, attr in { Roles.ROLE_ATTR, Titles.ATTR, Titles.PLACE_ATTR } do
+			player:GetAttributeChangedSignal(attr):Connect(function()
+				refreshTag(player)
+			end)
+		end
 	end
 	Players.PlayerAdded:Connect(watch)
 	for _, p in Players:GetPlayers() do

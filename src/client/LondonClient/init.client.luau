@@ -21,6 +21,7 @@ require(script:WaitForChild("JobUI")).init() -- job tracker (Phase 5)
 require(script:WaitForChild("DailyUI")).init() -- appointments countdown, today's tasks (Phase 6)
 require(script:WaitForChild("SpeechUI")).init() -- quick phrases and gestures (T05)
 require(script:WaitForChild("ThroneUI")).init() -- the throne: offers, proclamations, abdicate (T34)
+require(script:WaitForChild("CourtUI")).init() -- titles, offices, forms of address (T35, T08)
 
 Net.listen("Admin", "Notice", function(msg)
 	if type(msg.text) ~= "string" then

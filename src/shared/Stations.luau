@@ -40,6 +40,9 @@ Stations.ROLES = {
 	{ id = "Royal", name = "Royal Family", station = "The Crown", claim = "claim", seats = 8, minPlaytime = 1 * HOUR, blurb = "Join the line of succession." },
 	{ id = "King", name = "King", station = "The Crown", claim = "throne", seats = 1, minPlaytime = 2 * HOUR, blurb = "Claimed at the empty throne." },
 	{ id = "Queen", name = "Queen", station = "The Crown", claim = "throne", seats = 1, minPlaytime = 2 * HOUR, blurb = "Claimed at the empty throne." },
+	{ id = "LordChamberlain", name = "Lord Chamberlain", station = "The Crown", claim = "appoint", seats = 1, blurb = "Runs the Household and the throne room." },
+	{ id = "PrivateSecretary", name = "Private Secretary", station = "The Crown", claim = "appoint", seats = 1, blurb = "Keeps the Crown's diary and letters." },
+	{ id = "Equerry", name = "Equerry", station = "The Crown", claim = "appoint", seats = 4, blurb = "Attends the King or Queen (equerry or lady-in-waiting)." },
 	{ id = "MP", name = "Member of Parliament", station = "Justice", claim = "appoint", seats = 12, blurb = "Won in the server's election." },
 } :: { Role }
 

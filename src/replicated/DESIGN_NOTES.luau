@@ -43,6 +43,8 @@ MODULES
              Client: Net.send / Net.request / Net.listen. Server: Net.push / Net.pushAll.
     Money    integer pence; Money.format(270) = "£1 2s 6d"; split / fromLsd / isValidAmount.
     Text     sanitize + escapeRich (both sides); filterBroadcast / filterFor (server, fail closed).
+    Titles   (T08) title ranks Duke … Knight, PLACES, Titles.address (tag lines in the player's
+             form: neutral / his / her), style, precedence (§1), better (saved highest honour).
   ServerScriptService.LondonServer (boot Script)
     Store    DataStore wrapper; Studio mock (JSON round trip, MOCK_LATENCY).
     Profiles session lock (UpdateAsync, token, stale takeover), migrate + reconcile, autosave,
@@ -87,6 +89,13 @@ MODULES
              opens to claims (the role's playtime gate). Only the monarch may sit. Reigns count
              in progress.honours as "reign:<role>:<n>". Remotes Throne.Get/Accept/Decline/
              Abdicate; pushes Offer, Proclaim, State, Notice. Identity.grant sets the role.
+    Court    (M4, T35) titles (attrs Title/TitlePlace, caps Config.COURT_TITLE_CAPS, one per
+             player, dropped on a character switch), Household offices and royal invitations
+             (offers, accept in Config.COURT_OFFER_SECONDS), revoke with a filtered reason, one
+             grant a minute per granter, AdminLog "court.*", Throne.proclaim, saved highest
+             honour "honour:<id>", undoGrantsBy for no-confidence (T38), the form of address
+             (profile.settings.address). Remotes Court.Get/GrantTitle/Appoint/InviteRoyal/
+             Answer/Revoke/Renounce/SetForm; pushes Offer, Closed, Changed, Notice.
     Lamps    gas lamps built along MapLayoutData's roads (Config.LAMP_*), tag "Lamp", attrs
              Route/Lit; lamplighters (Jobs) or the city's fallback light and put them out.
     Economy (Phase 2) the money ledger: every change has a reason (REASONS: faucet / sink / move),
@@ -155,6 +164,9 @@ MODULES
     SpeechUI   (stub) "Say" panel: phrases by category, gestures (PlayEmote / EMOTE_ANIMATIONS).
     ThroneUI   (stub) proclamation banner under the clock; succession offer Accept/Decline with
              a countdown; "You reign as King" + Abdicate (two taps) top left.
+    CourtUI    (stub) "Court" button top left (royals, titled, Household): style + form of
+             address, Renounce; for granters a player list, titles with a place, offices, the
+             royal family, revoke with a reason, a confirm step; offer popup Accept/Decline.
     DailyUI    (stub) appointment countdown under the clock; "Today" tasks + streak panel.
     JobUI      (stub) job tracker top left: step, distance, shift pay, Skip; marker + hold prompt.
     BuildUI    (stub) build mode: orbit camera, catalogue, ghost + reasons, undo/redo; draws
