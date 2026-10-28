@@ -12,7 +12,7 @@ local World = {}
 
 -- Folders a ground ray must pass through: map markers and everything our systems build.
 World.SKIP_MAP = { "JobSites", "Labels", "CabRanks", "BusStops", "Routes", "Bounds", "Spawns", "Landmarks_Greybox" }
-World.SKIP_ROOT = { "Activities", "Counters", "Properties", "Shops" }
+World.SKIP_ROOT = { "Activities", "Counters", "Properties", "Shops", "LotTemplates" }
 
 local rayParams = RaycastParams.new()
 rayParams.FilterType = Enum.RaycastFilterType.Exclude

@@ -3,7 +3,8 @@
 -- here with a reason, so the game knows where money comes from (faucets) and goes (sinks).
 --   Economy.change(player, delta, reason, ref?)   wallet +/-; refuses to go below 0 (fines: to -DEBT_MAX)
 --   Economy.pay(player, pence, reason, ref?)      into the wallet
---   Economy.charge(player, pence, reason, ref?)   from the wallet, then the bank; all or nothing
+--   Economy.charge(player, pence, reason, ref?, bankFirst?)   wallet then bank (or bank then
+--                                                 wallet: rent); all or nothing
 --   Economy.deposit / Economy.withdraw(player, pence)   wallet <-> bank
 --   Economy.transfer(from, to, pence, reason)     player to player (new-account daily cap)
 --   Economy.balance(player) -> wallet, bank;  Economy.recent(player) -> ledger lines;  Economy.totals()
@@ -94,8 +95,9 @@ function Economy.pay(player: Player, pence: number, reason: string, ref: string?
 	return Economy.change(player, pence, reason, ref)
 end
 
--- From the wallet, then the bank. Nothing is taken unless the whole amount can be.
-function Economy.charge(player: Player, pence: number, reason: string, ref: string?): (boolean, string?)
+-- From the wallet, then the bank (bankFirst: the other way round, for standing payments like
+-- rent). Nothing is taken unless the whole amount can be.
+function Economy.charge(player: Player, pence: number, reason: string, ref: string?, bankFirst: boolean?): (boolean, string?)
 	local p = Profiles.get(player)
 	if not p then
 		return false, "Your profile isn't loaded yet."
@@ -104,9 +106,15 @@ function Economy.charge(player: Player, pence: number, reason: string, ref: stri
 	if p.pence + p.bank < pence then
 		return false, string.format("That costs %s; you have %s.", Money.format(pence), Money.format(math.max(0, p.pence + p.bank)))
 	end
-	local fromWallet = math.min(math.max(p.pence, 0), pence)
-	p.pence -= fromWallet
-	p.bank -= pence - fromWallet
+	if bankFirst then
+		local fromBank = math.min(math.max(p.bank, 0), pence)
+		p.bank -= fromBank
+		p.pence -= pence - fromBank
+	else
+		local fromWallet = math.min(math.max(p.pence, 0), pence)
+		p.pence -= fromWallet
+		p.bank -= pence - fromWallet
+	end
 	record(player, -pence, reason, ref)
 	Profiles.pushWallet(player)
 	return true

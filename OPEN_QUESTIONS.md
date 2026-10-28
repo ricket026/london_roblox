@@ -47,3 +47,7 @@ Each open question has a **default** I'll use if you don't answer.
 | Q22 | **Price of a fresh (unlinked) character in slots 2–3?** Only the £100 link price was set | Free (`Config.SLOT_NEW_PRICE = 0`) |
 | Q23 | **How should outfits be made?** 3D outfits built from parts (TASKS T06, discussed), catalog clothing IDs, or Blender meshes later. And are hats a separate choice? | 3D part outfits now (swappable for Blender meshes later); hats come with the outfit |
 | Q24 | **Staff tools vs Q11 "no staff":** the M0 `Admin` module has moderator/admin levels and group ranks | Cut down to owner-only tools + automatic moderation |
+| Q25 | **Rent while you're away:** rent is weekly in real time (PROPERTY §3); a player who comes back after a month owes 4 weeks at once (or the tenancy has lapsed, build kept) | As built: rent keeps falling due; consider pausing it after 2 weeks away |
+| Q26 | **"At Home":** spec says visitors knock and the owner admits them | As built (v1): At Home simply unlocks the doors; knocking comes with the visiting task (P10) |
+| Q27 | **No free plot of your kind in a server:** spec offers a hotel room or a market stall | As built: the deed waits and appears when a plot frees up; hotel rooms later |
+| Q28 | **Template houses on all ~4,000 plots** (~25,000 parts): fine on phones? | On (`Config.LOT_TEMPLATES`); turn off if the Play-test lags, until streaming is tuned (T55) |

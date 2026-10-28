@@ -10,8 +10,9 @@ table is the contract** between code (`src/shared/Kit.luau`, greybox from parts 
   street** (to your right when you face the house from the street), **+Z into the plot** (away from
   the street), **+Y up**. The server turns lot space into world space from the plot's CFrame and
   its `Front` side.
-- **Units:** positions are stored in **half-studs** (0.5). Structure snaps to **2-stud cells**
-  (multiples of 4 half-studs); furniture snaps to half-studs. **Storeys** are 12 studs; `y` is
+- **Units:** positions are stored in **half-studs** (0.5). Walls and trim snap to **1-stud
+  steps** (so 1-stud-thick walls meet at corners); floors, roofs and outside pieces to **2-stud
+  cells** (multiples of 4 half-studs); furniture to half-studs. **Storeys** are 12 studs; `y` is
   the storey index (0 = ground).
 - **Rotation:** `r` = 0–3, quarter turns clockwise seen from above, about the piece's footprint
   centre. At `r = 0` a wall's **face** looks toward −Z (the street).
@@ -25,7 +26,7 @@ table is the contract** between code (`src/shared/Kit.luau`, greybox from parts 
 |---|---|---|
 | `wall` | wall bays, interior walls | floors (they sit on the floor edge) |
 | `floor` | floor tiles, stairs | walls |
-| `roof` | roofs, chimneys | nothing |
+| `roof` | roofs, chimneys | nothing (a chimney may stand in a roof) |
 | `trim` | cornice, portico, steps, railings, balcony | walls (they're fixed to them) |
 | `outside` | garden walls, lawn, paths, trees | nothing; ground storey only (`y = 0`) |
 | `furniture` | beds, tables, shop fittings | rugs; must stand on a floor |
@@ -44,6 +45,7 @@ the default. **Tris**: budget for the final Blender mesh (greybox uses a handful
 | id | class | w | d | h | front | colour slots (default) | tris | what it is |
 |---|---|---|---|---|---|---|---|---|
 | `wall_plain` | wall | 4 | 1 | 12 | no | face (`brick_stock_sooted`) | 60 | solid wall bay |
+| `wall_half` | wall | 2 | 1 | 12 | no | face (`brick_stock_sooted`) | 40 | narrow wall: corners, side walls, odd frontages |
 | `wall_sash` | wall | 4 | 1 | 12 | no | face, trim (`stone_portland`) | 300 | sash window 2 × 6, sill and lintel |
 | `wall_sash_tall` | wall | 4 | 1 | 12 | no | face, trim | 320 | taller window 2 × 8 (first floor of grand houses) |
 | `wall_bay` | wall | 4 | 1 | 12 | yes | face, trim | 600 | canted bay window projecting 1.5 to the street |

@@ -23,6 +23,7 @@ keep the scripts you touch to the list (or say why), run `tools/check_luau.py`, 
 | ✅ | World clock (24-min day, phases) + clock HUD | Not Play-tested |
 | ✅ | Activity framework + ducks, test your strength, mudlarking, chess | Not Play-tested; chess rules pass perft |
 | ✅ | Phase 2 economy core: ledger, wallet HUD, bag, NPC counters, bank, hand-overs (T09, T10, T11, T15, P01) | Not Play-tested; `tests/test_economy*.luau`; INSTALL step 6 |
+| ✅ | Phase 3 homes and building: kit, plots, templates, estate agents, rent/buy/sell, build mode, save/load, keys, locks, reports (P02–P07, P09; P08, P10 partly) | Not Play-tested; `tests/test_kit.luau`, `test_property.luau`, `test_build_ui.luau`; INSTALL step 7 |
 
 ---
 
@@ -55,48 +56,58 @@ economy core (T09, T10, T15, T11) comes first and is listed under M2 below.
 - **Built:** `Shared.Items`, `LondonServer.Inventory`, `LondonServer.Exchange`, client `EconomyUI`
   (bag, Give, offer popup). Play-test: the held part's grip on R15 and R6, Give with 2 players.
 
-### P02 · Profile v3: deeds and storage 🟡 (v3 schema + migration done; `PropertyBuild_v1` store to do)
+### P02 · Profile v3: deeds and storage ✅ (2026-10-28)
 - **Specs** PROPERTY §6 · **Size** S · `properties`, `storage` (removals), `inventory` (P01) with a
   v2 → v3 migration in `Profiles`; new store `PropertyBuild_v1` written under the profile's lock
   token. Update `Shared.Types` and TECH §5.1.
 
-### P03 · Estate agents, rent and buy, plot assignment ⬜
+### P03 · Estate agents, rent and buy, plot assignment ✅ (2026-10-28, not Play-tested)
 - **Specs** PROPERTY §2–4 · **Depends** P02, T15 · **Size** M
 - Server `Property` module: deed kinds from Config, rent (weekly from the bank, 3-day grace,
   lapse keeps the build), buy and sell-back, per-server lot assignment (saved lot → same
   district → same kind → hotel/stall), addresses from road names, 10-minute linger after leaving.
 - **Done when** two players rent terraces in one server and get different lots, and one of them
   gets the same address back after rejoining an empty server.
+- **Built:** `LondonServer.Property` + `Lots` (both done-when cases are in `tests/test_property.luau`).
+  Not yet: the hotel room / market stall fallback (Q27: the deed waits for a free plot instead).
 
-### P04 · The kit: piece data and builder ⬜
+### P04 · The kit: piece data and builder ✅ (2026-10-28)
 - **Specs** BUILDING §1–2 · **Size** M · `Shared.Kit` (piece ids, sizes, grid footprint, colour
   slots, groups) and a builder that makes a piece (greybox parts now) at a grid position on a lot.
   Lot `Front` side computed from the road data (once, cached as an attribute).
 - **Done when** a test command lays out one of every piece on a lot, at the right scale next to
   an R15 character.
+- **Built:** `Shared.Kit` + `Shared.Palette`; `tests/test_kit.luau` checks every piece against
+  art/kit.md and the geometry (rotation, wedges, seats, door hinges). Still wanted: the Studio
+  layout command, to eyeball scale next to a character.
 
-### P05 · Templates on every unused plot ⬜
+### P05 · Templates on every unused plot ✅ (2026-10-28, not Play-tested)
 - **Specs** BUILDING §6 · **Depends** P04 · **Size** M · ≤ 6 parts per unused lot, varied by
   `LotId`, district style (stock brick in the East End, stucco in Belgravia...). Full-detail only
   near players. Check part counts and FPS with all ~4,000 lots.
 - **Done when** every street has houses and a phone keeps 30 FPS walking through Mayfair.
+- **Built:** `Lots.buildTemplate` (≤ 8 parts, colour, door, roof and chimney by `LotId` and lot
+  type). FPS unmeasured: `Config.LOT_TEMPLATES` turns them off (Q28).
 
-### P06 · Build mode: place, rotate, move, delete, rules ⬜
+### P06 · Build mode: place, rotate, move, delete, rules ✅ (2026-10-28, not Play-tested)
 - **Specs** BUILDING §3–4 · **Depends** P03, P04 · **Size** L (split client UI / server rules)
 - Build camera, catalogue, ghost preview with rule reasons, budget meter, storey selector,
   undo/redo, templates to start from, draft vs published (street-front rule). Server validates
   every edit (bounds, height, budget, permissions, rate limit). Touch and gamepad from day one.
+- **Built:** server `Builds`, client `BuildUI` (orbit camera by buttons/wheel/Q-E, catalogue,
+  ghost with reasons, storeys, Place/Select, turn, move, paint, delete, undo/redo, "Start again",
+  publish). Not yet: copy, a storey cut-away view, drag-to-orbit on touch.
 
-### P07 · Save and load builds ⬜
+### P07 · Save and load builds ✅ (2026-10-28)
 - **Specs** BUILDING §5 · **Depends** P06 · **Size** S · Relative-to-lot format, validate on load,
   pieces that don't fit go to storage, size budget per property.
 
-### P08 · Decorating: furniture, paint, wallpaper, storage ⬜
+### P08 · Decorating: furniture, paint, wallpaper, storage 🟡 (furniture from storage, starter set, paint, lamps; wallpaper per face and a flickering fire to do)
 - **Specs** BUILDING §2, SHOPS §1 · **Depends** P06, P01 · **Size** M · Free starter set, bought
   furniture from storage, paint/wallpaper per face, fireplaces and lamps that light.
 
-### P09 · "Report this building" ⬜ · **Specs** BUILDING §7 · 3 reports in a server → template for the session; logged.
-### P10 · Keys, locks, "At Home", visiting ⬜ · **Specs** PROPERTY §5 · Uses `Doors`; key permissions enter/decorate/build/sell.
+### P09 · "Report this building" ✅ (2026-10-28) · **Specs** BUILDING §7 · 3 reports in a server → template for the session; logged.
+### P10 · Keys, locks, "At Home", visiting 🟡 (keys, locks, At Home = doors open; knocking, map markers and visiting to do, Q26) · **Specs** PROPERTY §5 · Uses `Doors`; key permissions enter/decorate/build/sell.
 
 ### S01 · Shop settings, till, opening, selling to players ⬜
 - **Specs** SHOPS §2, §4 · **Depends** P03, P06, P01 · **Size** M · Trade choice, filtered sign,

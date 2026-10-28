@@ -8,7 +8,8 @@ is also the modular kit ART.md §3 planned for the M8 art pass.
 
 ## 1. Scale and grid (ART.md §2)
 - Characters ~5 studs tall; **storey 12 studs**; doors 8 studs; window bays 4 studs wide.
-- Placement grid **2 studs** (the map's cell size) horizontally, **storey levels** vertically
+- Placement grid **2 studs** (the map's cell size) for floors, roofs and garden pieces, **1 stud**
+  for walls and trim (1-stud-thick walls must meet at corners), **storey levels** vertically
   (pieces sit on floor level 0, 12, 24, ...; furniture snaps to 0.5 studs on a floor).
 - Rotation in 90° steps for structure; 15° steps for furniture.
 - Plots have attributes from `MapGreybox`: `LotId`, `District`, `LotType`, `Frontage`, `Depth`;

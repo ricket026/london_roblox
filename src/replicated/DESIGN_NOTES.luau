@@ -86,6 +86,20 @@ MODULES
              estate agents and wholesalers (Phase 3-4).
     Exchange (Phase 2) in-person hand-overs of money and/or a stack; checked again on accept.
              Remotes Exchange.Offer / Answer / Cancel; pushes Offered, Closed.
+    Lots     (Phase 3) every plot in Workspace.Map.Plots: street side from the roads in
+             ServerStorage.MapLayoutData, lot frame attributes (LotOrigin/LotRight/LotIn/LotW/
+             LotD), address (LotAddress), per-server claims (LotOwner), template houses in
+             workspace.LotTemplates (Config.LOT_TEMPLATES). Lots.choose follows PROPERTY §4.
+    Builds   (Phase 3) builds on plots: renders published builds (workspace.Properties), pushes
+             drafts to the owner/builders, validates edits with Shared.Kit, PropertyBuild_v1
+             store (key u_<userId>_<deedId>, only while the owner's profile is open; never over a
+             build that failed to load). Remotes Build.Enter/Exit/Place/Remove/Move/Paint/
+             Publish/Starter; pushes State, Changed, Notice, Closed.
+    Property (Phase 3) deeds in profile.properties: estate agents (counter kind "estate"),
+             rent (bank first, grace, lapse keeps the build), buy/sell back, placing on plots,
+             10-min linger, keys (enter/decorate/build/sell), lock, At Home, name plate,
+             reports. Doors.canOpen hook; plot attributes LotLocked/AtHome/LotName/LotEnter so
+             doors still work while the owner is away. Remotes Property.*.
   ReplicatedStorage.Shared (M1 additions)
     Stations every role, its station, claim rule, seats, playtime gate.
     Names    name rules + period name suggestions.
@@ -95,12 +109,21 @@ MODULES
     Meter    timing meter curve shared by client and server.
     Items    (Phase 2) every item: name, category, base price, stack size, use text, holdable,
              furniture kit id, player-made.
+    Palette  (Phase 3) art/style.md colours by id; builds save the index (append only).
+    Kit      (Phase 3) the building kit (art/kit.md is the contract, tests/test_kit.luau checks
+             it): pieces, footprints, rules (Kit.check), street-front rule (Kit.publishable),
+             greybox geometry (Kit.makePiece), starter houses (Kit.starter). Lot space: origin
+             street-left corner, +X along the street, +Z into the plot, half-stud units.
   StarterPlayerScripts.LondonClient  boots the UI modules + staff notices into RBXSystem chat.
     CharacterUI (stub) character menu at session start / "Characters" button: slots, creator,
              share progress, rename, delete. Menu camera from Config.MENU_CAMERA.
     IdentityUI (stub) "Station" role menu bottom-left.
     ClockHUD   (stub) "6:45 pm · Dusk" at the top.
     Activities (stub) reward toasts + Strength meter + Chess board for seated players.
+    BuildUI    (stub) build mode: orbit camera, catalogue, ghost + reasons, undo/redo; draws
+             drafts locally (hides the template here only).
+    PropertyUI (stub) "Property" button: your properties, keys, name plate, Build; estate
+             agent menus (EconomyUI.onCounter "estate"); "Report this house".
     EconomyUI  (stub) wallet top right, bag (B), Give, counter menus (shop, bank;
              EconomyUI.onCounter(kind, fn) for more), offer popup, toasts. The only module that
              listens to Profile.Wallet (Net.listen keeps one listener per action).
@@ -114,6 +137,9 @@ OPEN / LATER
   Console shows 3x "ContentId rbxassetid://203785492 ... Asset type does not match" with all
   London scripts disabled too: engine/baseplate noise, not ours.
   Money deltas (TECH §5.1 note) not separate yet: whole profile is saved under the session lock.
+  Kit changes from the 2026-10-27 spec: walls and trim snap to 1 stud (corners meet), a 2-stud
+  `wall_half`, chimneys may stand in roofs; recorded in art/kit.md and BUILDING §1.
+  Rent keeps falling due while a player is away (Q25); At Home just unlocks (Q26).
   Counters stand where tools/check_sites.py says the ground is clear (no lot, carriageway or
   landmark); it reads parts only, so check terrain slopes and facing in Studio.
   Offline mutes not supported (target must be in the server). Consider Players:BanAsync at publish.

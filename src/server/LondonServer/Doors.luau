@@ -3,8 +3,11 @@
 --   DoorHinge   Vector3  world point on the pintle axis (closed position)
 --   DoorOpenDeg number   swing about +Y that opens it (sign from the model, e.g. Parliament manifest)
 --   DoorGroup   string   leaves sharing a group open and close together (double doors)
---   DoorLocked  boolean  optional; true hides the prompt (Property system sets it later)
+--   DoorLocked  boolean  optional; true hides the prompt
+--   DoorLot     string   optional; a property door (Shared.Kit builds): the prompt always shows
+--                        and Doors.canOpen(player, leaf) decides (set by LondonServer.Property)
 -- gets one ProximityPrompt per group, on the leaf whose name sorts first. Server-authoritative.
+-- Leaves that leave the game (a rebuilt house) drop out of their group.
 local CollectionService = game:GetService("CollectionService")
 local TweenService = game:GetService("TweenService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -17,6 +20,11 @@ type Leaf = { part: BasePart, closed: CFrame, open: CFrame }
 type Group = { leaves: { Leaf }, isOpen: boolean, prompt: ProximityPrompt?, busy: boolean, openedAt: number }
 
 local groups: { [string]: Group } = {}
+
+-- Who may open a property door (DoorLot attribute); replaced by Property.
+Doors.canOpen = function(_player: Player, _leaf: BasePart): boolean
+	return true
+end
 
 local function swing(g: Group, open: boolean)
 	g.isOpen = open
@@ -57,7 +65,11 @@ end
 
 local function refreshPrompt(g: Group)
 	if g.prompt then
+		local old = g.prompt.Parent
 		g.prompt:Destroy()
+		if old and old:IsA("Attachment") then
+			old:Destroy()
+		end
 		g.prompt = nil
 	end
 	table.sort(g.leaves, function(a, b)
@@ -86,6 +98,9 @@ local function refreshPrompt(g: Group)
 			return -- server-side distance check
 		end
 		if leaf.part:GetAttribute("DoorLocked") then
+			return
+		end
+		if leaf.part:GetAttribute("DoorLot") ~= nil and not Doors.canOpen(player, leaf.part) then
 			return
 		end
 		Doors.toggle(name)
@@ -126,11 +141,34 @@ local function addLeaf(inst: Instance)
 	refreshPrompt(g)
 end
 
+local function removeLeaf(inst: Instance)
+	local name = inst:GetAttribute("DoorGroup")
+	local g = if type(name) == "string" then groups[name] else nil
+	if not g then
+		return
+	end
+	for k, leaf in g.leaves do
+		if leaf.part == inst then
+			table.remove(g.leaves, k)
+			break
+		end
+	end
+	if #g.leaves == 0 then
+		if g.prompt then
+			g.prompt:Destroy()
+		end
+		groups[name :: string] = nil
+	else
+		refreshPrompt(g)
+	end
+end
+
 function Doors.init()
 	for _, inst in CollectionService:GetTagged(Config.DOOR_TAG) do
 		addLeaf(inst)
 	end
 	CollectionService:GetInstanceAddedSignal(Config.DOOR_TAG):Connect(addLeaf)
+	CollectionService:GetInstanceRemovedSignal(Config.DOOR_TAG):Connect(removeLeaf)
 end
 
 return Doors

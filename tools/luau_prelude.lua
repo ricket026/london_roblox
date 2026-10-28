@@ -466,8 +466,12 @@ CF.__index = function(c, k)
 		return v3(-r[3], -r[6], -r[9])
 	elseif k == "RightVector" then
 		return v3(r[1], r[4], r[7])
-	elseif k == "UpVector" then
+	elseif k == "UpVector" or k == "YVector" then
 		return v3(r[2], r[5], r[8])
+	elseif k == "XVector" then
+		return v3(r[1], r[4], r[7])
+	elseif k == "ZVector" then
+		return v3(r[3], r[6], r[9])
 	elseif k == "Rotation" then
 		return cf(0, 0, 0, table.unpack(r))
 	end
@@ -532,6 +536,10 @@ local function axis(rx, ry, rz)
 	local Y = { cy, 0, sy, 0, 1, 0, -sy, 0, cy }
 	local Z = { cz, -sz, 0, sz, cz, 0, 0, 0, 1 }
 	return X, Y, Z
+end
+function CFrame.fromMatrix(pos, vx, vy, vz)
+	vz = vz or Vector3.Cross(vx, vy)
+	return cf(pos.X, pos.Y, pos.Z, vx.X, vy.X, vz.X, vx.Y, vy.Y, vz.Y, vx.Z, vy.Z, vz.Z)
 end
 function CFrame.Angles(rx, ry, rz) -- X, then Y, then Z (R = X * Y * Z)
 	local X, Y, Z = axis(rx or 0, ry or 0, rz or 0)
@@ -690,7 +698,8 @@ local EVENTS = {
 	Heartbeat = true, RenderStepped = true, Stepped = true, PreSimulation = true, PostSimulation = true,
 	InputBegan = true, InputEnded = true, InputChanged = true, Chatted = true, MessageReceived = true,
 	Running = true, Seated = true, StateChanged = true, HealthChanged = true, MoveToFinished = true,
-	PromptButtonHoldBegan = true, PromptButtonHoldEnded = true, Idled = true,
+	PromptButtonHoldBegan = true, PromptButtonHoldEnded = true, Idled = true, TouchTapInWorld = true,
+	TouchStarted = true, TouchEnded2 = true, LastInputTypeChanged = true,
 }
 
 local Inst = {}
@@ -794,6 +803,35 @@ local function setParent(obj, parent)
 	end
 end
 
+-- CollectionService signals: a tagged instance entering / leaving the DataModel counts as the
+-- tag being added / removed (as in Roblox).
+local function inGame(o)
+	while o do
+		if o == game then
+			return true
+		end
+		o = rawget(o, "_props").Parent
+	end
+	return false
+end
+function __tagMoved(obj, wasIn)
+	local nowIn = inGame(obj)
+	if wasIn == nowIn then
+		return
+	end
+	local function each(o)
+		local tags = rawget(o, "_tags")
+		if tags then
+			for _, t in ipairs(tags) do
+				__tagSignal(nowIn and "added" or "removed", t, o)
+			end
+		end
+		for _, ch in ipairs(rawget(o, "_children")) do
+			each(ch)
+		end
+	end
+	each(obj)
+end
 local propHooks = {} -- class -> prop -> fn(obj, value) run after a set
 
 InstMT.__newindex = function(obj, k, v)
@@ -802,7 +840,9 @@ InstMT.__newindex = function(obj, k, v)
 		if rawget(obj, "_destroyed") then
 			error("The Parent property of " .. tostring(props.Name) .. " is locked")
 		end
+		local wasIn = inGame(obj)
 		setParent(obj, v)
+		__tagMoved(obj, wasIn)
 	else
 		if props[k] == v then
 			return
@@ -977,7 +1017,9 @@ function Inst:Destroy()
 		ch:Destroy()
 	end
 	if self.Parent then
+		local wasIn = inGame(self)
 		setParent(self, nil)
+		__tagMoved(self, wasIn)
 	end
 	rawset(self, "_destroyed", true)
 end
@@ -1120,17 +1162,42 @@ methods("Model", {
 	ScaleTo = function() end,
 })
 
+-- Remotes copy what they carry (Roblox serialises it): plain tables arrive as new tables;
+-- instances and engine values (Vector3, CFrame, ...) arrive as themselves.
+local function wire(v, seen)
+	if type(v) ~= "table" or getmetatable(v) ~= nil then
+		return v
+	end
+	seen = seen or {}
+	if seen[v] then
+		return seen[v]
+	end
+	local out = {}
+	seen[v] = out
+	for k, x in pairs(v) do
+		out[wire(k, seen)] = wire(x, seen)
+	end
+	return out
+end
+local function wireAll(packed)
+	local out = { n = packed.n }
+	for i = 1, packed.n do
+		out[i] = wire(packed[i])
+	end
+	return out
+end
 defaults({ "RemoteEvent", "UnreliableRemoteEvent" }, function() end)
 methods("RemoteEvent", {
 	FireServer = function(self, ...)
-		self.OnServerEvent:Fire(__localPlayer, ...)
+		local args = wireAll(table.pack(...))
+		self.OnServerEvent:Fire(__localPlayer, table.unpack(args, 1, args.n))
 	end,
 	FireClient = function(self, player, ...)
-		__clientInbox(player, self, table.pack(...))
+		__clientInbox(player, self, wireAll(table.pack(...)))
 	end,
 	FireAllClients = function(self, ...)
 		for _, p in ipairs(game:GetService("Players"):GetPlayers()) do
-			__clientInbox(p, self, table.pack(...))
+			__clientInbox(p, self, wireAll(table.pack(...)))
 		end
 	end,
 })
@@ -1140,7 +1207,9 @@ methods("RemoteFunction", {
 		if not f then
 			error("no OnServerInvoke on " .. self:GetFullName())
 		end
-		return f(__localPlayer, ...)
+		local args = wireAll(table.pack(...))
+		local res = wireAll(table.pack(f(__localPlayer, table.unpack(args, 1, args.n))))
+		return table.unpack(res, 1, res.n)
 	end,
 	InvokeClient = function()
 		error("InvokeClient is not used in this code base")
@@ -1271,6 +1340,28 @@ game.FindService = game.GetService
 workspace = service("Workspace")
 game.Workspace = workspace
 rawget(workspace, "_props").CurrentCamera = __newInstance("Camera", "Camera")
+rawget(workspace.CurrentCamera, "_props").CFrame = CFrame.new(0, 20, 20)
+rawget(workspace.CurrentCamera, "_props").ViewportSize = Vector2.new(800, 400)
+rawget(workspace.CurrentCamera, "_props").FieldOfView = 70
+Ray = {}
+function Ray.new(origin, direction)
+	return { Origin = origin, Direction = direction, Unit = { Origin = origin, Direction = direction.Unit } }
+end
+-- A ray through a viewport point, with a simple pinhole camera (tests aim with lot coordinates).
+methods("Camera", {
+	ViewportPointToRay = function(self, x, y)
+		local cf = self.CFrame
+		local size = self.ViewportSize
+		local t = math.tan(math.rad(self.FieldOfView / 2))
+		local dx = (x / size.X * 2 - 1) * t * size.X / size.Y
+		local dy = (1 - y / size.Y * 2) * t
+		local dir = (cf.LookVector + cf.RightVector * dx + cf.UpVector * dy).Unit
+		return Ray.new(cf.Position, dir)
+	end,
+	ScreenPointToRay = function(self, x, y)
+		return self:ViewportPointToRay(x, y)
+	end,
+})
 methods("Workspace", {
 	GetServerTimeNow = function()
 		return __epoch + __now
@@ -1503,6 +1594,21 @@ methods("TweenService", {
 
 local Collection = service("CollectionService")
 local tagged = {}
+local tagSigs = { added = {}, removed = {} }
+function tagSignals(kind, tag)
+	tagSigs[kind][tag] = tagSigs[kind][tag] or Signal.new()
+	return tagSigs[kind][tag]
+end
+-- added: only while the instance is in the DataModel (AddTag on a loose instance fires on parenting)
+function __tagSignal(kind, tag, obj)
+	if kind == "added" and not inGame(obj) then
+		return
+	end
+	local sig = tagSigs[kind][tag]
+	if sig then
+		sig:Fire(obj)
+	end
+end
 methods("CollectionService", {
 	AddTag = function(self, obj, tag)
 		tagged[tag] = tagged[tag] or {}
@@ -1511,10 +1617,7 @@ methods("CollectionService", {
 			local tags = rawget(obj, "_tags") or {}
 			table.insert(tags, tag)
 			rawset(obj, "_tags", tags)
-			local s = rawget(self, "_tagAdded") and rawget(self, "_tagAdded")[tag]
-			if s then
-				s:Fire(obj)
-			end
+			__tagSignal("added", tag, obj)
 		end
 	end,
 	RemoveTag = function(self, obj, tag)
@@ -1522,22 +1625,31 @@ methods("CollectionService", {
 		local i = table.find(list, obj)
 		if i then
 			table.remove(list, i)
+			local tags = rawget(obj, "_tags") or {}
+			local j = table.find(tags, tag)
+			if j then
+				table.remove(tags, j)
+			end
+			__tagSignal("removed", tag, obj)
 		end
 	end,
 	HasTag = function(self, obj, tag)
 		return table.find(tagged[tag] or {}, obj) ~= nil
 	end,
-	GetTagged = function(self, tag)
-		return table.clone(tagged[tag] or {})
+	GetTagged = function(self, tag) -- only instances in the DataModel, as in Roblox
+		local out = {}
+		for _, o in ipairs(tagged[tag] or {}) do
+			if inGame(o) then
+				table.insert(out, o)
+			end
+		end
+		return out
 	end,
 	GetInstanceAddedSignal = function(self, tag)
-		local t = rawget(self, "_tagAdded") or {}
-		rawset(self, "_tagAdded", t)
-		t[tag] = t[tag] or Signal.new()
-		return t[tag]
+		return tagSignals("added", tag)
 	end,
 	GetInstanceRemovedSignal = function(self, tag)
-		return Signal.new()
+		return tagSignals("removed", tag)
 	end,
 })
 

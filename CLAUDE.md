@@ -85,14 +85,16 @@ same for UI modules. `ReplicatedStorage.Shared` holds modules both sides use.
 | Shared: Config, Net, Roles, Money, Text, Types | foundations (M0) |
 | Shared: Stations, Names, Looks, Hobbies, Collection, Chess, Meter | role table, name rules, look presets, hobby levels, collection items, chess rules, timing meter |
 | Shared: Items | every item: price, stack, use, holdable, furniture, player-made |
+| Shared: Kit, Palette | building kit pieces + rules + greybox geometry (art/kit.md is the contract), named colours |
 | Server: Profiles + Store | profile schema v3, session lock, autosave, mock store in Studio |
 | Server: Characters | save slots, creator, linked slots, spawning from a HumanoidDescription, respawn |
 | Server: Identity | per-server roles with seats, overhead name tags |
 | Server: WorldClock | shared 24-min day, `Phase` attribute, `PhaseChanged` |
 | Server: Activities (+ Ducks, Strength, Mudlark, Chess) | activity framework and the first four activities |
 | Server: Economy, Inventory, Counters, Exchange, World | money ledger + bank, bag/storage + held item, NPC counters, hand-overs, map helpers |
+| Server: Lots, Builds, Property | plots (street side, address, claims, templates), player builds (edits, render, save), deeds (rent/buy, keys, doors) |
 | Server: Admin, AdminLog, Analytics, Doors, Debug | M0 (Debug = Studio-only test bindable) |
-| Client: CharacterUI, IdentityUI, ClockHUD, Activities (+ Chess, Strength), EconomyUI | menus and HUD stubs |
+| Client: CharacterUI, IdentityUI, ClockHUD, Activities (+ Chess, Strength), EconomyUI, BuildUI, PropertyUI | menus and HUD stubs |
 
 Data (`Shared.Types`): one profile per account. **Account-wide**: money, collection, Robux
 purchases, outfits/vehicles/rental, moderation record. **Per character slot**: name and look.
@@ -105,8 +107,10 @@ Extension points:
 - Something that must settle before a character switch: `Characters.onBeforeChange(fn)`.
 - New NPC counter: `Counters.add{ id, kind, name, x, z, yaw }` (server) and, for a new kind,
   `Counters.onOpen(kind, fn)` + `EconomyUI.onCounter(kind, fn)` (client).
+- New building piece: add a row to art/kit.md and the same entry to `Shared.Kit` (test_kit fails
+  until both match); new colours go at the END of `Shared.Palette` (saved by index).
 - Net domains in use: `Profile`, `Admin`, `Identity`, `Character`, `Activity`, `Economy`,
-  `Inventory`, `Counter`, `Exchange`. `Net.listen` keeps one listener per action.
+  `Inventory`, `Counter`, `Exchange`, `Property`, `Build`. `Net.listen` keeps one listener per action.
 
 ## Working with the user
 

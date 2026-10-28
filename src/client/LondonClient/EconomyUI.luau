@@ -8,6 +8,8 @@
 --     other systems add kinds with EconomyUI.onCounter(kind, fn(body, msg, order) -> nil).
 --   Offers to you: Exchange.Offered -> Accept / Decline (Exchange.Answer); Exchange.Closed.
 --   EconomyUI.toast(text) shows a short message at the bottom of the screen.
+--   EconomyUI.ui: the plain widgets (text, button, line, row, panel, clear, counter, focus) for the
+--   other stub UIs (PropertyUI, BuildUI), so they share one look until the UI pass.
 local ContextActionService = game:GetService("ContextActionService")
 local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
@@ -197,6 +199,26 @@ local function row(body: Instance, order: number, label: string, buttons: { { st
 		out[k] = button(r, b[1], { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, x, 0, 2), Size = UDim2.fromOffset(w, 30) })
 	end
 	return r, out
+end
+
+EconomyUI.ui = {
+	text = text,
+	button = button,
+	line = line,
+	row = row,
+	clear = clear,
+	counter = counter,
+	focus = function(b: GuiObject?)
+		focus(b)
+	end,
+	panel = function(name: string, title: string): (Frame, ScrollingFrame, TextLabel)
+		return panel(name, title)
+	end,
+	colours = { INK = INK, PAPER = PAPER, MUTED = MUTED, GOLD = GOLD, ERROR = ERROR, BUTTON = BUTTON },
+}
+
+function EconomyUI.gui(): ScreenGui
+	return gui
 end
 
 -- Wallet ------------------------------------------------------------------------------------

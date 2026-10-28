@@ -7,7 +7,8 @@ How: each src file is converted to plain Lua (tools/luau2lua.py, line numbers ke
 script tree built from default.project.json (so script.Parent / WaitForChild resolve like in
 Studio), and run in Lua with tools/luau_prelude.lua standing in for the engine. Tests use
 test(name, fn), eq(a, b), ok(x), near(a, b), raises(fn) and the __ helpers in the prelude
-(__addPlayer, __removePlayer, __advance(seconds), __received(player, remote, action), __find(path)).
+(__addPlayer, __removePlayer, __advance(seconds), __received(player, remote, action), __find(path),
+__asClient(player, fn), __readText(repo path)).
 
 This checks logic, not the engine: Studio Play-tests are still needed for physics, UI looks,
 replication and anything the prelude fakes.
@@ -32,6 +33,15 @@ def source(path):
         with open(os.path.join(ROOT, path), encoding="utf-8") as f:
             _cache[path] = convert(f.read())
     return _cache[path]
+
+
+def read_text(rel):
+    """Tests may read repo files (e.g. art/kit.md, the contract test_kit checks)."""
+    full = os.path.normpath(os.path.join(ROOT, rel))
+    if not full.startswith(ROOT + os.sep):
+        raise ValueError("outside the repo: " + rel)
+    with open(full, encoding="utf-8") as f:
+        return f.read()
 
 
 def script_class(filename):
@@ -90,6 +100,7 @@ def build_tree(lua):
 def run_file(path):
     lua = LuaRuntime(unpack_returned_tuples=True)
     lua.globals().__source = source
+    lua.globals().__readText = read_text
     with open(os.path.join(HERE, "luau_prelude.lua"), encoding="utf-8") as f:
         lua.execute(f.read())
     build_tree(lua)

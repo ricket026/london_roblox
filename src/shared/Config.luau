@@ -249,6 +249,47 @@ Config.COUNTERS = {
 		stock = { "bed_double", "wardrobe", "table_dining", "armchair", "sofa", "sideboard", "bookcase", "desk",
 			"fireplace", "standard_lamp", "chandelier", "clock_long", "plant_pot", "piano_upright", "kitchen_range",
 			"dresser", "sink", "counter_till", "display_case", "barrel", "flower_stand" } },
+	-- estate agents (LondonServer.Property): rent, buy and sell back homes and shops
+	{ id = "estate_mayfair", kind = "estate", name = "Estate Agent, Mayfair", x = -935, z = 422, yaw = 180 }, -- Grosvenor Sq
+	{ id = "estate_holborn", kind = "estate", name = "Estate Agent, Holborn", x = -675, z = -1682, yaw = 0 }, -- Lincoln's Inn Fields
+	{ id = "estate_covent", kind = "estate", name = "Estate Agent, Covent Garden", x = -80, z = -1480, yaw = 90 },
+	{ id = "estate_eastend", kind = "estate", name = "Estate Agent, Spitalfields", x = -480, z = -2975, yaw = 180 },
 }
+
+-- Property (PROPERTY.md) ----------------------------------------------------------------------
+-- Kinds a player can rent or buy. lotType = the plots' LotType attribute (MapGreybox districts);
+-- rent = pence per RENT_PERIOD, buy = pence; storeys = height limit and budget = most pieces in
+-- one build (BUILDING §3, art/kit.md). `later` kinds aren't offered by estate agents yet.
+Config.PROPERTY_KINDS = {
+	lodging = { name = "Lodging room", lotType = "Lodging", home = true, rent = 240, buy = 7200, storeys = 2, budget = 120 },
+	terrace = { name = "Terrace house", lotType = "Terrace", home = true, rent = 960, buy = 28800, storeys = 3, budget = 300 },
+	townhouse = { name = "Townhouse", lotType = "Townhouse", home = true, rent = 3600, buy = 96000, storeys = 4, budget = 500 },
+	shop = { name = "Shop", lotType = "Shop", home = false, rent = 720, buy = 48000, storeys = 3, budget = 300 },
+	workshop = { name = "Workshop", lotType = "Workshop", home = false, rent = 960, buy = 43200, storeys = 2, budget = 250, later = true },
+	warehouse = { name = "Warehouse", lotType = "Warehouse", home = false, rent = 1920, buy = 84000, storeys = 4, budget = 400, later = true },
+}
+Config.PROPERTY_ORDER = { "lodging", "terrace", "townhouse", "shop", "workshop", "warehouse" }
+Config.PROPERTY_HOMES = 2 -- homes per account (lodging, terrace, townhouse)
+Config.PROPERTY_BUSINESSES = 2 -- shops, workshops and warehouses per account
+Config.RENT_PERIOD = 7 * 24 * 3600 -- seconds of real time one rent payment covers
+Config.RENT_GRACE = 3 * 24 * 3600 -- seconds after rent falls due before the tenancy lapses
+Config.RENT_CHECK_SECONDS = 60 -- how often rent is checked for players in the server
+Config.PROPERTY_SELL_BACK = 0.5 -- share of the buy price the estate agent pays when you sell
+Config.PROPERTY_LINGER = 600 -- seconds a build stays on its plot after the owner leaves
+Config.PROPERTY_KEYS = 5 -- key holders per property
+Config.PROPERTY_NAME_MAX = 30 -- characters in a house name plate
+Config.PROPERTY_RATE = { count = 8, per = 5 } -- property menu calls per player
+Config.REPORTS_TO_HIDE = 3 -- reports from different players in one server that hide a build there
+Config.REPORT_SESSIONS_TO_DRAFT = 2 -- sessions with a hidden build before it goes back to draft
+Config.REPORT_REASONS = { "Rude or offensive", "Blocks the way", "Traps people", "Something else" }
+Config.LOT_TEMPLATES = true -- build a template house on every unused plot (BUILDING §6)
+Config.LOT_TEMPLATE_BATCH = 150 -- plots per frame while templates are built at start
+
+-- Build mode (BUILDING §4-5) -------------------------------------------------------------------
+Config.BUILD_STORE = "PropertyBuild_v1" -- DataStore for builds, key u_<userId>_<deedId>
+Config.BUILD_RATE = { count = 12, per = 1 } -- build edits per player per second
+Config.BUILD_SAVE_SECONDS = 60 -- changed builds save this often (and on leaving build mode)
+Config.BUILD_MAX_BYTES = 200000 -- largest saved build, JSON bytes (DataStore limit is 4 MB)
+Config.BUILD_UNDO = 50 -- undo steps kept by the client
 
 return Config

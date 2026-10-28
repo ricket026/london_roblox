@@ -18,7 +18,8 @@ they move ahead of vehicles and jobs; the economy core goes first because both n
 3. Spawn at the terminus (T03), a quick win while installing.
 *Done when* the character creator, roles, clock and four activities run with no errors.
 
-**Phase 2 · Economy core** (everything with money or goods needs it)
+**Phase 2 · Economy core** (everything with money or goods needs it) · *code written 2026-10-28,
+INSTALL step 6, awaiting a Play-test*
 1. Economy ledger `Economy.change` (T09), then wallet HUD (T10).
 2. Items and inventory: `Shared.Items`, bag and storage (P01).
 3. Generic counter menu for buying from NPC sellers (T15), reused by estate agents, suppliers and
@@ -27,7 +28,8 @@ they move ahead of vehicles and jobs; the economy core goes first because both n
 *Done when* a player buys an item at a counter, carries it, gives it to another player, and every
 penny shows in the ledger.
 
-**Phase 3 · Homes and building** (PROPERTY.md, BUILDING.md)
+**Phase 3 · Homes and building** (PROPERTY.md, BUILDING.md) · *code written 2026-10-28 (wallpaper,
+knocking/visiting still to do), INSTALL step 7, awaiting a Play-test*
 1. Profile v3 with deeds and storage (P02).
 2. The kit: piece data and a builder that makes pieces from it (P04).
 3. Templates on every unused plot, so the whole city gets houses (P05).

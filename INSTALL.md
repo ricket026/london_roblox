@@ -28,6 +28,7 @@ Never paste a `.rbxmx` file or anything starting with `<roblox` into a script.
 | 4 | Activities (ducks, test your strength, mudlarking, chess) | ⬜ |
 | 5 | Debug commands for testing | ⬜ |
 | 6 | Money and things: wallet, bag, shop and bank counters, hand-overs (Phase 2) | ⬜ |
+| 7 | Homes and building: estate agents, rent/buy, plots, template houses, build mode, keys (Phase 3) | ⬜ |
 
 **Players → CharacterAutoLoads must be unticked** (Properties window). Players spawn only after
 picking a character.
@@ -156,4 +157,69 @@ Counter positions are first placements checked against the map file; move any th
 Debug: `game.ServerStorage.LondonDebug:Invoke("giveItem", <userId>, "tea", 3)`, and
 `print(game.ServerStorage.LondonDebug:Invoke("ledger", <userId>))` for this session's money lines,
 `print(game.ServerStorage.LondonDebug:Invoke("totals"))` for money in and out of the server by reason.
+
+## Step 7: homes and building (estate agents, plots, build mode)
+Needs step 6, and **ServerStorage › MapLayoutData** (already in your place; it gives the plots
+their street side and address). New scripts first, then replacements, then the start-up lines.
+
+**New ModuleScripts**
+- inside ReplicatedStorage › **Shared**: `Palette` ([Palette.luau](https://github.com/ricket026/london_roblox/blob/m1-identity/src/shared/Palette.luau)),
+  `Kit` ([Kit.luau](https://github.com/ricket026/london_roblox/blob/m1-identity/src/shared/Kit.luau))
+- inside ServerScriptService › **LondonServer**: `Lots` ([Lots.luau](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Lots.luau)),
+  `Builds` ([Builds.luau](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Builds.luau)),
+  `Property` ([Property.luau](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Property.luau))
+- inside StarterPlayer › StarterPlayerScripts › **LondonClient**: `BuildUI` ([BuildUI.luau](https://github.com/ricket026/london_roblox/blob/m1-identity/src/client/LondonClient/BuildUI.luau)),
+  `PropertyUI` ([PropertyUI.luau](https://github.com/ricket026/london_roblox/blob/m1-identity/src/client/LondonClient/PropertyUI.luau))
+
+**Replace the code of**: Shared › [Config](https://github.com/ricket026/london_roblox/blob/m1-identity/src/shared/Config.luau),
+LondonServer › [Doors](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Doors.luau),
+LondonServer › [Economy](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Economy.luau),
+LondonServer › [World](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/World.luau),
+LondonClient › [EconomyUI](https://github.com/ricket026/london_roblox/blob/m1-identity/src/client/LondonClient/EconomyUI.luau).
+(If you're doing steps 6 and 7 together, the step 6 links are already the latest.)
+
+**LondonServer** (the Script):
+- under `local Exchange = require(script:WaitForChild("Exchange"))` add
+  ```lua
+  local Lots = require(script:WaitForChild("Lots"))
+  local Builds = require(script:WaitForChild("Builds"))
+  local Property = require(script:WaitForChild("Property"))
+  ```
+- under `Exchange.init()` add
+  ```lua
+  Lots.init()
+  Builds.init()
+  Property.init()
+  ```
+- under `Characters.onProfileLoaded(player)` add `Property.onProfileLoaded(player)`
+- under `Economy.onPlayerRemoving(player)` add `Property.onPlayerRemoving(player)`
+- replace the line `game:BindToClose(Profiles.closeAll)` with
+  ```lua
+  game:BindToClose(function()
+  	Builds.closeAll()
+  	Profiles.closeAll()
+  end)
+  ```
+
+**LondonClient** (the LocalScript): under the `EconomyUI` line add
+```lua
+require(script:WaitForChild("BuildUI")).init() -- build mode (Phase 3)
+require(script:WaitForChild("PropertyUI")).init() -- estate agents, your properties, keys (Phase 3)
+```
+Or replace both start-up scripts entirely with the GitHub versions
+([server](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/init.server.luau), [client](https://github.com/ricket026/london_roblox/blob/m1-identity/src/client/LondonClient/init.client.luau)).
+
+Test (Play):
+- every empty plot gets a plain template house (it builds in over a few seconds). If Studio
+  lags badly, set `Config.LOT_TEMPLATES = false` and tell me;
+- give yourself money (`("givePence", <userId>, 30000)`), then speak to an estate agent: Lincoln's
+  Inn Fields (Holborn), Grosvenor Square (Mayfair), Covent Garden piazza or Spitalfields market.
+  **Rent** a terrace or lodging: the message gives the address;
+- walk there: your house is built on the plot (doors locked to others; **Property › Unlock**);
+- standing on your plot, **Property › Build**: pick a piece, move the mouse to place it (touch: tap,
+  then **Put**), **R** turns it, **Select** + **Delete**, **Paint**, **Undo**. Take out a front-wall
+  window: the house becomes a draft (others see the plain house); put a wall back and **Publish**;
+- **Exit** saves. Leave and rejoin: the same address and house come back.
+Things to look at closely (they can't be checked outside Studio): doors swing the right way,
+roofs slope up to the ridge, chairs face forward, the build camera, and frame rate with templates.
 
