@@ -543,6 +543,10 @@ Config.AUDIENCE_REASON_MAX = 80 -- characters
 Config.AUDIENCE_QUEUE_MAX = 10 -- petitioners waiting at once
 Config.AUDIENCE_RATE = { count = 8, per = 10 } -- throne room calls per player
 
+-- The collection book (ACTIVITIES §4; TASKS T27) -----------------------------------------------
+Config.BOOK_CHECK = 15 -- seconds between checks for newly completed pages
+Config.BOOK_RATE = { count = 6, per = 10 } -- book calls per player
+
 -- First join and goals (LOW_POP_AND_ONBOARDING §3-4; TASKS T25) ---------------------------------
 Config.ARRIVAL_SECONDS = 5 -- the arrival camera over the terminus (skippable)
 Config.ARRIVAL_CAMERA = { x = 300, y = 90, z = -1180 } -- where it starts, looking at SPAWN_POINT

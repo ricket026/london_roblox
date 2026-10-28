@@ -287,7 +287,11 @@ economy core (T09, T10, T15, T11) comes first and is listed under M2 below.
    auction, photography, detective mysteries, allotments, ice skating, balloon.
 Mark progress in the table in `activities/README.md`.
 
-### T27 · Collection book UI ⬜ · **Specs** ACTIVITIES §4 · Pages from `Collection.PAGES`, found/missing, page rewards.
+### T27 · Collection book UI ✅ (code + tests; needs a Play-test) · **Specs** ACTIVITIES §4 · Pages from `Collection.PAGES`, found/missing, page rewards.
+- **Built** `LondonServer.Book` + `LondonClient.BookUI`, `tests/test_book.luau`. Completed pages are
+  saved in `profile.settings.pagesDone` and announced to the server. **Still to do** the page's
+  cosmetic (with T28 hobby rewards), the Gazette mention (T23), the trophy cabinet (a furniture
+  piece showing medals, P08).
 ### T28 · Hobby level rewards ⬜ · **Specs** ACTIVITIES §3 · Cosmetic per level (ribbons, title tags) + unlocks.
 ### T29 · All-time leaderboards ⬜ · OrderedDataStore per activity (live servers), "Hall of Champions" board.
 

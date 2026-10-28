@@ -26,6 +26,7 @@ require(script:WaitForChild("VoteUI")).init() -- no confidence and vote-kick (T3
 require(script:WaitForChild("ThroneRoomUI")).init() -- throne room protocol and audiences (T36)
 require(script:WaitForChild("EventUI")).init() -- events: what's on, sign-up, hosting (T39)
 require(script:WaitForChild("OnboardingUI")).init() -- first join: arrival, rules, first job; Next steps (T25)
+require(script:WaitForChild("BookUI")).init() -- the collection book (T27)
 
 Net.listen("Admin", "Notice", function(msg)
 	if type(msg.text) ~= "string" then

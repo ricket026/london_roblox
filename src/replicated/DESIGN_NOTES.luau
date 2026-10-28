@@ -118,6 +118,9 @@ MODULES
              starter job via Identity.canTake + grant; Config.GOALS by Daily.onRecord events and
              5-second checks (bank, property, rank), bonus once ("prize"); funnel Arrival,
              Rules, FirstJob, FirstPay. Remotes Onboarding.*.
+    Book     (T27) the collection book from profile.collection; a page complete (all found)
+             is saved in profile.settings.pagesDone and pushed Book.Completed to everyone.
+             Remote Book.Get.
     Lamps    gas lamps built along MapLayoutData's roads (Config.LAMP_*), tag "Lamp", attrs
              Route/Lit; lamplighters (Jobs) or the city's fallback light and put them out.
     Economy (Phase 2) the money ledger: every change has a reason (REASONS: faucet / sink / move),
@@ -194,6 +197,7 @@ MODULES
              those who preside; the audience reason box; the mark marker when called.
     OnboardingUI (stub) arrival camera (Skip), rules card, starter job card (the "Welcome"
              panel); "Next steps" left side under the top-left buttons (fold by the heading).
+    BookUI     (stub) "Book" top right: one page at a time, counts, "? ? ?" for missing.
     EventUI    (stub) gold line under the banner (name, step, time, distance); "Events" top
              right: what's on (Join / Leave; host: Next step / End) and what you may start.
     VoteUI     (stub) "Votes" top right: players with Kick / No confidence, reasons, Start; the
@@ -216,7 +220,7 @@ HUD MAP (offsets in px; check a new piece against this on a 360 px tall landscap
   Top left     JobUI tracker 44-136 (on duty) or ThroneUI reign panel 44-108 (monarch) ·
                CourtUI Court 140-168 · ThroneRoomUI Room 172-200 · OnboardingUI Next steps 206-298
   Top right    wallet 6, bank 30, Bag 52-86, Property 92-126, Report this house 132-162 (near a
-               house), Votes 168-198, Events 204-234
+               house), Votes 168-198, Events 204-234, Book 240-270
   Middle       centred panels (ui.panel, 85% high, max 420×520); throne / Court offers (0.5, 0.5)
   Bottom       VoteUI vote box 134-242 from the top on 360 px (bottom −118) · ThroneRoomUI room
                line bottom −92 · EconomyUI toast bottom −60 · left: Station 12-232, Characters
