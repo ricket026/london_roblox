@@ -108,8 +108,9 @@ same for UI modules. `ReplicatedStorage.Shared` holds modules both sides use.
 | Server: Votes | no-confidence votes (seated roles; bar via `Identity.bar`) and vote-kicks (rejoin bar) |
 | Server: ThroneRoom | throne room Open / Closed / Session (RoomZone), the floor, chat gating, audience book and queue |
 | Server: Events | event framework: `Config.EVENTS` data + `Events.hook`; host / schedule / random / decree; rewards |
+| Server: Onboarding | first join (rules card, starter job) and the "Next steps" goals (`Config.GOALS`) |
 | Server: Admin, AdminLog, Analytics, Doors, Debug | M0 (Debug = Studio-only test bindable) |
-| Client: CharacterUI, IdentityUI, ClockHUD, Activities (+ Chess, Strength), EconomyUI, BuildUI, PropertyUI, ShopUI, JobUI, DailyUI, SpeechUI, ThroneUI, CourtUI, VoteUI, ThroneRoomUI, EventUI | menus and HUD stubs |
+| Client: CharacterUI, IdentityUI, ClockHUD, Activities (+ Chess, Strength), EconomyUI, BuildUI, PropertyUI, ShopUI, JobUI, DailyUI, SpeechUI, ThroneUI, CourtUI, VoteUI, ThroneRoomUI, EventUI, OnboardingUI | menus and HUD stubs |
 
 Data (`Shared.Types`): one profile per account. **Account-wide**: money, collection, Robux
 purchases, outfits/vehicles/rental, moderation record. **Per character slot**: name and look.
@@ -130,13 +131,14 @@ Extension points:
 - New NPC counter: `Counters.add{ id, kind, name, x, z, yaw }` (server) and, for a new kind,
   `Counters.onOpen(kind, fn)` + `EconomyUI.onCounter(kind, fn)` (client).
 - Something players do that a daily task could ask for: call `Daily.record(player, "<event>")`
-  and add a `Config.DAILY_POOL` entry with that event.
+  and add a `Config.DAILY_POOL` entry with that event (a `Config.GOALS` entry can use it too;
+  other listeners: `Daily.onRecord(fn)`).
 - New job: a station role in `Shared.Stations`, numbers in `Config.JOBS`, and
   `Jobs.register(roleId, function(player) return task end)` (steps "goto"/"hold", optional need/give).
 - New building piece: add a row to art/kit.md and the same entry to `Shared.Kit` (test_kit fails
   until both match); new colours go at the END of `Shared.Palette` (saved by index).
 - Net domains in use: `Profile`, `Admin`, `Identity`, `Character`, `Activity`, `Economy`,
-  `Inventory`, `Counter`, `Exchange`, `Property`, `Build`, `Shop`, `Job`, `Daily`, `Appointment`, `Phrase`, `Throne`, `Court`, `Decree`, `Vote`, `Room`, `Event`. `Net.listen` keeps one listener per action.
+  `Inventory`, `Counter`, `Exchange`, `Property`, `Build`, `Shop`, `Job`, `Daily`, `Appointment`, `Phrase`, `Throne`, `Court`, `Decree`, `Vote`, `Room`, `Event`, `Onboarding`. `Net.listen` keeps one listener per action.
 
 ## Working with the user
 

@@ -543,6 +543,32 @@ Config.AUDIENCE_REASON_MAX = 80 -- characters
 Config.AUDIENCE_QUEUE_MAX = 10 -- petitioners waiting at once
 Config.AUDIENCE_RATE = { count = 8, per = 10 } -- throne room calls per player
 
+-- First join and goals (LOW_POP_AND_ONBOARDING §3-4; TASKS T25) ---------------------------------
+Config.ARRIVAL_SECONDS = 5 -- the arrival camera over the terminus (skippable)
+Config.ARRIVAL_CAMERA = { x = 300, y = 90, z = -1180 } -- where it starts, looking at SPAWN_POINT
+Config.RULES = {
+	"No attacking people for no reason.",
+	"Drive with care in the streets.",
+	"Respect the court and its protocol.",
+	"Never share real names or personal details.",
+	"Be kind. Report trouble with Roblox's report button.",
+}
+Config.STARTER_JOBS = { "Newsboy", "Postman", "Lamplighter" } -- offered on the first day (Shared.Stations ids)
+Config.ONBOARDING_RATE = { count = 6, per = 10 } -- onboarding calls per player
+-- The "Next steps" goals (once per account, in profile.settings.goals). `event`: a Daily.record
+-- event (a prefix when it ends in ":", or a list); `check`: "bank" (pence banked >= value),
+-- "property" (deeds >= value) or "rank" (any job rank >= value). `bonus`: pence, paid once.
+Config.GOALS = {
+	{ id = "wages", text = "Earn your first wages", event = "job:", bonus = 6 },
+	{ id = "pastime", text = "Try a pastime: the ducks, the strength test, chess or mudlarking", event = "activity:", bonus = 6 },
+	{ id = "save", text = "Save £1 in the bank", check = "bank", value = 240, bonus = 6 },
+	{ id = "occasion", text = "Be there for an appointment or a royal occasion", event = { "appointment", "event" }, bonus = 6 },
+	{ id = "shop", text = "Buy something at a shop or market stall", event = "shop_buy", bonus = 6 },
+	{ id = "lodging", text = "Rent a lodging from an estate agent", check = "property", value = 1, bonus = 12 },
+	{ id = "rank2", text = "Reach rank 2 in a job", check = "rank", value = 2, bonus = 24 },
+}
+Config.GOALS_SHOWN = 2 -- unfinished goals shown at once
+
 -- Events (EVENTS.md §1, §3, §4; TASKS T39) ------------------------------------------------------
 Config.EVENT_MAJOR_GAP = 600 -- seconds between the end of one major event and the next
 Config.EVENT_SPECTATE_SECONDS = 20 -- seconds near a running event that make you a spectator

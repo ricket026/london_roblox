@@ -261,10 +261,17 @@ economy core (T09, T10, T15, T11) comes first and is listed under M2 below.
 - Population budget that shrinks as players rise; walking lanes and idle crowds in hubs; NPC fares,
   buyers, shopkeepers, lamplighter; later NPC traffic. Simple rigs, a few lines of speech.
 
-### T25 · First-join flow and goals HUD ⬜
+### T25 · First-join flow and goals HUD ✅ (code + tests; needs a Play-test)
 - **Specs** LOW_POP §3–4, Config.ONBOARDING_STEPS · **Depends** T03, T17 · **Size** M
 - Arrival cinematic (skippable) → character creator (exists) → rules card → pick a starter job
   with a 60-second guided task → first pay → "Next steps" goals list. Log each funnel step.
+- **Built** `LondonServer.Onboarding` + `LondonClient.OnboardingUI`, `Daily.onRecord`, `Config.RULES`,
+  `STARTER_JOBS`, `GOALS`, `ARRIVAL_*`, `tests/test_onboarding.luau`. Flags live in
+  `profile.settings` (rulesAccepted, starterPicked, goals, goalsHidden), so no schema change. The
+  starter jobs use the existing job tasks (Lamplighter has work from dusk). Funnel: Arrival, Rules,
+  FirstJob, FirstPay (Name and Look from Characters).
+- **Not yet** the train pulling in during the arrival (needs the train model), the NPC tour guide
+  (S03), goals for vehicles, licences and being presented (their systems aren't built).
 
 ### T26 · Activities ⬜ (one task per activity)
 **Specs** `activities/` (a full design per activity: site, rules, controls, rewards, checks,

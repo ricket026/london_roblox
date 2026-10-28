@@ -5,7 +5,8 @@
 --   Tasks: Config.DAILY_TASKS a day per account, picked from Config.DAILY_POOL (the same choice all
 --   day), Config.DAILY_TASK_PAY each when done. Other systems report what players do:
 --   Daily.record(player, event, n?)   events "job:<Job>", "lamp", "shop_buy", "counter_buy",
---   "activity:<Activity>", "appointment" (Config.DAILY_POOL[].event)
+--   "activity:<Activity>", "appointment", "event" (Config.DAILY_POOL[].event)
+--   Daily.onRecord(fn) hears every recorded event too (LondonServer.Onboarding's goals).
 -- Remote (Daily domain, call): Get. Pushes Daily.State { day, streak, tasks } and Daily.Notice.
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -68,10 +69,19 @@ local function push(player: Player)
 	Net.push(player, "Daily", "State", Daily.view(player))
 end
 
+-- Other systems that want every recorded event (the "Next steps" goals): fn(player, event, n).
+local listeners: { (Player, string, number) -> () } = {}
+function Daily.onRecord(fn: (Player, string, number) -> ())
+	table.insert(listeners, fn)
+end
+
 function Daily.record(player: Player, event: string, n: number?)
 	local tasks = Daily.tasks(player)
 	if not tasks or not Profiles.progress(player) then
 		return -- at the character menu
+	end
+	for _, fn in listeners do
+		task.spawn(fn, player, event, n or 1)
 	end
 	local changed = false
 	for _, t in tasks do

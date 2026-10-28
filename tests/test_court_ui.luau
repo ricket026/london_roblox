@@ -2,6 +2,7 @@
 local Shared = __find("ReplicatedStorage.Shared")
 local Config = require(Shared.Config)
 Config.STIPEND_PER_DAY, Config.DAILY_TASK_PAY = 0, 0
+Config.GOALS = {} -- the "Next steps" bonuses are tested in test_onboarding
 local Net = require(Shared.Net)
 local Roles = require(Shared.Roles)
 

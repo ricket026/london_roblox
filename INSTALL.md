@@ -34,6 +34,7 @@ Never paste a `.rbxmx` file or anything starting with `<roblox` into a script.
 | 10 | Quick phrases and gestures: speak without typing (T05) | ⬜ |
 | 11 | The Court: the throne (claim, succession, abdication), titles, Household offices, forms of address, decrees and bank holidays, no-confidence votes and vote-kick, throne room protocol and audiences (T34–T38, T08) | ⬜ |
 | 12 | Events: balcony appearance, the Coronation, the pea-souper fog; the event framework (T39) | ⬜ |
+| 13 | First join: arrival camera, rules card, first job; the "Next steps" goals (T25) | ⬜ |
 
 Do the steps **in order**: each needs the ones before it (a script that waits for a missing one
 just hangs; `tools/check_install.py` checks this list against the code). The links always show
@@ -403,6 +404,29 @@ proclamation, a flag in front of the Palace, and a gold line under the banner co
 to Join (Archbishop, Choir, Guard of honour); the host can press **Next step** to hurry it; at the
 end the King is crowned. The pea-souper comes by itself about once every 72 minutes (fog for ten
 minutes). New events are a `Config.EVENTS` entry (and, if they need code, an `Events.hook`).
+
+## Step 13: first join (arrival, rules, first job) and "Next steps"
+**New scripts**
+- ModuleScript `Onboarding` inside ServerScriptService › **LondonServer**: [Onboarding](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Onboarding.luau)
+- ModuleScript `OnboardingUI` inside StarterPlayer › StarterPlayerScripts › **LondonClient**: [OnboardingUI](https://github.com/ricket026/london_roblox/blob/m1-identity/src/client/LondonClient/OnboardingUI.luau)
+
+**Replace**
+- `Config` in ReplicatedStorage › Shared: [Config](https://github.com/ricket026/london_roblox/blob/m1-identity/src/shared/Config.luau) (`Config.RULES`, `STARTER_JOBS`, `GOALS`)
+- `Daily` in ServerScriptService › LondonServer: [Daily](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Daily.luau) (`Daily.onRecord` for the goals)
+
+Start-up lines:
+- **LondonServer**: under `local Events = require(script:WaitForChild("Events"))` add
+  `local Onboarding = require(script:WaitForChild("Onboarding"))`, and under `Events.init()` add `Onboarding.init()`.
+- **LondonClient**: under the `EventUI` line add
+  ```lua
+  require(script:WaitForChild("OnboardingUI")).init() -- first join: arrival, rules, first job; Next steps (T25)
+  ```
+
+Test (Play): your account hasn't seen the rules yet, so after picking a character the camera
+sweeps down over Charing Cross (**Skip** bottom right), then the rules card (**I agree**), then
+"Your first job" (Newsboy, Postman, Lamplighter or Not now). Left side: **Next steps** with two
+goals and their bonus; tap the heading to fold it. To see the cards again, clear
+`settings.rulesAccepted` and `settings.starterPicked` in your profile (Debug `raw` / `setRaw`).
 
 ## After the last step: the start-up scripts
 Once every step above is in, the two start-up scripts can simply be **replaced entirely** with
