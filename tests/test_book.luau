@@ -98,3 +98,64 @@ test("the Book panel: pages, found and missing", function()
 	__advance(0)
 	ok(string.find(texts(), "%? %? %?"), "missing finds are hidden: " .. texts())
 end)
+
+local Hobbies = require(Shared.Hobbies)
+local Daily = require(__find(LS .. "Daily"))
+
+test("pastimes: levels unlock titles; wear one on the name tag; it's saved and comes back", function()
+	local prog = Profiles.progress(P)
+	prog.hobbies.Outdoors = Hobbies.xpFor(3)
+	local v = call(P, "Pastimes").data
+	local outdoors
+	for _, h in v.hobbies do
+		if h.name == "Outdoors" then
+			outdoors = h
+		end
+	end
+	eq(outdoors.level, 3)
+	ok(outdoors.titles[1].unlocked and not outdoors.titles[2].unlocked)
+	ok(not call(P, "Wear", { hobby = "Outdoors", level = 6 }).ok, "not until level 6")
+	ok(not call(P, "Wear", { hobby = "Outdoors", level = 4 }).ok, "no title at level 4")
+	ok(call(P, "Wear", { hobby = "Outdoors", level = 3 }).ok)
+	eq(P:GetAttribute("Badge"), "Friend of the Ducks")
+	local tag = P.Character:FindFirstChild("RPTag")
+	ok(string.find(tag.RPRole.Text, "Friend of the Ducks"), tag.RPRole.Text)
+	ok(table.find(prog.honours, "badge:Outdoors:3") ~= nil, "saved with the character")
+	P:SetAttribute("CharSlot", "x")
+	P:SetAttribute("CharSlot", "1")
+	eq(P:GetAttribute("Badge"), "Friend of the Ducks", "put back on arrival")
+	ok(call(P, "Wear", {}).ok)
+	eq(P:GetAttribute("Badge"), nil, "taken off")
+	eq(table.find(prog.honours, "badge:Outdoors:3"), nil)
+end)
+
+test("a new title is announced after the activity that earns it", function()
+	Daily.record(P, "activity:Ducks") -- first look this session: nothing new
+	__advance(0)
+	__clearInbox(P)
+	Profiles.progress(P).hobbies.Outdoors = Hobbies.xpFor(6)
+	Daily.record(P, "activity:Ducks")
+	__advance(0)
+	local n = __received(P, "BookEvent", "Notice")
+	ok(#n > 0 and string.find(n[#n].text, "Keen Naturalist"), "announced")
+end)
+
+test("the Pastimes tab: Wear", function()
+	local gui = P.PlayerGui.Economy
+	gui.BookPanel.Visible = true
+	local function press(label)
+		for _, d in gui.BookPanel.Body:GetDescendants() do
+			if d:IsA("TextButton") and d.Text == label then
+				d.Activated:Fire()
+				__advance(0)
+				return true
+			end
+		end
+		return false
+	end
+	ok(press("Pastimes"))
+	ok(press("Wear"), "an unlocked title has Wear")
+	ok(P:GetAttribute("Badge") ~= nil)
+	ok(press("Take off"))
+	eq(P:GetAttribute("Badge"), nil)
+end)

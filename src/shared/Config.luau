@@ -546,6 +546,16 @@ Config.AUDIENCE_RATE = { count = 8, per = 10 } -- throne room calls per player
 -- The collection book (ACTIVITIES §4; TASKS T27) -----------------------------------------------
 Config.BOOK_CHECK = 15 -- seconds between checks for newly completed pages
 Config.BOOK_RATE = { count = 6, per = 10 } -- book calls per player
+-- Titles a hobby level unlocks (ACTIVITIES §3; TASKS T28): { level, title }. A player may wear
+-- one under their name (Book panel › Pastimes); it's saved with the character's progress.
+Config.HOBBY_TITLES = {
+	Sport = { { 3, "Keen Sportsman" }, { 6, "Strongest on the Pier" }, { 10, "Champion of the Fair" } },
+	Music = { { 3, "Parlour Singer" }, { 6, "Bandstand Regular" }, { 10, "Virtuoso" } },
+	Performance = { { 3, "Promising Player" }, { 6, "Darling of the Stalls" }, { 10, "Star of the West End" } },
+	Outdoors = { { 3, "Friend of the Ducks" }, { 6, "Keen Naturalist" }, { 10, "Keeper of the Park" } },
+	Collecting = { { 3, "Mudlark" }, { 6, "Seasoned Mudlark" }, { 10, "Master of the Foreshore" } },
+	Games = { { 3, "Club Player" }, { 6, "Chess Master" }, { 10, "Grandmaster of the Bandstand" } },
+}
 
 -- First join and goals (LOW_POP_AND_ONBOARDING §3-4; TASKS T25) ---------------------------------
 Config.ARRIVAL_SECONDS = 5 -- the arrival camera over the terminus (skippable)

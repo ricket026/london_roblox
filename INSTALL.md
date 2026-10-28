@@ -35,7 +35,7 @@ Never paste a `.rbxmx` file or anything starting with `<roblox` into a script.
 | 11 | The Court: the throne (claim, succession, abdication), titles, Household offices, forms of address, decrees and bank holidays, no-confidence votes and vote-kick, throne room protocol and audiences (T34–T38, T08) | ⬜ |
 | 12 | Events: balcony appearance, the Coronation, the pea-souper fog; the event framework (T39) | ⬜ |
 | 13 | First join: arrival camera, rules card, first job; the "Next steps" goals (T25) | ⬜ |
-| 14 | The collection book (T27) | ⬜ |
+| 14 | The collection book and pastime titles (T27, T28) | ⬜ |
 
 Do the steps **in order**: each needs the ones before it (a script that waits for a missing one
 just hangs; `tools/check_install.py` checks this list against the code). The links always show
@@ -429,12 +429,15 @@ sweeps down over Charing Cross (**Skip** bottom right), then the rules card (**I
 goals and their bonus; tap the heading to fold it. To see the cards again, clear
 `settings.rulesAccepted` and `settings.starterPicked` in your profile (Debug `raw` / `setRaw`).
 
-## Step 14: the collection book
+## Step 14: the collection book and pastime titles
 **New scripts**
 - ModuleScript `Book` inside ServerScriptService › **LondonServer**: [Book](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Book.luau)
 - ModuleScript `BookUI` inside StarterPlayer › StarterPlayerScripts › **LondonClient**: [BookUI](https://github.com/ricket026/london_roblox/blob/m1-identity/src/client/LondonClient/BookUI.luau)
 
-**Replace** `Config` in ReplicatedStorage › Shared: [Config](https://github.com/ricket026/london_roblox/blob/m1-identity/src/shared/Config.luau) (`BOOK_*`).
+**Replace**
+- `Config` in ReplicatedStorage › Shared: [Config](https://github.com/ricket026/london_roblox/blob/m1-identity/src/shared/Config.luau) (`BOOK_*`, `HOBBY_TITLES`)
+- `Titles` in ReplicatedStorage › Shared: [Titles](https://github.com/ricket026/london_roblox/blob/m1-identity/src/shared/Titles.luau) and `Identity` in
+  ServerScriptService › LondonServer: [Identity](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Identity.luau) (the worn title on the name tag)
 
 Start-up lines:
 - **LondonServer**: under `local Onboarding = require(script:WaitForChild("Onboarding"))` add
@@ -446,7 +449,8 @@ Start-up lines:
 
 Test (Play): **Book** (top right, under Events): page by page (◀ ▶), what you've found and how
 often, "? ? ?" for the rest. Feed the ducks or go mudlarking and open it again. Finishing a page
-tells you and everyone in the server.
+tells you and everyone in the server. The **Pastimes** tab shows each hobby's level; titles
+unlock at levels 3, 6 and 10 (`Config.HOBBY_TITLES`): **Wear** one and it shows under your name.
 
 ## After the last step: the start-up scripts
 Once every step above is in, the two start-up scripts can simply be **replaced entirely** with

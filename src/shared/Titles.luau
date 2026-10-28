@@ -11,6 +11,7 @@ local Titles = {}
 
 Titles.ATTR = "Title"
 Titles.PLACE_ATTR = "TitlePlace"
+Titles.BADGE_ATTR = "Badge" -- the hobby title worn (LondonServer.Book)
 Titles.FORMS = { "neutral", "his", "her" }
 
 export type Rank = { id: string, his: string, her: string, of: boolean, peer: boolean }
@@ -73,6 +74,7 @@ local STYLED_ROLES = { King = true, Queen = true, Royal = true, MP = true, Const
 
 export type Info = {
 	first: string, last: string, role: string?, roleName: string?, title: string?, place: string?, form: string?,
+	badge: string?, -- a hobby title the player wears ("Keen Naturalist"), last on the tag
 }
 
 -- The two lines of the overhead tag. line1 is the name as addressed ("Sir Albert Tester",
@@ -111,6 +113,9 @@ function Titles.address(info: Info): (string, string)
 	end
 	if not STYLED_ROLES[role] and role ~= "Citizen" and info.roleName then
 		table.insert(parts, info.roleName)
+	end
+	if info.badge and info.badge ~= "" then
+		table.insert(parts, info.badge)
 	end
 	return name, table.concat(parts, " · ")
 end

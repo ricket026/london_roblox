@@ -5,7 +5,7 @@
 -- Config.DEFAULT_ROLE whenever the player switches character.
 -- Player attributes (read by tags, Roles.roleOf and the client): RPName, Role; tags also show
 -- the per-server title (Shared.Titles attributes Title, TitlePlace) in the player's chosen form
--- of address (profile.settings.address).
+-- of address (profile.settings.address), and the hobby title they wear (attribute Badge).
 -- Remotes (Identity domain, calls): Get, ChooseRole { role }.
 --   Identity.grant(player, roleId) (game-rule roles: throne, offices), Identity.holdersOf(roleId),
 --   Identity.refreshTag(player) (after the form of address changes).
@@ -93,6 +93,7 @@ local function refreshTag(player: Player)
 			title = player:GetAttribute(Titles.ATTR) :: any,
 			place = if type(place) == "string" then place else nil,
 			form = if profile then profile.settings.address else nil,
+			badge = player:GetAttribute(Titles.BADGE_ATTR) :: any,
 		})
 		name.Text, role.Text = line1, line2
 	else
@@ -289,7 +290,7 @@ function Identity.init()
 		player:GetAttributeChangedSignal(Identity.NAME_ATTR):Connect(function()
 			refreshTag(player)
 		end)
-		for _, attr in { Roles.ROLE_ATTR, Titles.ATTR, Titles.PLACE_ATTR } do
+		for _, attr in { Roles.ROLE_ATTR, Titles.ATTR, Titles.PLACE_ATTR, Titles.BADGE_ATTR } do
 			player:GetAttributeChangedSignal(attr):Connect(function()
 				refreshTag(player)
 			end)

@@ -2,7 +2,8 @@
 -- LondonClient.BookUI (stub): the collection book (ACTIVITIES §4). Plain on purpose.
 --   A "Book" button (top right, under Events) opens one page at a time (◀ ▶): what you've found
 --   and how often, "? ? ?" for what you haven't, the page count, and a mark when it's complete.
--- Server: LondonServer.Book (Book.Get; pushes Completed, Notice).
+--   The Pastimes tab: each hobby's level and XP, the titles it unlocks, Wear / Take off.
+-- Server: LondonServer.Book (Book.Get / Pastimes / Wear; pushes Completed, Notice).
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -21,11 +22,70 @@ local panel: Frame
 local body: ScrollingFrame
 local title: TextLabel
 local book: { [string]: any } = { pages = {} }
+local pastimes: { [string]: any } = { hobbies = {} }
 local pageIndex = 1
+local tab = "book"
 
-local function render()
+local render: () -> ()
+
+local function tabs(o: () -> number)
+	local _, b = ui.row(body, o(), "", { { if tab == "book" then "• Book" else "Book" }, { if tab == "pastimes" then "• Pastimes" else "Pastimes" } }, 100)
+	b[1].Activated:Connect(function()
+		tab = "book"
+		render()
+	end)
+	b[2].Activated:Connect(function()
+		tab = "pastimes"
+		local ok, res = Net.request("Book", "Pastimes")
+		if ok then
+			pastimes = res
+		end
+		render()
+	end)
+end
+
+local function renderPastimes(o: () -> number)
+	title.Text = "Pastimes"
+	ui.line(body, o(), "Wearing: " .. (pastimes.wearing or "no title"), C.INK, 16)
+	if pastimes.wearing then
+		local _, off = ui.row(body, o(), "", { { "Take off" } }, 96)
+		off[1].Activated:Connect(function()
+			local ok, res = Net.request("Book", "Wear", {})
+			if ok then
+				pastimes = res
+				render()
+			end
+		end)
+	end
+	for _, h in pastimes.hobbies or {} do
+		ui.line(body, o(), string.format("%s · level %d · %d%s XP", h.name, h.level, h.xp, if h.next then "/" .. h.next else ""), C.GOLD, 17)
+		for _, t in h.titles do
+			if t.unlocked then
+				local _, b = ui.row(body, o(), t.text, { { if pastimes.wearing == t.text then "Worn" else "Wear" } }, 76)
+				b[1].Activated:Connect(function()
+					local ok, res = Net.request("Book", "Wear", { hobby = h.name, level = t.level })
+					if ok then
+						pastimes = res
+						render()
+					else
+						EconomyUI.toast(tostring(res), true)
+					end
+				end)
+			else
+				ui.line(body, o(), string.format("%s (level %d)", t.text, t.level), C.MUTED, 15)
+			end
+		end
+	end
+end
+
+render = function()
 	ui.clear(body)
 	local o = ui.counter()
+	tabs(o)
+	if tab == "pastimes" then
+		renderPastimes(o)
+		return
+	end
 	local pages = book.pages or {}
 	local page = pages[pageIndex]
 	if not page then

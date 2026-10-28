@@ -292,7 +292,12 @@ Mark progress in the table in `activities/README.md`.
   saved in `profile.settings.pagesDone` and announced to the server. **Still to do** the page's
   cosmetic (with T28 hobby rewards), the Gazette mention (T23), the trophy cabinet (a furniture
   piece showing medals, P08).
-### T28 · Hobby level rewards ⬜ · **Specs** ACTIVITIES §3 · Cosmetic per level (ribbons, title tags) + unlocks.
+### T28 · Hobby level rewards 🟡 (title tags done; ribbons and unlocks to do) · **Specs** ACTIVITIES §3 · Cosmetic per level (ribbons, title tags) + unlocks.
+- **Built** in `LondonServer.Book` + the Pastimes tab of `BookUI`: `Config.HOBBY_TITLES` (levels 3, 6,
+  10 per hobby), Wear / Take off (attribute `Badge`, last on the name tag via `Titles.address`),
+  saved as `badge:<hobby>:<level>` in `progress.honours`, a notice when a new one unlocks. Tests in
+  `test_book.luau`. **Still to do** hat ribbons (an `OutfitParts` piece by hobby colour at level
+  5) and unlocks (a better rod, club boat... when those activities exist).
 ### T29 · All-time leaderboards ⬜ · OrderedDataStore per activity (live servers), "Hall of Champions" board.
 
 ---
