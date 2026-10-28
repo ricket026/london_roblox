@@ -36,10 +36,16 @@ merged. Open a pull request only when the user asks.
 
 ```
 python3 tools/check_luau.py      # block/bracket balance, Module.field references, unused locals
+python3 tools/luau_test.py       # runs tests/*.luau against the real src/ modules (needs `pip install lupa`)
 python3 tools/chess_perft.py     # chess rules (Python port of Shared.Chess) vs standard counts
 ```
-Both must pass before you commit. They are not a type checker: say plainly in your report what
-still needs a Play-test in Studio. Map positions can be checked against the place file's parts
+All must pass before you commit. `luau_test.py` converts src/ to plain Lua (`tools/luau2lua.py`,
+same line numbers) and runs it with `tools/luau_prelude.lua` standing in for Roblox: instances,
+signals, remotes, players, a DataStore, CFrame/Vector3 maths and **virtual time**
+(`__advance(seconds)`). Tests can boot the real server (`__run(__find("ServerScriptService.LondonServer"))`),
+add players (`__addPlayer`) and call remotes through `Net._dispatch`; see `tests/test_characters.luau`.
+**Write tests for every new system.** None of this is a type checker or the real engine: say plainly in your report what still needs a
+Play-test in Studio. Map positions can be checked against the place file's parts
 (the earlier review did this; positions for activity sites are in `Config`, with Y found by
 raycast at runtime).
 
