@@ -81,6 +81,12 @@ MODULES
              Activities and Appointments. Pushes Daily.State/Notice.
     Appointments  one every 10 real minutes by server time (same everywhere): flag at the spot,
              memento (Collection "Mementos") for 30 s there. Pushes Appointment.Next/Notice.
+    Throne   (M4, T34) claim prompts on the throne-room seats (Config.THRONE_SEATS) while a throne
+             is free; a vacancy (abdicate, leave, switch character: the Role attribute watcher)
+             is offered to royals in join order (Identity.holdersOf "Royal"), 20 s each, then
+             opens to claims (the role's playtime gate). Only the monarch may sit. Reigns count
+             in progress.honours as "reign:<role>:<n>". Remotes Throne.Get/Accept/Decline/
+             Abdicate; pushes Offer, Proclaim, State, Notice. Identity.grant sets the role.
     Lamps    gas lamps built along MapLayoutData's roads (Config.LAMP_*), tag "Lamp", attrs
              Route/Lit; lamplighters (Jobs) or the city's fallback light and put them out.
     Economy (Phase 2) the money ledger: every change has a reason (REASONS: faucet / sink / move),
@@ -147,6 +153,8 @@ MODULES
     Activities (stub) reward toasts + Strength meter + Chess board for seated players.
     ShopUI     (stub) counter kinds "playershop", "stall", "supplier" in EconomyUI's panel.
     SpeechUI   (stub) "Say" panel: phrases by category, gestures (PlayEmote / EMOTE_ANIMATIONS).
+    ThroneUI   (stub) proclamation banner under the clock; succession offer Accept/Decline with
+             a countdown; "You reign as King" + Abdicate (two taps) top left.
     DailyUI    (stub) appointment countdown under the clock; "Today" tasks + streak panel.
     JobUI      (stub) job tracker top left: step, distance, shift pay, Skip; marker + hold prompt.
     BuildUI    (stub) build mode: orbit camera, catalogue, ghost + reasons, undo/redo; draws

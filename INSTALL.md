@@ -32,6 +32,7 @@ Never paste a `.rbxmx` file or anything starting with `<roblox` into a script.
 | 8 | Shops, jobs and gas lamps: tills, suppliers, stalls, postman, newsboy, lamplighter, baker, carpenter, shop assistant (Phases 4–5, T04) | ⬜ |
 | 9 | Appointments at the hubs every 10 minutes, today's tasks panel (T30, T33) | ⬜ |
 | 10 | Quick phrases and gestures: speak without typing (T05) | ⬜ |
+| 11 | The throne: claim an empty throne, line of succession, abdication (T34) | ⬜ |
 
 Do the steps **in order**: each needs the ones before it (a script that waits for a missing one
 just hangs; `tools/check_install.py` checks this list against the code). The links always show
@@ -290,6 +291,36 @@ Test (Play, two players): **Say** (bottom left) › pick a line: a speech bubble
 both players, and the line in the other player's chat. **Wave**, **Cheer** and **Point** play
 Roblox's own emotes. Bow, curtsy, salute, doff hat and applaud need animations: publish them and
 put their ids in `Config.EMOTE_ANIMATIONS`.
+
+## Step 11: the throne (claim, succession, abdication)
+**New scripts**
+- ModuleScript `Throne` inside ServerScriptService › **LondonServer**: [Throne](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Throne.luau)
+- ModuleScript `ThroneUI` inside StarterPlayer › StarterPlayerScripts › **LondonClient**: [ThroneUI](https://github.com/ricket026/london_roblox/blob/m1-identity/src/client/LondonClient/ThroneUI.luau)
+
+**Replace** (open the script, select all, paste the GitHub version)
+- `Config` in ReplicatedStorage › Shared: [Config](https://github.com/ricket026/london_roblox/blob/m1-identity/src/shared/Config.luau) (the throne settings at the end)
+- `Identity` in ServerScriptService › LondonServer: [Identity](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Identity.luau) (`Identity.grant`, `Identity.holdersOf`)
+
+Start-up lines:
+- **LondonServer**: under `local Speech = require(script:WaitForChild("Speech"))` add
+  `local Throne = require(script:WaitForChild("Throne"))`, and under `Speech.init()` add `Throne.init()`.
+- **LondonClient**: under the `SpeechUI` line add
+  ```lua
+  require(script:WaitForChild("ThroneUI")).init() -- the throne: offers, proclamations, abdicate (T34)
+  ```
+
+It uses the two seats already in the place: `Workspace.PalaceInteriors.ThroneRoom.Gameplay.ThroneSeat1`
+(the King's) and `ThroneSeat2` (the Queen's). If yours are named differently, change
+`Config.THRONE_SEATS`.
+
+Test (Play): the throne needs 2 h of playtime (Royal Family needs 1 h). In Studio, give yourself
+some: during Play, switch the command bar to **Server** and run
+`require(game.ServerScriptService.LondonServer.Profiles).get(game.Players:GetPlayers()[1]).playtime = 9000`.
+Walk up to the King's throne and hold **Claim the throne**: a gold proclamation appears under the
+clock, your role is King, and only you can sit on that throne. Top left: **Abdicate** (tap twice).
+With two players (Test › Clients and Servers), make the second one Royal Family first: when the
+King abdicates or leaves, the royal gets **Accept / Decline** in the middle of the screen for
+20 seconds.
 
 ## After the last step: the start-up scripts
 Once every step above is in, the two start-up scripts can simply be **replaced entirely** with

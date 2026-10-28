@@ -475,4 +475,11 @@ Config.SPEECH_RATE = { count = 3, per = 6 } -- phrases per player
 -- 0 = not made yet: the button says so. Never guess ids; the user publishes them.
 Config.EMOTE_ANIMATIONS = { bow = 0, curtsy = 0, doff = 0, salute = 0, applaud = 0 }
 
+-- The throne (COURT_PARLIAMENT §2.1; TASKS T34) --------------------------------------------------
+-- The two thrones in the place's throne room: Workspace.PalaceInteriors.ThroneRoom.Gameplay.<seat>
+Config.THRONE_SEATS = { King = "ThroneSeat1", Queen = "ThroneSeat2" }
+Config.THRONE_OFFER_SECONDS = 20 -- each royal in the line of succession has this long to accept
+Config.THRONE_RATE = { count = 4, per = 10 } -- throne calls per player
+Config.THRONE_PROCLAIM_SECONDS = 8 -- how long a proclamation banner stays on screen
+
 return Config

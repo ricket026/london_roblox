@@ -5,6 +5,7 @@
 -- Config.DEFAULT_ROLE whenever the player switches character.
 -- Player attributes (read by tags, Roles.roleOf and the client): RPName, Role.
 -- Remotes (Identity domain, calls): Get, ChooseRole { role }.
+--   Identity.grant(player, roleId) (game-rule roles: throne, offices), Identity.holdersOf(roleId).
 -- Pushes: Identity.State (to one player), Identity.Seats (to everyone, on any seat change).
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -187,6 +188,23 @@ function Identity.onPlayerRemoving(player: Player)
 	if held and held.seats then
 		Net.pushAll("Identity", "Seats", { seats = seatCounts() })
 	end
+end
+
+-- A role given by a game rule rather than the menu (the throne, appointments): no menu or
+-- cooldown checks; the caller checks eligibility and seats. Returns false for unknown roles.
+function Identity.grant(player: Player, roleId: string): boolean
+	if not Stations.BY_ID[roleId] or not rpName(player) then
+		return false
+	end
+	setRole(player, roleId)
+	switchedAt[player] = os.clock()
+	pushState(player)
+	return true
+end
+
+-- Who holds a limited-seat role, in the order they took it (the royal line of succession).
+function Identity.holdersOf(roleId: string): { Player }
+	return table.clone(holders[roleId] or {})
 end
 
 -- Studio test hook: skips cooldowns and playtime gates.

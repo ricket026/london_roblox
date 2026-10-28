@@ -301,10 +301,17 @@ Mark progress in the table in `activities/README.md`.
 
 ## M4: the Court
 
-### T34 · Throne claim and line of succession ⬜
+### T34 · Throne claim and line of succession ✅ (code + tests; needs a Play-test)
 - **Specs** COURT_PARLIAMENT §2, §2.1 · **Size** M · `Stations` King/Queen have `claim = "throne"`;
   build the claim at the throne in `PalaceInteriors.ThroneRoom`, succession offers (20 s each),
   abdication, accession proclamation, saved cosmetic reign count (`progress.honours`).
+- **Built** `LondonServer.Throne` + `LondonClient.ThroneUI`, `Identity.grant` / `holdersOf`,
+  `Config.THRONE_*`, `tests/test_throne.luau`, INSTALL step 11. "Claim the throne" is a 2 s hold
+  prompt on each throne seat; only the monarch can sit there. Royals are offered the throne
+  without the 2 h gate (they met the royal family's 1 h one); after the line, anyone with 2 h may
+  claim. The reign count is the honours entry `"reign:King:2"` (one entry per throne, counted up).
+- **Left for a Studio pass** the prompt's placement on the real seats, and the proclamation banner
+  next to the clock and the "Today" button on a phone. The Coronation event belongs to T39.
 ### T35 · Appointments, honours and grants menu ⬜ · **Specs** COURT §2 table, §5 · Seat caps, rate limits, logging.
 ### T36 · Throne room protocol and audience queue ⬜ · **Specs** COURT §4 · Court chat channel, floor control.
 ### T37 · Decrees ⬜ · **Specs** COURT §6 · Banner + bell, decree boards, Gazette column, lever decrees.
