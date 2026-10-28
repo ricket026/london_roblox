@@ -214,14 +214,11 @@ function Characters.describe(player: Player, look: Types.Look): HumanoidDescript
 end
 
 -- Spawning ----------------------------------------------------------------------------------
--- Where characters arrive (T03): around the terminus platforms marker (Map.JobSites), spread over
--- Config.SPAWN_RADIUS, standing on the ground found by raycast, facing into the station.
+-- Where characters arrive (T03): the terminus forecourt (Config.SPAWN_POINT), spread over
+-- Config.SPAWN_RADIUS, standing on the ground found by raycast.
 local spawnRng = Random.new()
 function Characters.spawnPoint(): CFrame
-	local map = workspace:FindFirstChild("Map")
-	local sites = map and map:FindFirstChild("JobSites")
-	local marker = sites and sites:FindFirstChild(Config.SPAWN_MARKER)
-	local centre = if marker and marker:IsA("BasePart") then marker.Position else Vector3.new(Config.SPAWN_POINT.x, 0, Config.SPAWN_POINT.z)
+	local centre = Vector3.new(Config.SPAWN_POINT.x, 0, Config.SPAWN_POINT.z)
 	local a = spawnRng:NextNumber() * math.pi * 2
 	local r = math.sqrt(spawnRng:NextNumber()) * Config.SPAWN_RADIUS
 	local g = World.ground(centre.X + math.cos(a) * r, centre.Z + math.sin(a) * r)

@@ -1,6 +1,7 @@
 -- Phase 4 client: ShopUI as the shopkeeper sees it (supplier menu, the till's staff menu).
 local Shared = __find("ReplicatedStorage.Shared")
 local Config = require(Shared.Config)
+Config.STIPEND_PER_DAY, Config.DAILY_TASK_PAY = 0, 0 -- daily money is tested in test_daily; keep balances exact here
 local Net = require(Shared.Net)
 local Kit = require(Shared.Kit)
 

@@ -24,6 +24,7 @@ local Profiles = require(script.Parent:WaitForChild("Profiles"))
 local Economy = require(script.Parent:WaitForChild("Economy"))
 local Inventory = require(script.Parent:WaitForChild("Inventory"))
 local World = require(script.Parent:WaitForChild("World"))
+local Daily = require(script.Parent:WaitForChild("Daily"))
 
 local Counters = {}
 
@@ -206,6 +207,7 @@ function Counters.buy(player: Player, counterId: string, itemId: string, count: 
 		return nil, why
 	end
 	Inventory.add(player, itemId, count)
+	Daily.record(player, "counter_buy")
 	local p = Profiles.get(player)
 	return { wallet = if p then p.pence else 0, bank = if p then p.bank else 0, bought = it.name, count = count, toStorage = it.furniture ~= nil }
 end

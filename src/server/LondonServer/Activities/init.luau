@@ -23,6 +23,7 @@ local Profiles = require(script.Parent:WaitForChild("Profiles"))
 local Analytics = require(script.Parent:WaitForChild("Analytics"))
 local Characters = require(script.Parent:WaitForChild("Characters"))
 local Economy = require(script.Parent:WaitForChild("Economy"))
+local Daily = require(script.Parent:WaitForChild("Daily"))
 
 local A = {}
 A.MODULES = { "Ducks", "Strength", "Mudlark", "Chess" }
@@ -115,6 +116,7 @@ function A.reward(player: Player, opts: RewardOpts)
 		msg.items = found
 	end
 	Analytics.event(player, "Activity_" .. opts.activity)
+	Daily.record(player, "activity:" .. opts.activity)
 	Net.push(player, "Activity", "Reward", msg)
 end
 

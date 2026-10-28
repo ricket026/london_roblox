@@ -173,10 +173,11 @@ Config.LAMP_LIGHT_COLOUR = { 255, 196, 120 }
 Config.LAMP_NPC_DELAY = 180 -- seconds into dusk / dawn before the city's own lamplighters do the rest
 Config.LAMP_HOLD = 1.5 -- seconds a lamplighter holds the pole to light or put out a lamp
 
--- Spawning (TASKS T03): new and returning characters arrive on the terminus platforms
-Config.SPAWN_MARKER = "Spawn: terminus platforms" -- a part in Workspace.Map.JobSites
-Config.SPAWN_POINT = { x = 555, z = -1350 } -- used when the marker isn't there
-Config.SPAWN_RADIUS = 18 -- studs around the spawn point characters are spread over
+-- Spawning (TASKS T03): characters arrive on the forecourt of Charing Cross terminus. (The
+-- "Spawn: terminus platforms" marker in Map.JobSites is inside the station's greybox block,
+-- which is solid until the art pass gives the station platforms.)
+Config.SPAWN_POINT = { x = 271, z = -1350 } -- map studs, the open forecourt west of the station
+Config.SPAWN_RADIUS = 14 -- studs around the spawn point characters are spread over
 
 -- Activities (LondonServer.Activities, systems/ACTIVITIES.md) ----------------
 -- Sites are greybox map coordinates (map_layout_v2.json); Y comes from a raycast to the ground.
@@ -428,6 +429,41 @@ Config.NEWSBOY_CORNERS = {
 	{ name = "Lincoln's Inn Fields", x = -700, z = -1740 },
 	{ name = "Finsbury Circus", x = -600, z = -2540 },
 	{ name = "Spitalfields", x = -440, z = -3060 },
+}
+
+-- Daily (PLAYER_GATHERING §4, ECONOMY §4; TASKS T16, T33) --------------------------------------
+Config.STIPEND_PER_DAY = 12 -- pence per day of the login streak: 1s on day 1 ... 7s on day 7
+Config.STIPEND_MAX_STREAK = 7 -- days the streak counts up to
+Config.DAILY_TASKS = 3 -- tasks each account gets per UTC day
+Config.DAILY_TASK_PAY = 24 -- pence for each daily task done (2s)
+-- The pool daily tasks are picked from. event = what other systems report (Daily.record).
+Config.DAILY_POOL = {
+	{ id = "postman", text = "Deliver a postal round", event = "job:Postman", n = 1 },
+	{ id = "newsboy", text = "Sell a bundle of papers", event = "job:Newsboy", n = 1 },
+	{ id = "lamps", text = "Light or put out 6 gas lamps", event = "lamp", n = 6 },
+	{ id = "bake", text = "Bake a batch of bread", event = "job:Baker", n = 1 },
+	{ id = "carpenter", text = "Make a piece of furniture", event = "job:Carpenter", n = 1 },
+	{ id = "shop", text = "Buy something in a player's shop or stall", event = "shop_buy", n = 1 },
+	{ id = "kiosk", text = "Buy something at a kiosk or a market counter", event = "counter_buy", n = 1 },
+	{ id = "chess", text = "Play a game of chess by the bandstand", event = "activity:Chess", n = 1 },
+	{ id = "ducks", text = "Feed the ducks in St James's Park", event = "activity:Ducks", n = 1 },
+	{ id = "mudlark", text = "Find two things on the foreshore", event = "activity:Mudlark", n = 2 },
+	{ id = "strength", text = "Try the strength machine in Covent Garden", event = "activity:Strength", n = 1 },
+	{ id = "appointment", text = "Be there for one of the city's appointments", event = "appointment", n = 1 },
+}
+
+-- Appointments at the hubs (PLAYER_GATHERING §2, TASKS T30): one every APPOINTMENT_SECONDS by the
+-- shared clock, so every server has the same one at the same time. Being within RADIUS for STAY
+-- seconds while it's on gives its memento (Shared.Collection) and counts for daily tasks.
+Config.APPOINTMENT_SECONDS = 600 -- one every 10 real minutes
+Config.APPOINTMENT_LENGTH = 120 -- seconds each lasts (it starts at the end of its 10 minutes)
+Config.APPOINTMENT_STAY = 30 -- seconds you must be there
+Config.APPOINTMENT_RADIUS = 45 -- studs from the spot
+Config.APPOINTMENTS = {
+	{ id = "train", title = "The Brighton express arrives", place = "Charing Cross station", x = 271, z = -1300, memento = "memento_ticket" },
+	{ id = "concert", title = "A band concert", place = "the bandstand in St James's Park", x = 128, z = -300, memento = "memento_programme" },
+	{ id = "guard", title = "The Changing of the Guard", place = "the Palace", x = 0, z = -20, memento = "memento_guard" },
+	{ id = "auction", title = "The flower auction", place = "Covent Garden market", x = -140, z = -1480, memento = "memento_auction" },
 }
 
 return Config

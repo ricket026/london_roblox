@@ -31,6 +31,7 @@ local Inventory = require(script.Parent:WaitForChild("Inventory"))
 local World = require(script.Parent:WaitForChild("World"))
 local Lots = require(script.Parent:WaitForChild("Lots"))
 local Lamps = require(script.Parent:WaitForChild("Lamps"))
+local Daily = require(script.Parent:WaitForChild("Daily"))
 
 local Jobs = {}
 Jobs.rng = Random.new()
@@ -175,6 +176,7 @@ local function complete(player: Player, t: Task)
 	if r then
 		r.done += 1
 	end
+	Daily.record(player, "job:" .. t.job)
 	Net.push(player, "Job", "Done", { text = string.format("%s done: %s, +%d XP.", t.title, Money.format(paid), t.xp) })
 	tasks[player] = nil
 	task.delay(1, function()
@@ -404,8 +406,9 @@ local function lamplighter(player: Player): Task?
 			kind = "hold", pos = lamp.Position - Vector3.new(0, 7, 0), radius = 8, seconds = Config.LAMP_HOLD,
 			text = string.format("%s lamp %d of %d", if want then "Light" else "Put out", k, #todo),
 			action = if want then "Light" else "Put out", pay = def.lampPay,
-			done = function()
+			done = function(p: Player)
 				Lamps.setLit(lamp, want)
+				Daily.record(p, "lamp")
 			end,
 			skip = function()
 				return lamp:GetAttribute("Lit") == want or Lamps.wanted() ~= want

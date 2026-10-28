@@ -30,6 +30,7 @@ Never paste a `.rbxmx` file or anything starting with `<roblox` into a script.
 | 6 | Debug commands, day/night lighting, arriving at the terminus (T07, T03) | ⬜ |
 | 7 | Homes and building: estate agents, rent/buy, plots, template houses, build mode, keys (Phase 3) | ⬜ |
 | 8 | Shops, jobs and gas lamps: tills, suppliers, stalls, postman, newsboy, lamplighter, baker, carpenter, shop assistant (Phases 4–5, T04) | ⬜ |
+| 9 | Appointments at the hubs every 10 minutes, today's tasks panel (T30, T33) | ⬜ |
 
 Do the steps **in order**: each needs the ones before it (a script that waits for a missing one
 just hangs; `tools/check_install.py` checks this list against the code). The links always show
@@ -71,7 +72,7 @@ the new ones, so adding them first avoids a hang).
 
 **New ModuleScripts**
 - inside ReplicatedStorage › **Shared**: [Items](https://github.com/ricket026/london_roblox/blob/m1-identity/src/shared/Items.luau), [OutfitParts](https://github.com/ricket026/london_roblox/blob/m1-identity/src/shared/OutfitParts.luau)
-- inside ServerScriptService › **LondonServer**: [Economy](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Economy.luau), [Inventory](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Inventory.luau),
+- inside ServerScriptService › **LondonServer**: [Daily](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Daily.luau), [Economy](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Economy.luau), [Inventory](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Inventory.luau),
   [World](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/World.luau), [Counters](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Counters.luau), [Exchange](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Exchange.luau), [Wardrobe](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Wardrobe.luau)
 - inside StarterPlayer › StarterPlayerScripts › **LondonClient**: [EconomyUI](https://github.com/ricket026/london_roblox/blob/m1-identity/src/client/LondonClient/EconomyUI.luau)
 
@@ -86,6 +87,7 @@ LondonServer › [Characters](https://github.com/ricket026/london_roblox/blob/m1
   local Inventory = require(script:WaitForChild("Inventory"))
   local Counters = require(script:WaitForChild("Counters"))
   local Exchange = require(script:WaitForChild("Exchange"))
+  local Daily = require(script:WaitForChild("Daily"))
   ```
 - under `Characters.init()` add
   ```lua
@@ -93,6 +95,7 @@ LondonServer › [Characters](https://github.com/ricket026/london_roblox/blob/m1
   Inventory.init()
   Counters.init()
   Exchange.init()
+  Daily.init()
   ```
 - in the `PlayerRemoving` function, under `Characters.onPlayerRemoving(player)` add
   `Economy.onPlayerRemoving(player)`.
@@ -147,7 +150,7 @@ Commands (Command Bar, set to **Server**), e.g. `game.ServerStorage.LondonDebug:
 `("setRole", <userId>, "Judge")`, `("giveItem", <userId>, "tea", 3)`,
 `print(game.ServerStorage.LondonDebug:Invoke("ledger", <userId>))`, `print(game.ServerStorage.LondonDebug:Invoke("totals"))`.
 
-Test: new characters arrive by the terminus platforms; `("clock", 21)` makes it night (darker, a
+Test: new characters arrive on the forecourt of Charing Cross station; `("clock", 21)` makes it night (darker, a
 blue haze); `("weather", "fog")` closes the view right in.
 
 ## Step 7: homes and building (estate agents, plots, build mode)
@@ -213,8 +216,7 @@ up to the ridge, chairs face forward, the build camera, and frame rate with temp
 **Replace the code of**: Shared › [Stations](https://github.com/ricket026/london_roblox/blob/m1-identity/src/shared/Stations.luau) (new roles: Lamplighter's already there;
 Baker, Carpenter, Shop Assistant).
 
-From here the two start-up scripts can simply be **replaced entirely** with the GitHub versions
-([server](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/init.server.luau), [client](https://github.com/ricket026/london_roblox/blob/m1-identity/src/client/LondonClient/init.client.luau)). Or add the lines by hand:
+Start-up lines:
 
 **LondonServer** (the Script):
 - under `local WorldClock = require(script:WaitForChild("WorldClock"))` add
@@ -249,3 +251,25 @@ Test (Play; two players for buying: Test › Clients and Servers):
 - **Baker**: flour from Spitalfields Wholesale, bake at the Bakehouse there; **Carpenter**: timber
   from the Docks Warehouse, make furniture at the workshop in Finsbury Circus; **Shop Assistant**:
   with a Till key, mind someone's open shop; the owner sets your wage at the till.
+
+## Step 9: appointments at the hubs, and today's tasks
+**New scripts**
+- ModuleScript `Appointments` inside ServerScriptService › **LondonServer**: [Appointments](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Appointments.luau)
+- ModuleScript `DailyUI` inside StarterPlayer › StarterPlayerScripts › **LondonClient**: [DailyUI](https://github.com/ricket026/london_roblox/blob/m1-identity/src/client/LondonClient/DailyUI.luau)
+
+After this step the two start-up scripts can simply be **replaced entirely** with the GitHub
+versions ([server](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/init.server.luau), [client](https://github.com/ricket026/london_roblox/blob/m1-identity/src/client/LondonClient/init.client.luau)).
+Or add the lines by hand:
+- **LondonServer**: under `local Daily = require(script:WaitForChild("Daily"))` add
+  `local Appointments = require(script:WaitForChild("Appointments"))`, and under `Jobs.init()` add
+  `Appointments.init()`.
+- **LondonClient**: under the `JobUI` line add
+  ```lua
+  require(script:WaitForChild("DailyUI")).init() -- appointments countdown, today's tasks (Phase 6)
+  ```
+
+Test (Play): under the clock, "Next: The Changing of the Guard at the Palace · 7:40" counts down;
+when it starts a red flag goes up there and the line says "Now:". Stand by the flag for half a
+minute: a memento goes in your collection book. **Today** shows three tasks (they pay 2s each)
+and your stipend streak (1s on the first day, up to 7s on the seventh day in a row).
+

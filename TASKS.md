@@ -23,6 +23,7 @@ keep the scripts you touch to the list (or say why), run `tools/check_luau.py`, 
 | ✅ | World clock (24-min day, phases) + clock HUD | Not Play-tested |
 | ✅ | Activity framework + ducks, test your strength, mudlarking, chess | Not Play-tested; chess rules pass perft |
 | ✅ | Phase 2 economy core: ledger, wallet HUD, bag, NPC counters, bank, hand-overs (T09, T10, T11, T15, P01) | Not Play-tested; `tests/test_economy*.luau`; INSTALL step 4 |
+| ✅ | Daily stipend streak (T16), daily tasks (T33 part), hub appointments every 10 min with mementos (T30), DailyUI | Not Play-tested; `tests/test_daily.luau`; INSTALL steps 4, 9 |
 | ✅ | Streets: gas lamps (T04), lamplighter (T18), lighting by phase + weather (T07), terminus spawn (T03) | Not Play-tested; `tests/test_lamps.luau`; INSTALL steps 4, 6, 8 |
 | ✅ | 3D part outfits and hats for all six outfits (T06) | Not Play-tested; `tests/test_wardrobe.luau`; INSTALL step 4 |
 | ✅ | Phase 5 start: job framework (T17) + Postman, Newsboy (selling), Baker, Carpenter (S07), shop assistant wages (S05), job tracker | Not Play-tested; `tests/test_jobs.luau`, wages in `test_shops.luau`; INSTALL step 8 |
@@ -130,7 +131,7 @@ economy core (T09, T10, T15, T11) comes first and is listed under M2 below.
 
 ## M1: greybox city + identity (finish)
 
-### T03 · Spawn at the terminus ✅ (2026-10-28: `Characters.spawnPoint`, around the JobSites marker; not Play-tested)
+### T03 · Spawn at the terminus ✅ (2026-10-28: `Characters.spawnPoint`, on the station forecourt; the platforms marker is inside the solid greybox station; not Play-tested)
 - **Specs** LOW_POP §3 step 1, PLAYER_GATHERING §1 (terminus is a hub) · **Size** S
 - New characters and returning players spawn on the platforms (`Map.JobSites["Spawn: terminus
   platforms"]`, ~(555, ?, −1350)): add `SpawnLocation`s from code or pick a spot and set the
@@ -226,7 +227,7 @@ economy core (T09, T10, T15, T11) comes first and is listed under M2 below.
   pass `tools/check_sites.py`) + the counter panel in `EconomyUI`. New kinds:
   `Counters.onOpen` (server) and `EconomyUI.onCounter` (client).
 
-### T16 · Daily stipend and streak ⬜
+### T16 · Daily stipend and streak ✅ (2026-10-28, `LondonServer.Daily`; not Play-tested)
 - **Specs** ECONOMY §4, PLAYER_GATHERING §4 · **Size** S · 1s, rising to 7s over a 7-day streak.
 
 ---
@@ -283,7 +284,7 @@ Mark progress in the table in `activities/README.md`.
 
 ## M3b: getting players together (top priority per PLAYER_GATHERING)
 
-### T30 · Hub appointments ⬜
+### T30 · Hub appointments ✅ (2026-10-28, `LondonServer.Appointments`: train, concert, guard, auction in turn; mementos; HUD countdown; the events themselves (music, NPC passengers, guards marching) come with T39/T24)
 - **Specs** PLAYER_GATHERING §2 · **Size** M · Something at a hub every ~10 real minutes (train
   arrival, bandstand concert, park race, bridge lift, auction) with a HUD countdown and map
   marker. Uses the shared clock so every server lines up.
@@ -293,7 +294,7 @@ Mark progress in the table in `activities/README.md`.
   🔒 Needs the place published and Studio API access on (ROADMAP "before M0" checklist).
 
 ### T32 · Parties and join-friends ⬜ · 2–6 players teleport/spawn together.
-### T33 · Daily tasks and letters ⬜ · **Specs** PLAYER_GATHERING §4 · Filtered letters, `CanUsersDirectChatAsync` check (TECH §8).
+### T33 · Daily tasks and letters 🟡 (3 daily tasks from Config.DAILY_POOL done; letters to do) · **Specs** PLAYER_GATHERING §4 · Filtered letters, `CanUsersDirectChatAsync` check (TECH §8).
 
 ---
 

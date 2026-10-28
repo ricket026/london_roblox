@@ -168,10 +168,12 @@ def read_sites():
     sites = []
     for m in re.finditer(r'id = "(\w+)", kind = "\w+", name = "[^"]+", x = (-?[\d.]+), z = (-?[\d.]+)', src):
         sites.append(("counter " + m.group(1), float(m.group(2)), float(m.group(3))))
-    for key in ("DUCKS_SITE", "STRENGTH_SITE", "MUDLARK_SIGN"):
+    for key in ("DUCKS_SITE", "STRENGTH_SITE", "MUDLARK_SIGN", "SPAWN_POINT"):
         m = re.search(r"Config\." + key + r" = \{ x = (-?[\d.]+), z = (-?[\d.]+) \}", src)
         if m:
             sites.append((key, float(m.group(1)), float(m.group(2))))
+    for t in re.finditer(r'id = "(\w+)", title = "[^"]+", place = "[^"]+", x = (-?[\d.]+), z = (-?[\d.]+)', src):
+        sites.append(("appointment " + t.group(1), float(t.group(2)), float(t.group(3))))
     m = re.search(r"Config\.NEWSBOY_CORNERS = \{(.*?)\n\}", src, re.S)
     if m:
         for t in re.finditer(r'name = "([^"]+)", x = (-?[\d.]+), z = (-?[\d.]+)', m.group(1)):

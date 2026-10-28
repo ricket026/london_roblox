@@ -2,6 +2,7 @@
 -- hourly cap, XP and ranks shared by linked slots), Postman and Newsboy, and the tracker UI.
 local Shared = __find("ReplicatedStorage.Shared")
 local Config = require(Shared.Config)
+Config.STIPEND_PER_DAY, Config.DAILY_TASK_PAY = 0, 0 -- daily money is tested in test_daily; keep balances exact here
 local Net = require(Shared.Net)
 local Ranks = require(Shared.Ranks)
 

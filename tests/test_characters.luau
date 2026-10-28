@@ -3,6 +3,7 @@ local Players = game:GetService("Players")
 -- the client does. Profiles use the Studio mock store, so leaving and rejoining round-trips JSON.
 local Shared = __find("ReplicatedStorage.Shared")
 local Config = require(Shared.Config)
+Config.STIPEND_PER_DAY, Config.DAILY_TASK_PAY = 0, 0 -- daily money is tested in test_daily; keep balances exact here
 local Net = require(Shared.Net)
 __run(__find("ServerScriptService.LondonServer"))
 local Profiles = require(__find("ServerScriptService.LondonServer.Profiles"))

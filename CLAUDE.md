@@ -101,8 +101,9 @@ same for UI modules. `ReplicatedStorage.Shared` holds modules both sides use.
 | Server: Shops | property shops and market stalls: till, stock, prices, wages, NPC customers (suppliers are a Counters kind) |
 | Server: Jobs (+ Shared.Ranks) | job framework (duty by role, server-checked steps, pay caps, ranks) and Postman, Newsboy, Lamplighter, Baker, Carpenter |
 | Server: Lamps | gas lamps along every road (from MapLayoutData), lit by lamplighters or the city's fallback |
+| Server: Daily, Appointments | stipend streak + daily tasks (`Daily.record(player, event)`), hub appointments every 10 min |
 | Server: Admin, AdminLog, Analytics, Doors, Debug | M0 (Debug = Studio-only test bindable) |
-| Client: CharacterUI, IdentityUI, ClockHUD, Activities (+ Chess, Strength), EconomyUI, BuildUI, PropertyUI, ShopUI, JobUI | menus and HUD stubs |
+| Client: CharacterUI, IdentityUI, ClockHUD, Activities (+ Chess, Strength), EconomyUI, BuildUI, PropertyUI, ShopUI, JobUI, DailyUI | menus and HUD stubs |
 
 Data (`Shared.Types`): one profile per account. **Account-wide**: money, collection, Robux
 purchases, outfits/vehicles/rental, moderation record. **Per character slot**: name and look.
@@ -115,12 +116,14 @@ Extension points:
 - Something that must settle before a character switch: `Characters.onBeforeChange(fn)`.
 - New NPC counter: `Counters.add{ id, kind, name, x, z, yaw }` (server) and, for a new kind,
   `Counters.onOpen(kind, fn)` + `EconomyUI.onCounter(kind, fn)` (client).
+- Something players do that a daily task could ask for: call `Daily.record(player, "<event>")`
+  and add a `Config.DAILY_POOL` entry with that event.
 - New job: a station role in `Shared.Stations`, numbers in `Config.JOBS`, and
   `Jobs.register(roleId, function(player) return task end)` (steps "goto"/"hold", optional need/give).
 - New building piece: add a row to art/kit.md and the same entry to `Shared.Kit` (test_kit fails
   until both match); new colours go at the END of `Shared.Palette` (saved by index).
 - Net domains in use: `Profile`, `Admin`, `Identity`, `Character`, `Activity`, `Economy`,
-  `Inventory`, `Counter`, `Exchange`, `Property`, `Build`, `Shop`, `Job`. `Net.listen` keeps one listener per action.
+  `Inventory`, `Counter`, `Exchange`, `Property`, `Build`, `Shop`, `Job`, `Daily`, `Appointment`. `Net.listen` keeps one listener per action.
 
 ## Working with the user
 

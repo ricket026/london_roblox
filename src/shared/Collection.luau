@@ -14,7 +14,7 @@ export type Item = {
 	source: string?, -- which activity rolls this item
 }
 
-Collection.PAGES = { "Birds of the Park", "Mudlark Finds" }
+Collection.PAGES = { "Birds of the Park", "Mudlark Finds", "Mementos" }
 
 Collection.ITEMS = {
 	{ id = "bird_mallard", name = "Mallard", page = "Birds of the Park", value = 0 },
@@ -31,6 +31,12 @@ Collection.ITEMS = {
 	{ id = "mud_pin", name = "Tudor Dress Pin", page = "Mudlark Finds", value = 8, weight = 2, source = "Mudlark" },
 	{ id = "mud_ring", name = "Silver Ring", page = "Mudlark Finds", value = 9, weight = 1.5, source = "Mudlark" },
 	{ id = "mud_roman", name = "Roman Coin", page = "Mudlark Finds", value = 12, weight = 0.8, source = "Mudlark" },
+
+	-- for being there at the city's appointments (LondonServer.Appointments)
+	{ id = "memento_ticket", name = "Railway Ticket Stub", page = "Mementos", value = 0 },
+	{ id = "memento_programme", name = "Concert Programme", page = "Mementos", value = 0 },
+	{ id = "memento_guard", name = "Palace Postcard", page = "Mementos", value = 0 },
+	{ id = "memento_auction", name = "Auction Lot Card", page = "Mementos", value = 0 },
 } :: { Item }
 
 Collection.BY_ID = {} :: { [string]: Item }

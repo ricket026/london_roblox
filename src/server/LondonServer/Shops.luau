@@ -40,6 +40,7 @@ local Lots = require(script.Parent:WaitForChild("Lots"))
 local Builds = require(script.Parent:WaitForChild("Builds"))
 local Property = require(script.Parent:WaitForChild("Property"))
 local Jobs = require(script.Parent:WaitForChild("Jobs"))
+local Daily = require(script.Parent:WaitForChild("Daily"))
 local Roles = require(Shared:WaitForChild("Roles"))
 
 local Shops = {}
@@ -447,6 +448,7 @@ function Shops.buy(player: Player, id: string, itemId: string, by: number, count
 	Inventory.add(player, itemId, count, nil, taken.by, taken.byName)
 	s.data.till += total
 	creditSale(s)
+	Daily.record(player, "shop_buy")
 	local it = Items.get(itemId) :: Items.Item
 	tell(s, string.format("Sold %d × %s to %s for %s.", count, it.name, displayName(player), Money.format(total)))
 	if s.data.till + s.data.tillNpc >= Config.SHOP_TILL_BANK_AT then
