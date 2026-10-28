@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Checks the map positions in src/shared/Config.luau against the place file and the map layout.
 
-For every site (NPC counters in Config.COUNTERS, and the activity sites DUCKS_SITE, STRENGTH_SITE,
-MUDLARK_SIGN, CHESS_TABLES) it reports the park / square it is in and any problems:
+For every site (NPC counters in Config.COUNTERS, newsboy corners, and the activity sites
+DUCKS_SITE, STRENGTH_SITE, MUDLARK_SIGN, CHESS_TABLES) it reports the park / square it is in and any problems:
   ERROR  on a building lot (Workspace.Map.Plots), on a road's carriageway, or inside a landmark
   note   a pavement, or a part within a few studs (kerbs, walls: often intended)
 Exit status 1 if any site has an ERROR. Needs: pip install lz4 zstandard
@@ -172,6 +172,10 @@ def read_sites():
         m = re.search(r"Config\." + key + r" = \{ x = (-?[\d.]+), z = (-?[\d.]+) \}", src)
         if m:
             sites.append((key, float(m.group(1)), float(m.group(2))))
+    m = re.search(r"Config\.NEWSBOY_CORNERS = \{(.*?)\n\}", src, re.S)
+    if m:
+        for t in re.finditer(r'name = "([^"]+)", x = (-?[\d.]+), z = (-?[\d.]+)', m.group(1)):
+            sites.append(("corner " + t.group(1), float(t.group(2)), float(t.group(3))))
     m = re.search(r"Config\.CHESS_TABLES = \{(.*)\}\n", src)
     if m:
         for k, t in enumerate(re.finditer(r"x = (-?[\d.]+), z = (-?[\d.]+)", m.group(1))):

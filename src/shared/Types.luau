@@ -45,6 +45,7 @@ export type Profile = {
 	limits: {
 		activityWindow: number, activityPaid: number, -- hourly pastime pay cap (os.time window start)
 		transferDay: string, transferred: number, -- pence handed to others on that UTC day (new accounts)
+		jobHour: number, jobPaid: { [string]: number }, -- job pay this real hour (os.time // 3600), per job
 	},
 	inventory: { bag: { Stack }, storage: { Stack } }, -- bag = carried (Config.BAG_SLOTS); storage = home/shop
 	properties: { [string]: Deed }, -- deed id -> deed (PROPERTY.md)

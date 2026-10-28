@@ -89,7 +89,7 @@ function Profiles.defaults(): Profile
 		outfits = { owned = {}, equipped = {} },
 		vehicles = {},
 		record = { arrests = 0, warnings = {}, mutedUntil = 0 },
-		limits = { activityWindow = 0, activityPaid = 0, transferDay = "", transferred = 0 },
+		limits = { activityWindow = 0, activityPaid = 0, transferDay = "", transferred = 0, jobHour = 0, jobPaid = {} },
 		inventory = { bag = {}, storage = {} },
 		properties = {},
 		nextDeed = 1,

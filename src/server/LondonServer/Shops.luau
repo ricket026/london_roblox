@@ -13,9 +13,13 @@
 -- Remotes (Shop domain, calls): Menu { shop }, Buy { shop, item, by, count }, Open { shop, open },
 --   Restock { shop, slot, count, from }, Unstock { shop, item, by, count },
 --   Price { shop, item, pence }, Settings { shop, trade, sign }, BankTill { shop },
+--   Wage { shop, userId, pence } (owner: an assistant's wage per in-game day, 0 = none),
 --   RentStall { counter }, LeaveStall { counter }.   ("shop" = the plot name or the stall id)
 -- The till's prompt pushes Counter.Open { kind = "playershop" }; a stall's counter pushes
 -- Counter.Open { kind = "stall" }. Pushes Shop.Notice { text } to whoever minds the shop.
+-- Shop assistants (SHOPS §6): a key holder with Till who holds the ShopAssistant role and minds an
+-- open shop is paid their wage from the owner's bank each minute (ledger "wage_staff"), and gets
+-- Config.JOBS.ShopAssistant.xpPerSale job XP for each sale made while they mind it.
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -35,6 +39,8 @@ local World = require(script.Parent:WaitForChild("World"))
 local Lots = require(script.Parent:WaitForChild("Lots"))
 local Builds = require(script.Parent:WaitForChild("Builds"))
 local Property = require(script.Parent:WaitForChild("Property"))
+local Jobs = require(script.Parent:WaitForChild("Jobs"))
+local Roles = require(Shared:WaitForChild("Roles"))
 
 local Shops = {}
 Shops.rng = Random.new()
@@ -42,7 +48,7 @@ Shops.rng = Random.new()
 type Stack = Types.Stack
 export type Data = {
 	trade: string, sign: string, prices: { [string]: number }, stock: { Stack },
-	till: number, tillNpc: number, tradeAt: number,
+	till: number, tillNpc: number, tradeAt: number, wages: { [string]: number }?,
 }
 export type Shop = {
 	id: string, kind: string, lot: string?, counter: string?, ownerId: number, data: Data,
@@ -51,6 +57,7 @@ export type Shop = {
 
 local propertyShops: { [string]: Shop } = {}
 local stalls: { [string]: Shop } = {}
+local owed: { [Player]: number } = {} -- fractions of a penny of wages not yet paid
 
 local function newData(trade: string, sign: string): Data
 	return { trade = trade, sign = sign, prices = {}, stock = {}, till = 0, tillNpc = 0, tradeAt = 0 }
@@ -203,6 +210,26 @@ end
 local function tell(s: Shop, text: string)
 	for _, p in minders(s) do
 		Net.push(p, "Shop", "Notice", { text = text })
+	end
+end
+
+-- Assistants on duty at this shop now: minding it, not the owner, holding the ShopAssistant role.
+local function assistants(s: Shop): { Player }
+	local out = {}
+	if s.kind ~= "property" then
+		return out
+	end
+	for _, p in minders(s) do
+		if p.UserId ~= s.ownerId and p:GetAttribute(Roles.ROLE_ATTR) == "ShopAssistant" then
+			table.insert(out, p)
+		end
+	end
+	return out
+end
+
+local function creditSale(s: Shop)
+	for _, p in assistants(s) do
+		Jobs.addXp(p, "ShopAssistant", Config.JOBS.ShopAssistant.xpPerSale)
 	end
 end
 
@@ -361,6 +388,18 @@ function Shops.payload(player: Player, s: Shop): { [string]: any }
 			table.insert(trades, { id = id, name = Config.SHOP_TRADES[id].name })
 		end
 		msg.trades = trades
+		-- key holders with Till, and their wages
+		local _, deed = Property.deedAt(s.lot :: string)
+		local staff = {}
+		for uid, perms in (if deed then deed.keys else nil) or {} do
+			if type(perms) == "table" and perms.sell then
+				local p = Players:GetPlayerByUserId(tonumber(uid) or 0)
+				local wage = (s.data.wages or {})[uid] or 0
+				table.insert(staff, { userId = tonumber(uid), name = if p then displayName(p) else "Player " .. uid, wage = wage, wageText = Money.format(wage) })
+			end
+		end
+		msg.staffList = staff
+		msg.minWage, msg.maxWage = Config.SHOP_MIN_WAGE, Config.SHOP_MAX_WAGE
 	end
 	return msg
 end
@@ -407,6 +446,7 @@ function Shops.buy(player: Player, id: string, itemId: string, by: number, count
 	local taken = takeStock(s, itemId, st.by, count) :: Stack
 	Inventory.add(player, itemId, count, nil, taken.by, taken.byName)
 	s.data.till += total
+	creditSale(s)
 	local it = Items.get(itemId) :: Items.Item
 	tell(s, string.format("Sold %d × %s to %s for %s.", count, it.name, displayName(player), Money.format(total)))
 	if s.data.till + s.data.tillNpc >= Config.SHOP_TILL_BANK_AT then
@@ -533,6 +573,47 @@ function Shops.settings(player: Player, id: string, trade: string, sign: string)
 	return true
 end
 
+-- Wages ----------------------------------------------------------------------------------------
+function Shops.setWage(player: Player, id: string, userId: number, pence: number): (boolean, string?)
+	local s = Shops.get(id)
+	if not s or s.kind ~= "property" or not isOwner(player, s) then
+		return false, "Only the owner sets wages."
+	end
+	if pence ~= 0 and (pence < Config.SHOP_MIN_WAGE or pence > Config.SHOP_MAX_WAGE) then
+		return false, string.format("Between %s and %s a day.", Money.format(Config.SHOP_MIN_WAGE), Money.format(Config.SHOP_MAX_WAGE))
+	end
+	s.data.wages = s.data.wages or {}
+	local wages = s.data.wages :: { [string]: number }
+	wages[tostring(userId)] = if pence > 0 then pence else nil
+	return true
+end
+
+-- One minute of wages for every assistant on duty at an open shop.
+function Shops.payWages(seconds: number)
+	local day = Config.DAY_MINUTES * 60
+	for _, s in propertyShops do
+		local o = owner(s)
+		if s.open and o then
+			for _, a in assistants(s) do
+				local wage = (s.data.wages or {})[tostring(a.UserId)]
+				if wage and wage > 0 then
+					local due = (owed[a] or 0) + wage * seconds / day
+					local whole = math.floor(due)
+					owed[a] = due - whole
+					if whole > 0 then
+						if Economy.charge(o, whole, "wage_staff", s.id, true) then
+							Economy.pay(a, whole, "wage_staff", s.id)
+						else
+							Net.push(a, "Shop", "Notice", { text = "The owner couldn't pay your wage." })
+							Net.push(o, "Shop", "Notice", { text = "You haven't the money to pay your assistant." })
+						end
+					end
+				end
+			end
+		end
+	end
+end
+
 -- Market stalls ------------------------------------------------------------------------------
 local function stallOf(player: Player): Shop?
 	for _, s in stalls do
@@ -640,6 +721,7 @@ function Shops.npcTick(s: Shop)
 			takeStock(s, c.st.i, c.st.by, n)
 			s.data.tillNpc += price * n
 			s.npcSpent += price * n
+			creditSale(s)
 			tell(s, string.format("A customer bought %s%s for %s.", if n > 1 then "2 × " else "", it.name, Money.format(price * n)))
 			if s.data.till + s.data.tillNpc >= Config.SHOP_TILL_BANK_AT then
 				Shops.bankTill(s)
@@ -790,6 +872,9 @@ function Shops.init()
 		Shops.bankTill(s)
 		return {}
 	end)
+	Net.handle("Shop", "Wage", { schema = { shop = shopV, userId = V.userId(), pence = V.int(0, Config.SHOP_MAX_WAGE) }, rate = rate, call = true }, function(player, a)
+		return result(Shops.setWage(player, a.shop, a.userId, a.pence))
+	end)
 	Net.handle("Shop", "RentStall", { schema = { counter = shopV }, rate = rate, call = true }, function(player, a)
 		return result(Shops.rentStall(player, a.counter))
 	end)
@@ -806,6 +891,15 @@ function Shops.init()
 			task.wait(Config.SHOP_CHECK_SECONDS)
 			Shops.check()
 		end
+	end)
+	task.spawn(function()
+		while true do
+			task.wait(60)
+			Shops.payWages(60)
+		end
+	end)
+	Players.PlayerRemoving:Connect(function(p)
+		owed[p] = nil
 	end)
 	task.spawn(function()
 		while true do

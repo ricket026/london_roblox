@@ -170,6 +170,20 @@ local function shopMenu(body: ScrollingFrame, msg: { [string]: any }, o: () -> n
 		save.Activated:Connect(function()
 			act(shop, "Settings", { trade = trade, sign = box.Text }, "Saved.")
 		end)
+		-- assistants: key holders with Till; wages per in-game day
+		if msg.staffList and #msg.staffList > 0 then
+			ui.line(body, o(), "Assistants (wage per in-game day, paid from your bank while they're on duty here):", C.MUTED, 15)
+		end
+		for _, st in msg.staffList or {} do
+			local _, wb = ui.row(body, o(), st.name .. " · " .. st.wageText, { { "−1s" }, { "+1s" } }, 56)
+			wb[1].Activated:Connect(function()
+				local w = st.wage - 12
+				act(shop, "Wage", { userId = st.userId, pence = if w < msg.minWage then 0 else w })
+			end)
+			wb[2].Activated:Connect(function()
+				act(shop, "Wage", { userId = st.userId, pence = math.min(msg.maxWage, math.max(msg.minWage, st.wage + 12)) })
+			end)
+		end
 		if msg.kind == "stall" then
 			local _, lb = ui.row(body, o(), "", { { "Give up the stall" } }, 160)
 			lb[1].Activated:Connect(function()

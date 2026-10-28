@@ -93,9 +93,10 @@ same for UI modules. `ReplicatedStorage.Shared` holds modules both sides use.
 | Server: Activities (+ Ducks, Strength, Mudlark, Chess) | activity framework and the first four activities |
 | Server: Economy, Inventory, Counters, Exchange, World | money ledger + bank, bag/storage + held item, NPC counters, hand-overs, map helpers |
 | Server: Lots, Builds, Property | plots (street side, address, claims, templates), player builds (edits, render, save), deeds (rent/buy, keys, doors) |
-| Server: Shops | property shops and market stalls: till, stock, prices, NPC customers (suppliers are a Counters kind) |
+| Server: Shops | property shops and market stalls: till, stock, prices, wages, NPC customers (suppliers are a Counters kind) |
+| Server: Jobs (+ Shared.Ranks) | job framework (duty by role, server-checked steps, pay caps, ranks) and Postman, Newsboy, Baker, Carpenter |
 | Server: Admin, AdminLog, Analytics, Doors, Debug | M0 (Debug = Studio-only test bindable) |
-| Client: CharacterUI, IdentityUI, ClockHUD, Activities (+ Chess, Strength), EconomyUI, BuildUI, PropertyUI, ShopUI | menus and HUD stubs |
+| Client: CharacterUI, IdentityUI, ClockHUD, Activities (+ Chess, Strength), EconomyUI, BuildUI, PropertyUI, ShopUI, JobUI | menus and HUD stubs |
 
 Data (`Shared.Types`): one profile per account. **Account-wide**: money, collection, Robux
 purchases, outfits/vehicles/rental, moderation record. **Per character slot**: name and look.
@@ -108,10 +109,12 @@ Extension points:
 - Something that must settle before a character switch: `Characters.onBeforeChange(fn)`.
 - New NPC counter: `Counters.add{ id, kind, name, x, z, yaw }` (server) and, for a new kind,
   `Counters.onOpen(kind, fn)` + `EconomyUI.onCounter(kind, fn)` (client).
+- New job: a station role in `Shared.Stations`, numbers in `Config.JOBS`, and
+  `Jobs.register(roleId, function(player) return task end)` (steps "goto"/"hold", optional need/give).
 - New building piece: add a row to art/kit.md and the same entry to `Shared.Kit` (test_kit fails
   until both match); new colours go at the END of `Shared.Palette` (saved by index).
 - Net domains in use: `Profile`, `Admin`, `Identity`, `Character`, `Activity`, `Economy`,
-  `Inventory`, `Counter`, `Exchange`, `Property`, `Build`, `Shop`. `Net.listen` keeps one listener per action.
+  `Inventory`, `Counter`, `Exchange`, `Property`, `Build`, `Shop`, `Job`. `Net.listen` keeps one listener per action.
 
 ## Working with the user
 

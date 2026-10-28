@@ -101,6 +101,11 @@ MODULES
              banks itself (shop_sale / npc_sale), NPC customers at the till (rng = Shops.rng).
              Remotes Shop.Menu/Buy/Open/Restock/Unstock/Price/Settings/BankTill/RentStall/
              LeaveStall; pushes Shop.Notice. Counters kind "supplier" = wholesale (Counter.Wholesale).
+    Jobs     (Phase 5) the job framework: duty = holding a job's station role; tasks of steps
+             ("goto" auto, "hold" via Job.Hold; need/give for makers) checked by the server;
+             pay with the rank bonus (Shared.Ranks) inside Config.JOBS[job].cap per real hour
+             (profile.limits.jobPaid); XP in progress.jobs. Postman, Newsboy, Baker, Carpenter.
+             Jobs.register(id, start) for new jobs. Pushes Job.Task/Done/Off/Notice.
     Property (Phase 3) deeds in profile.properties: estate agents (counter kind "estate"),
              rent (bank first, grace, lapse keeps the build), buy/sell back, placing on plots,
              10-min linger, keys (enter/decorate/build/sell), lock, At Home, name plate,
@@ -113,6 +118,7 @@ MODULES
     Hobbies  hobby XP -> level (Config.HOBBY_XP_*).
     Chess    full chess rules (server authority, client move hints).
     Meter    timing meter curve shared by client and server.
+    Ranks    (Phase 5) job rank maths (XP for rank n, rank for XP, pay multiplier).
     Items    (Phase 2) every item: name, category, base price, stack size, use text, holdable,
              furniture kit id, player-made.
     Palette  (Phase 3) art/style.md colours by id; builds save the index (append only).
@@ -127,6 +133,7 @@ MODULES
     ClockHUD   (stub) "6:45 pm · Dusk" at the top.
     Activities (stub) reward toasts + Strength meter + Chess board for seated players.
     ShopUI     (stub) counter kinds "playershop", "stall", "supplier" in EconomyUI's panel.
+    JobUI      (stub) job tracker top left: step, distance, shift pay, Skip; marker + hold prompt.
     BuildUI    (stub) build mode: orbit camera, catalogue, ghost + reasons, undo/redo; draws
              drafts locally (hides the template here only).
     PropertyUI (stub) "Property" button: your properties, keys, name plate, Build; estate

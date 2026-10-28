@@ -23,6 +23,7 @@ keep the scripts you touch to the list (or say why), run `tools/check_luau.py`, 
 | ✅ | World clock (24-min day, phases) + clock HUD | Not Play-tested |
 | ✅ | Activity framework + ducks, test your strength, mudlarking, chess | Not Play-tested; chess rules pass perft |
 | ✅ | Phase 2 economy core: ledger, wallet HUD, bag, NPC counters, bank, hand-overs (T09, T10, T11, T15, P01) | Not Play-tested; `tests/test_economy*.luau`; INSTALL step 6 |
+| ✅ | Phase 5 start: job framework (T17) + Postman, Newsboy (selling), Baker, Carpenter (S07), shop assistant wages (S05), job tracker | Not Play-tested; `tests/test_jobs.luau`, wages in `test_shops.luau`; INSTALL step 9 |
 | ✅ | Phase 4 shops: tills, stock, prices, trade, sign, staff by key, wholesale suppliers + delivery, NPC customers (at the till), market stalls (S01–S04; S05, S06 partly) | Not Play-tested; `tests/test_shops.luau`, `test_shop_ui.luau`; INSTALL step 8 |
 | ✅ | Phase 3 homes and building: kit, plots, templates, estate agents, rent/buy/sell, build mode, save/load, keys, locks, reports (P02–P07, P09; P08, P10 partly) | Not Play-tested; `tests/test_kit.luau`, `test_property.luau`, `test_build_ui.luau`; INSTALL step 7 |
 
@@ -118,9 +119,9 @@ economy core (T09, T10, T15, T11) comes first and is listed under M2 below.
 ### S02 · Wholesale suppliers and deliveries ✅ (in `Counters`, kind "supplier"; deliveries go to storage) · **Specs** SHOPS §3 · Supplier counters (T15) by in-game hours, 60% of base, delivery 2d.
 ### S03 · NPC customers 🟡 (sales at the till by trade, price, appeal, footfall, quiet bonus and hourly cap; no walking NPCs until T24) · **Specs** SHOPS §4, LOW_POP §1 · First slice of the NPC framework (T24): walk in, buy by trade/price/footfall/appeal, hourly cap.
 ### S04 · Market stalls ✅ (8 stalls in Config.COUNTERS, per server, rent each in-game day; Market Day doubling waits for EVENTS) · **Specs** SHOPS §5, PROPERTY §2 · Daily rent, fixed stall, Market Day doubling.
-### S05 · Staff and the shop-assistant job 🟡 (key holders with Till run the shop; wages and the job wait for T17) · **Specs** SHOPS §6 · Needs the job framework (T17) for ranks; wages per in-game day.
+### S05 · Staff and the shop-assistant job ✅ (ShopAssistant role: wage from the owner's bank while on duty, XP per sale; ranks unlock nothing yet) · **Specs** SHOPS §6 · Needs the job framework (T17) for ranks; wages per in-game day.
 ### S06 · Selling player-made goods to shops 🟡 (stock keeps "made by"; the sell-to-shop offer flow waits for makers, S07) · **Specs** SHOPS §3 · "Made by" tag, shop buying prices, both confirm.
-### S07 · Makers: baker and carpenter jobs ⬜ · **Specs** SHOPS §7, JOBS §3 · Depends T17, P01.
+### S07 · Makers: baker and carpenter jobs ✅ (one hold at the bakehouse / workshop turns flour or timber into "made by" goods; the crafting minigame is still to come) · **Specs** SHOPS §7, JOBS §3 · Depends T17, P01.
 ### S08 · Shoplifting ⬜ · **Specs** SHOPS §8 · With M5 law (T43).
 
 ---
@@ -227,18 +228,23 @@ economy core (T09, T10, T15, T11) comes first and is listed under M2 below.
 
 ## M3: jobs, activities, NPCs
 
-### T17 · Job framework ⬜
+### T17 · Job framework ✅ (2026-10-28, not Play-tested)
 - **Specs** JOBS §1 · **Depends** T09 · **Size** M
 - On/off duty at depots, one job at a time (2 min switch cooldown), tasks with checkpoints,
   XP to rank n = `150 × n^1.6`, +10% pay per rank, tracker HUD, anti-AFK, hourly pay cap.
   XP/ranks live in `Profiles.progress(player).jobs` (so linked slots share them).
+- **Built:** `LondonServer.Jobs` (duty = the station role; steps "goto"/"hold" with `need`/`give`;
+  `Jobs.register(jobId, start)` for new jobs), `Shared.Ranks`, client `JobUI` tracker with a marker
+  and hold prompt. Anti-AFK is by design (pay only for server-checked steps) plus the hourly cap.
+  Not yet: depots/uniforms/tools on going on duty, rank perks, training.
 
 ### T18 · Lamplighter ⬜ · **Depends** T04, T17 · Dusk/dawn routes, repairs, NPC fallback 10 min after dusk.
 ### T19 · Cabbie ⬜ · **Depends** T14, T17, T21 · Meter fares (VEHICLES §8), hailing, NPC fares at ranks.
 ### T20 · Omnibus driver + conductor ⬜ · **Depends** T14, T17 · Fixed route (`Map.BusStops`), stop timing.
 ### T21 · Licences and the driving test ⬜ · **Specs** VEHICLES §6 · Public Carriage Office course, revocation.
 ### T22 · Police constable (beat + whistle) ⬜ · **Specs** JOBS §2, LAW §4 step 1 · Arrests come in M5.
-### T23 · Newsboy and journalist (the Gazette) ⬜ · **Specs** JOBS §2 · Filtered articles, editions, selling.
+### T23b · Postman ✅ (rounds from the nearest post office to 5 doors near it; letters between players come with T33) · **Specs** JOBS §3
+### T23 · Newsboy and journalist (the Gazette) 🟡 (Newsboy selling bundles on corners works; journalist, editions and selling to players to do) · **Specs** JOBS §2 · Filtered articles, editions, selling.
 
 ### T24 · NPC framework and low-pop fallbacks ⬜
 - **Specs** LOW_POP §1, PLAYER_GATHERING §1 (ambient crowds), VEHICLES §9 · **Size** L

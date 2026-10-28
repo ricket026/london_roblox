@@ -231,6 +231,40 @@ test("a key holder with Till may run it; the shop closes when nobody minds the t
 	ok(string.find(res.err, "closed"), res.err)
 end)
 
+test("shop assistants: a wage from the owner's bank while on duty, XP for sales", function()
+	local E = game:GetService("Players"):GetPlayerByUserId(703)
+	__advance(300)
+	ok(call(E, "Identity", "ChooseRole", { role = "ShopAssistant" }).ok)
+	atTill(S)
+	ok(call(S, "Shop", "Open", { shop = SHOP, open = true }).ok)
+	local res = call(S, "Shop", "Wage", { shop = SHOP, userId = 703, pence = 30 })
+	eq(res.ok, false, "below the minimum wage")
+	ok(call(S, "Shop", "Wage", { shop = SHOP, userId = 703, pence = 120 }).ok)
+	local menu = call(S, "Shop", "Menu", { shop = SHOP })
+	eq(menu.data.staffList[1].wage, 120, "the owner sees the wage")
+	atTill(E)
+	stand(S, Shops.tillPosition(Shops.get(SHOP)) + Vector3.new(4, 1, -3))
+	local Profiles2 = Profiles
+	local bank, wallet = Profiles2.get(S).bank, Profiles2.get(E).pence
+	Shops.payWages(60)
+	local due = 120 * 60 // (Config.DAY_MINUTES * 60)
+	eq(Profiles2.get(E).pence, wallet + due, "a minute's wage")
+	eq(Profiles2.get(S).bank, bank - due, "from the owner's bank")
+	-- a sale while E minds the till
+	local slot
+	Inventory.add(S, "bun", 2)
+	for k, st in Profiles2.get(S).inventory.bag do
+		if st.i == "bun" then
+			slot = k
+		end
+	end
+	ok(call(S, "Shop", "Restock", { shop = SHOP, slot = slot, count = 2, from = "bag" }).ok)
+	atTill(Cu)
+	ok(call(Cu, "Shop", "Buy", { shop = SHOP, item = "bun", by = 0, count = 1 }).ok)
+	eq(Profiles2.progress(E).jobs.ShopAssistant.xp, Config.JOBS.ShopAssistant.xpPerSale)
+	ok(call(S, "Shop", "Open", { shop = SHOP, open = false }).ok)
+end)
+
 test("market stalls: rent per in-game day, run from the bag, give up", function()
 	local D = join(704, "Dulcie")
 	Economy.pay(D, 1000, "admin", "test")

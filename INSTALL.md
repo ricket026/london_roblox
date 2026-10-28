@@ -30,6 +30,7 @@ Never paste a `.rbxmx` file or anything starting with `<roblox` into a script.
 | 6 | Money and things: wallet, bag, shop and bank counters, hand-overs (Phase 2) | ⬜ |
 | 7 | Homes and building: estate agents, rent/buy, plots, template houses, build mode, keys (Phase 3) | ⬜ |
 | 8 | Shops: tills, stock, suppliers, market stalls, NPC customers (Phase 4) | ⬜ |
+| 9 | Jobs: postman, newsboy, baker, carpenter, shop assistant, job tracker (Phase 5) | ⬜ |
 
 **Players → CharacterAutoLoads must be unticked** (Properties window). Players spawn only after
 picking a character.
@@ -262,4 +263,40 @@ Test (Play; two players for buying: Test › Clients and Servers):
 - walk away: the shop closes and the till goes to your bank;
 - a market stall in Covent Garden piazza (south of the market hall) or Spitalfields: **Rent this
   stall**, put stock out, open.
+
+## Step 9: jobs (postman, newsboy, baker, carpenter, shop assistant)
+Needs step 8.
+
+**New ModuleScripts**
+- inside ReplicatedStorage › **Shared**: `Ranks` ([Ranks.luau](https://github.com/ricket026/london_roblox/blob/m1-identity/src/shared/Ranks.luau))
+- inside ServerScriptService › **LondonServer**: `Jobs` ([Jobs.luau](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Jobs.luau))
+- inside StarterPlayer › StarterPlayerScripts › **LondonClient**: `JobUI` ([JobUI.luau](https://github.com/ricket026/london_roblox/blob/m1-identity/src/client/LondonClient/JobUI.luau))
+
+**Replace the code of**: Shared › [Config](https://github.com/ricket026/london_roblox/blob/m1-identity/src/shared/Config.luau),
+Shared › [Stations](https://github.com/ricket026/london_roblox/blob/m1-identity/src/shared/Stations.luau) (new roles Baker, Carpenter, Shop Assistant),
+Shared › [Types](https://github.com/ricket026/london_roblox/blob/m1-identity/src/shared/Types.luau),
+LondonServer › [Profiles](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Profiles.luau),
+LondonServer › [Shops](https://github.com/ricket026/london_roblox/blob/m1-identity/src/server/LondonServer/Shops.luau),
+LondonClient › [ShopUI](https://github.com/ricket026/london_roblox/blob/m1-identity/src/client/LondonClient/ShopUI.luau).
+
+**LondonServer** (the Script):
+- under `local Shops = require(script:WaitForChild("Shops"))` add
+  `local Jobs = require(script:WaitForChild("Jobs"))`
+- under `Shops.init()` add `Jobs.init()`
+
+**LondonClient** (the LocalScript): under the `ShopUI` line add
+```lua
+require(script:WaitForChild("JobUI")).init() -- job tracker (Phase 5)
+```
+
+Test (Play):
+- **Station › Postman**: a tracker appears top left with a marker over the nearest post office;
+  hold the prompt there, then at each door. The round pays 1s 6d (more at higher ranks);
+- **Station › Newsboy**: collect at the newsagent by Horse Guards, sell on the corners;
+- **Station › Baker**: buy flour at Spitalfields Wholesale (lots of 5), then bake at the
+  Bakehouse in Spitalfields market: loaves "made by" you, to sell to a shop or a stall;
+- **Station › Carpenter**: timber from the Docks Warehouse, make furniture at the Carpenter's
+  Workshop in Finsbury Circus (it goes to storage);
+- **Shop Assistant**: with a Till key to someone's shop, mind their till while it's open; the
+  owner sets your wage in the till menu.
 

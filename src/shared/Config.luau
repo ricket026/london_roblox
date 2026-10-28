@@ -275,6 +275,9 @@ Config.COUNTERS = {
 	{ id = "stall_sp_2", kind = "stall", name = "Market Stall", x = -475, z = -3010, yaw = 0 },
 	{ id = "stall_sp_3", kind = "stall", name = "Market Stall", x = -460, z = -3010, yaw = 0 },
 	{ id = "stall_sp_4", kind = "stall", name = "Market Stall", x = -400, z = -3010, yaw = 0 },
+	-- workplaces for maker jobs (LondonServer.Jobs): hold the prompt there to make things
+	{ id = "bakehouse_spitalfields", kind = "workplace", name = "Bakehouse", x = -390, z = -3070, yaw = 180 },
+	{ id = "workshop_finsbury", kind = "workplace", name = "Carpenter's Workshop", x = -540, z = -2590, yaw = 180 },
 }
 
 -- Shops (SHOPS.md) ------------------------------------------------------------------------------
@@ -353,5 +356,43 @@ Config.BUILD_RATE = { count = 12, per = 1 } -- build edits per player per second
 Config.BUILD_SAVE_SECONDS = 60 -- changed builds save this often (and on leaving build mode)
 Config.BUILD_MAX_BYTES = 200000 -- largest saved build, JSON bytes (DataStore limit is 4 MB)
 Config.BUILD_UNDO = 50 -- undo steps kept by the client
+
+-- Jobs (JOBS.md §1; pay targets ECONOMY §2: new player £1 10s an hour, ranked labour £2 10s) ------
+Config.JOB_RANK_XP = 150 -- XP to reach rank n = JOB_RANK_XP * n ^ JOB_RANK_EXP (r2 455 ... r5 1970)
+Config.JOB_RANK_EXP = 1.6
+Config.JOB_MAX_RANK = 5
+Config.JOB_RANK_PAY = 0.1 -- extra pay per rank above 1 (rank 5 = +40%)
+Config.JOB_RATE = { count = 6, per = 3 } -- job calls per player
+Config.JOB_SKIP_SECONDS = 20 -- seconds between skipping tasks
+Config.JOB_RETRY_SECONDS = 10 -- seconds before trying again when there's no work
+-- per job: pence and XP per task; cap = most pence a real hour (2x the target, ECONOMY §9)
+Config.JOBS = {
+	-- collect at the nearest post office, then `stops` doors within `range` studs of it
+	Postman = { pay = 18, xp = 15, cap = 1200, stops = 5, range = 260, hold = 1 },
+	-- collect a bundle at the newsagent, sell it on corners within `range` studs; copyPay per
+	-- copy sold, bundleBonus for the whole bundle
+	Newsboy = { copyPay = 1, bundleBonus = 4, xp = 12, cap = 720, bundle = 10, corners = 3, range = 750, hold = 2, depot = "newsagent_trafalgar" },
+	-- makers (SHOPS §7): hold at the workplace with `need` in the bag; `give` is made, tagged with
+	-- the maker. Pay is small: the money is in selling what you make.
+	Baker = { pay = 4, xp = 14, cap = 600, hold = 5, workplace = "bakehouse_spitalfields", need = { flour = 2 }, give = { bread_loaf = 4 } },
+	-- the carpenter makes one of `makes` each time (it goes to storage, like all furniture)
+	Carpenter = { pay = 6, xp = 18, cap = 600, hold = 8, workplace = "workshop_finsbury", need = { timber = 4 },
+		makes = { "table_dining", "sideboard", "bookcase", "desk", "wardrobe", "clock_long" } },
+	-- shop assistants are paid wages by the shop's owner (Shops), XP per sale they serve
+	ShopAssistant = { xpPerSale = 3, cap = 0 },
+}
+Config.SHOP_MIN_WAGE = 60 -- pence per in-game day an owner pays an assistant on duty (5s)
+Config.SHOP_MAX_WAGE = 480 -- pence per in-game day (£2)
+-- Busy corners where newsboys sell (map studs; checked by tools/check_sites.py)
+Config.NEWSBOY_CORNERS = {
+	{ name = "Trafalgar Square", x = -60, z = -1120 },
+	{ name = "Horse Guards Parade", x = 300, z = -960 },
+	{ name = "Covent Garden", x = -120, z = -1485 },
+	{ name = "Leicester Square", x = -420, z = -1060 },
+	{ name = "Parliament Square", x = 800, z = -1000 },
+	{ name = "Lincoln's Inn Fields", x = -700, z = -1740 },
+	{ name = "Finsbury Circus", x = -600, z = -2540 },
+	{ name = "Spitalfields", x = -440, z = -3060 },
+}
 
 return Config
