@@ -1,5 +1,8 @@
 # Art & Assets Plan
 
+> Detailed guidelines are in [`art/`](art/README.md): style guide and palette, the building-kit
+> contract, the Blender pipeline, and the full asset list. They win where this plan differs.
+
 Era: **1897** (late Victorian). See DESIGN.md §3.
 
 ## 1. Direction

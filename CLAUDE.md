@@ -4,7 +4,8 @@ A Roblox roleplay game set in London, 1897 (working title *Crown & Court*). Read
 `TASKS.md` for what to work on. Design: `DESIGN.md` (pillars, §2), `TECH.md` (architecture),
 `ROADMAP.md` (milestones), the system specs (`JOBS.md`, `ECONOMY.md`, `LAW.md`...; index in
 `README.md`), per-activity designs in `activities/`, property/building/shops in `PROPERTY.md`,
-`BUILDING.md`, `SHOPS.md`, decisions in `OPEN_QUESTIONS.md`. Module-by-module notes: `src/replicated/DESIGN_NOTES.luau`.
+`BUILDING.md`, `SHOPS.md`, art and Blender guidelines in `art/` (style + palette, the kit
+contract, the pipeline, the asset list), decisions in `OPEN_QUESTIONS.md`. Module-by-module notes: `src/replicated/DESIGN_NOTES.luau`.
 **`PLAYER_GATHERING.md` wins any conflict between specs.**
 
 ## How code gets into the game (read before changing anything)
